@@ -1,16 +1,7 @@
 # Ion Commander
-
 Quick and dirty python code for commanding our Ions in the LaserLab 💡⚔
 
-## Examples
-
-Basic examples are provided in the `saves` folder:
-
-- Argon beam on Tungsten target (`Ar_on_W`)
-- Hydrogen and Argon beam on layered Iron and Tungsten target under 60deg (`H_Ar_on_Fe_W_60deg`)
-
 ## Installation
-
 The GUI needs [Python ≥ 3.11](https://www.python.org/downloads/) with following packages installed:
 
 ```
