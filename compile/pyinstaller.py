@@ -1,3 +1,18 @@
+# A manual for PyInstaller is found here: https://pyinstaller.org/en/stable/
+#
+# Automatic execution:
+#  1) Update Python and all necessary packages, as well as PyInstaller to the latest version
+#     Tested version: Python 3.11
+#      Package      Version
+#      ------------ ---------
+#      PyQt6        6.5.2
+#      pyqtgraph    0.13.3
+#      numpy        1.24.3
+#      scipy        1.10.1
+#      pyinstaller  5.11.0
+#
+#  2) Just run this python script and a 'Ion Commander' executable will be generated in the main folder
+
 import sys
 from os import path, remove, listdir
 from shutil import move, rmtree
@@ -39,7 +54,7 @@ hidden_imports = [
 exe_name = f'{GlobalConf.title}'
 system_name = system()
 if system_name == 'Windows':
-    exe_name += '_windows.exe'
+    exe_name += '.exe'
 elif system_name == 'Linux':
     exe_name += '_linux'
 elif system_name == 'Darwin':

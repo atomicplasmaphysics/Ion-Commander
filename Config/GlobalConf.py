@@ -27,7 +27,7 @@ class GlobalConf:
     """
 
     # title
-    title = 'VisualiseX'
+    title = 'Ion Commander'
 
     # settings object
     settings = LoggerSettings(f'TU Wien {title}', title)

@@ -14,7 +14,7 @@ from PyQt6.QtWidgets import (
 import pyqtgraph as pg
 
 
-from Config.StylesConf import Styles
+from Config.StylesConf import Colors
 
 from Utility.ModifyWidget import setWidgetBackground
 if TYPE_CHECKING:
@@ -606,8 +606,8 @@ class TOFCanvas(pg.PlotWidget):
         self.setLabel('bottom', 'TOF [ns]')
         self.sigRangeChanged.connect(self.updateLimits)
 
-        self.graph_curve: pg.PlotDataItem = self.plotItem.plot(pen=pg.mkPen(color=Styles.blue_hex, width=1))
-        self.graph_curve_fit: pg.PlotDataItem = self.plotItem.plot(pen=pg.mkPen(color=Styles.orange_hex, width=2))
+        self.graph_curve: pg.PlotDataItem = self.plotItem.plot(pen=pg.mkPen(color=Colors.tu_blue, width=1))
+        self.graph_curve_fit: pg.PlotDataItem = self.plotItem.plot(pen=pg.mkPen(color=Colors.orange, width=2))
         self.setLimits(yMin=0, xMin=0)
 
         self.bars: list[pg.InfiniteLine] = []
@@ -640,7 +640,7 @@ class TOFCanvas(pg.PlotWidget):
             y=self.data[1],
             stepMode='left',
             fillLevel=0,
-            brush=(*Styles.hex_to_rbg(Styles.blue_hex), 80)
+            brush=(*Colors.hex_to_rbg(Colors.tu_blue), 80)
         )
         self.graph_curve_fit.setData(x=[], y=[])
 
@@ -771,9 +771,9 @@ class FittingBar(pg.InfiniteLine):
             'pos': pos,
             'movable': True,
             'label': name,
-            'labelOpts': {'color': Styles.green_hex, 'position': label_position},
-            'pen': pg.mkPen(color=Styles.green_hex, width=2),
-            'hoverPen': pg.mkPen(color=Styles.pink_hex, width=3),
+            'labelOpts': {'color': Colors.lime, 'position': label_position},
+            'pen': pg.mkPen(color=Colors.lime, width=2),
+            'hoverPen': pg.mkPen(color=Colors.strawberry, width=3),
         }
         super_dict.update(kwargs)
 

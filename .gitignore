@@ -1,3 +1,5 @@
 /venv/
 /data/
-/VisualiseX_windows.exe
+/compile
+!compile/pyinstaller.py
+/Ion Commander*.exe

@@ -3,11 +3,6 @@ class Styles:
     Style snippets for various PyQt objects
     """
 
-    blue_hex = '#006699'
-    green_hex = '#8EFA00'
-    pink_hex = '#FF2F92'
-    orange_hex = '#FF9300'
-
     global_style_sheet = f'''
         QWidget {{
             background-color: #333;
@@ -40,6 +35,25 @@ class Styles:
             background: None;
         }}
     '''
+
+
+class Colors:
+    """
+    Different coperate colors
+    """
+
+    maroon = '#941751'
+    tu_blue = '#006699'
+    orange = '#FF9300'
+    petrol = '#007E71'
+    violett_darker = '#531B93'
+    rosa = '#FF818E'
+    error = '#D6002E'
+    lime = '#8EFA00'
+    torquoise = '#00FDFF'
+    strawberry = '#FF2F92'
+    violett = '#9E7BFF'
+    nude = '#FFBFBA'
 
     @staticmethod
     def hex_to_rbg(code: str):
