@@ -5,25 +5,26 @@ class Styles:
 
     global_style_sheet = f'''
         QWidget {{
-            background-color: #333;
-            color: #ccc;
+            background-color: #333333;
+            color: #CCCCCC;
         }}
 
         QPushButton,
         QComboBox,
         QDoubleSpinBox,
-        QSpinBox {{
-            background-color: #555;
-            border: 1px solid #444;
+        QSpinBox,
+        QTabBar::tab {{
+            background-color: #555555;
+            border: 1px solid #444444;
             padding: 3px;
-            color: #ccc;
+            color: #CCCCCC;
         }}
 
         QPushButton:hover,
         QComboBox:hover,
         QDoubleSpinBox:hover,
         QSpinBox:hover {{
-            background-color: #666;
+            background-color: #666666;
         }}
         
         QGroupBox {{
@@ -33,6 +34,16 @@ class Styles:
         
         QLabel {{
             background: None;
+        }}
+        
+        QTabWidget::pane {{
+            border: 0px;
+            border-top: 1px solid #CCCCCC;
+        }}
+        
+        QTabBar::tab:selected {{
+            background-color: #AAAAAA;
+            color: #000000;
         }}
     '''
 

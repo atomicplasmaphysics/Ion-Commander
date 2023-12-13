@@ -18,7 +18,34 @@ from Config.StylesConf import Colors
 
 from Utility.ModifyWidget import setWidgetBackground
 if TYPE_CHECKING:
+    from Windows.MainWindow import MainWindow
     from Utility.Fitting import FitMethod
+
+
+class TabWidget(QWidget):
+    """
+    TabWidgets that acts as extended QWidget
+
+    :param parent: parent widget
+    """
+
+    def __init__(self, parent: MainWindow):
+        super().__init__(parent)
+        self.main_window = parent
+
+    def checkClosable(self) -> bool:
+        """Checks if this tab is currently closeable"""
+        return True
+
+    def writeStatusBar(self, msg: str, visible_time: int = 3000):
+        """
+        Write to status bar of main window
+
+        :param msg: new text of status bar
+        :param visible_time: (optional) time in ms until status bar is cleared again. If 0, then message will stay persistent
+        """
+
+        self.main_window.writeStatusBar(msg, visible_time)
 
 
 class InputHBoxLayout(QHBoxLayout):

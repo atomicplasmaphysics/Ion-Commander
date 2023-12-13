@@ -1,28 +1,26 @@
 import numpy as np
 
-
-from PyQt6.QtCore import Qt, QCoreApplication, QDir, QPoint
-from PyQt6.QtGui import QCloseEvent, QGuiApplication, QDragEnterEvent, QDropEvent
-from PyQt6.QtWidgets import QMainWindow, QWidget, QGroupBox, QVBoxLayout, QHBoxLayout, QPushButton, QLabel
+from PyQt6.QtCore import Qt, QDir
+from PyQt6.QtGui import QDragEnterEvent, QDropEvent
+from PyQt6.QtWidgets import QGroupBox, QVBoxLayout, QHBoxLayout, QPushButton, QLabel
 
 import pyqtgraph as pg
 
 
-from Config.GlobalConf import GlobalConf
-
-from Utility.Layouts import DeleteWidgetList, DeleteWidgetListItem, ComboBox, TOFCanvas
+from Utility.Layouts import DeleteWidgetList, DeleteWidgetListItem, ComboBox, TOFCanvas, TabWidget
 from Utility.Dialogs import selectFileDialog, TACDialog
 from Utility.Fitting import getFileData, fittingFunctions
 
 
-class MainWindow(QMainWindow):
+class AnalyseWindow(TabWidget):
     """
-    Class used for main layout
+    Widget for Analysis
+
+    :param parent: parent widget
     """
 
-    def __init__(self):
-        super().__init__()
-        GlobalConf()
+    def __init__(self, parent):
+        super().__init__(parent)
 
         #
         # Global variables
@@ -33,30 +31,12 @@ class MainWindow(QMainWindow):
         self.supported_filetypes = ['dat', 'cod']
 
         #
-        # QCoreApplication Parameters
+        # SET UP WIDGET AND LAYOUT
         #
 
-        QCoreApplication.setOrganizationName('TUWien')
-        QCoreApplication.setOrganizationDomain('www.tuwien.at')
-        QCoreApplication.setApplicationName(GlobalConf.title)
-
-        super().__init__()
-
-        # Allow drops
-        self.setAcceptDrops(True)
-
-        #
-        # SET MAIN WIDGET AND LAYOUT
-        #
-
-        # Main widget
-        self.widget_main = QWidget(self)
-        self.setCentralWidget(self.widget_main)
-
-        # Main layout
         self.main_layout = QVBoxLayout(self)
         self.main_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
-        self.widget_main.setLayout(self.main_layout)
+        self.setLayout(self.main_layout)
 
         #
         # MENU ROW
@@ -128,28 +108,7 @@ class MainWindow(QMainWindow):
         self.graph = TOFCanvas(self, self.data, self.fit_function_class)
         self.main_layout.addWidget(self.graph)
 
-        #
-        # STATUS BAR
-        #
 
-        self.statusBar()
-
-        #
-        # Setup window location and signals
-        #
-
-        width, height = GlobalConf.getWindowSize()
-        x, y = GlobalConf.getWindowCenter()
-        if width == height == -1:
-            self.showMaximized()
-        else:
-            self.resize(width, height)
-            frame_geometry = self.frameGeometry()
-            center_point = QPoint(x, y)
-            if x == y == 0:
-                center_point = QGuiApplication.primaryScreen().availableVirtualGeometry().center()
-            frame_geometry.moveCenter(center_point)
-            self.move(frame_geometry.topLeft())
 
     def openFiles(self, files: list[str] = None):
         """
@@ -267,36 +226,6 @@ class MainWindow(QMainWindow):
             return
         plot_widget.setYRange(np.min(selected_ydata), np.max(selected_ydata))
 
-    def writeStatusBar(self, msg: str, visible_time: int = 3000):
-        """
-        Write to status bar
-
-        :param msg: new text of status bar
-        :param visible_time: (optional) time in ms until status bar is cleared again. If 0, then message will stay persistent
-        """
-
-        self.statusBar().showMessage(msg, visible_time)
-
-    def closeEvent(self, event: QCloseEvent):
-        """
-        Executed when close button is pressed
-
-        :param event: close event
-        """
-
-        event.accept()
-
-        if self.isMaximized():
-            dimensions = (-1, -1)
-            center = (0, 0)
-        else:
-            dimensions = (self.width(), self.height())
-            center = (int(self.pos().x() + self.width() / 2), int(self.pos().y() + self.height() / 2))
-        GlobalConf.updateWindowSize(*dimensions)
-        GlobalConf.updateWindowCenter(*center)
-
-        event.accept()
-
     def dragEnterEvent(self, event: QDragEnterEvent):
         """
         Executed when files are dragged over
@@ -320,3 +249,7 @@ class MainWindow(QMainWindow):
 
         files = [url.toLocalFile() for url in event.mimeData().urls()]
         self.openFiles(files)
+
+    def checkClosable(self) -> bool:
+        """Checks if this tab is currently closeable"""
+        return True

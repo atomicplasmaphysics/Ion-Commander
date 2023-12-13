@@ -20,6 +20,8 @@ def main():
     Execute the GUI
     """
 
+    # TODO: adjust logo and splashscreen
+
     # set up logging level
     setupLogging(logging.WARNING)
 
