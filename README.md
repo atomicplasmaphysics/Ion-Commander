@@ -30,7 +30,7 @@ Maybe get some popcorn while figuring it out 🍿
 ## TODOs
 - [ ] Make LogNorm stuff working
 - [ ] Better fitting routine and better starting parameters
-- [x] Make the current Data-Analysis application as a subtab
+- [ ] Make the current Data-Analysis application as a subtab
 - [ ] Build a controll subtab (Pressure, Voltage, Laser)
 - [ ] Logg everything in the controlltab
 - [ ] Build a measure subtab (for TAC)
