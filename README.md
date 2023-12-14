@@ -24,7 +24,7 @@ After executing the `compile\pyinstaller.py` file (same packages and package PyI
 For further information read the description of the `compile\pyinstaller.py` file.
 
 ## Manual
-You are a big boy 🐶, there is no manual needed, you can figure it out yourself
+You are a big boy 🐶, there is no manual needed, you can figure it out yourself.
 Maybe get some popcorn while figuring it out 🍿
 
 ## TODOs
