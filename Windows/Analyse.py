@@ -29,6 +29,7 @@ class AnalyseWindow(TabWidget):
         self.data: tuple[np.ndarray, np.ndarray] = (np.array([]), np.array([]))
         self.files_opened = False
         self.supported_filetypes = ['dat', 'cod']
+        self.setAcceptDrops(True)
 
         #
         # SET UP WIDGET AND LAYOUT
@@ -107,8 +108,6 @@ class AnalyseWindow(TabWidget):
 
         self.graph = TOFCanvas(self, self.data, self.fit_function_class)
         self.main_layout.addWidget(self.graph)
-
-
 
     def openFiles(self, files: list[str] = None):
         """
