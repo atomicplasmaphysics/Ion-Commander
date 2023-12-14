@@ -29,7 +29,7 @@ You are a big boy 🐶, there is no manual needed, you can figure it out yoursel
 ## TODOs
 - [ ] Make LogNorm stuff working
 - [ ] Better fitting routine and better starting parameters
-- [ ] Make the current Data-Analysis application as a subtab
+- [x] Make the current Data-Analysis application as a subtab
 - [ ] Build a controll subtab (Pressure, Voltage, Laser)
 - [ ] Logg everything in the controlltab
 - [ ] Build a measure subtab (for TAC)
