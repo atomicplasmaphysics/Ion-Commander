@@ -25,6 +25,7 @@ For further information read the description of the `compile\pyinstaller.py` fil
 
 ## Manual
 You are a big boy 🐶, there is no manual needed, you can figure it out yourself
+Maybe get some popcorn while figuring it out 🍿
 
 ## TODOs
 - [ ] Make LogNorm stuff working
