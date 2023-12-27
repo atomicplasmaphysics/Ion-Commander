@@ -47,6 +47,15 @@ class Styles:
         }}
     '''
 
+    title_style_sheet = f'''
+            qproperty-alignment: AlignCenter;
+            border-top-left-radius: 10px;
+            border-top-right-radius: 10px;
+            background-color: #AAAAAA;
+            padding: 1px 5px;
+            color: #000000;
+        '''
+
 
 class Colors:
     """
@@ -67,6 +76,6 @@ class Colors:
     nude = '#FFBFBA'
 
     @staticmethod
-    def hex_to_rbg(code: str):
+    def hex_to_rbg(code: str) -> tuple[int, int, int]:
         color = code.lstrip('#')
         return tuple(int(color[i: i + 2], 16) for i in (0, 2, 4))

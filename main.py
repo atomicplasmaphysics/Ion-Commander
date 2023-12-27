@@ -10,7 +10,7 @@ from PyQt6.QtGui import QPixmap, QIcon
 from Config.GlobalConf import GlobalConf
 from Config.StylesConf import Styles
 
-from Windows.MainWindow import MainWindow
+from Windows.Main import MainWindow
 
 from Utility.Logger import setupLogging
 

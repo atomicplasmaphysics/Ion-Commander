@@ -11,7 +11,7 @@ import pyqtgraph as pg
 
 
 if TYPE_CHECKING:
-    from Windows.MainWindow import MainWindow
+    from Windows.Main import MainWindow
 
 from Utility.Layouts import createFittingBars, FittingWidget
 

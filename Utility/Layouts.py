@@ -14,11 +14,11 @@ from PyQt6.QtWidgets import (
 import pyqtgraph as pg
 
 
-from Config.StylesConf import Colors
+from Config.StylesConf import Colors, Styles
 
 from Utility.ModifyWidget import setWidgetBackground
 if TYPE_CHECKING:
-    from Windows.MainWindow import MainWindow
+    from Windows.Main import MainWindow
     from Utility.Fitting import FitMethod
 
 
@@ -46,6 +46,64 @@ class TabWidget(QWidget):
         """
 
         self.main_window.writeStatusBar(msg, visible_time)
+
+
+class VBoxTitleLayout(QVBoxLayout):
+    """
+    Class providing a QVBoxLayout with a title and style
+
+    :param parent: parent widget
+    :param title: title of top line
+    :param title_style: style of title line
+    :param title_style_busy: style of title line in busy mode
+    :param busy_symbol: symbol when busy
+    :param spacing: spacing of widgets
+    :param add_stretch: if bool: addStretch(1) after title if True, else do nothing
+                        if integer: addSpacing(addStretch) after title
+    """
+
+    def __init__(self, parent, title: str, title_style: str = Styles.title_style_sheet,
+                 title_style_busy: str = Styles.title_style_sheet, busy_symbol: str = '⧖',
+                 spacing: int = 0, add_stretch: bool | int = 0, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.parent = parent
+        self.title_str = title
+        self.title_style = title_style
+        self.title_style_busy = title_style_busy
+        self.busy_symbol = busy_symbol
+
+        self.setSpacing(spacing)
+        self.hl = QHBoxLayout()
+
+        self.title = QLabel(self.title_str, self.parent)
+        self.title.setStyleSheet(title_style)
+        self.hl.addWidget(self.title)
+
+        if isinstance(add_stretch, bool) and add_stretch:
+            self.hl.addStretch(1)
+        elif isinstance(add_stretch, int):
+            self.hl.addSpacing(add_stretch)
+
+        self.addLayout(self.hl)
+
+    def busy(self, busy: bool = True, busy_text: str = ''):
+        """
+        Title changes when busy
+
+        :param busy: is busy or not
+        :param busy_text: additional busy text displayed in title
+        """
+
+        if busy:
+            if not busy_text:
+                self.title.setText(f'{self.title_str} {self.busy_symbol}')
+            else:
+                self.title.setText(f'{self.title_str} {self.busy_symbol} ({busy_text})')
+            self.title.setStyleSheet(self.title_style_busy)
+
+        else:
+            self.title.setText(self.title_str)
+            self.title.setStyleSheet(self.title_style)
 
 
 class InputHBoxLayout(QHBoxLayout):

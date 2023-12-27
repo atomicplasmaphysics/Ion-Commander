@@ -11,6 +11,7 @@ PyQt6       6.5.2
 pyqtgraph   0.13.3
 numpy       1.24.3
 scipy       1.10.1
+pyserial    3.5
 ```
 
 To execute the GUI, download all files from this repository and execute the `main.py` file from the console.
@@ -30,11 +31,14 @@ Maybe get some popcorn while figuring it out 🍿
 ## TODOs
 - [ ] Make LogNorm stuff working
 - [ ] Better fitting routine and better starting parameters
-- [ ] Make the current Data-Analysis application as a subtab
-- [ ] Build a controll subtab (Pressure, Voltage, Laser)
-- [ ] Logg everything in the controlltab
+- [x] Make the current Data-Analysis application as a subtab
+- [ ] Build a control subtab (Pressure, Voltage, Laser)
+- [ ] Logg everything in the control-tab
 - [ ] Build a measure subtab (for TAC)
 - [ ] Build a measure subtab (for TDC)
 - [ ] Build a measure subtab (for NDIGO - if NDIGO is built)
 - [ ] Build a laser subtab
 - [ ] Make better logo and splash screen
+
+## BUGs
+- [ ] Pack images in executable - otherwise not shown

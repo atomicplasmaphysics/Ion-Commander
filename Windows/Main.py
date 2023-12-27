@@ -8,6 +8,7 @@ from Config.GlobalConf import GlobalConf
 from Utility.Layouts import TabWidget
 
 from Windows.Analyse import AnalyseWindow
+from Windows.Control import ControlWindow
 
 
 class MainWindow(QMainWindow):
@@ -155,6 +156,10 @@ class MainWindow(QMainWindow):
         # TODO: Add measure tab TAC
         # TODO: Add measure tab TDC
         # TODO: Add measure tab NDIGO
+
+        # Add control tab
+        self.control_window = ControlWindow(self)
+        self.addTab(self.control_window, 'Control')
 
         # Add analyse tab
         self.analyse_window = AnalyseWindow(self)
