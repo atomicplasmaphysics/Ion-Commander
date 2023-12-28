@@ -27,10 +27,6 @@ class Styles:
             background-color: #666666;
         }}
         
-        QGroupBox {{
-            padding: 0px;
-            margin: 0px;
-        }}
         
         QLabel {{
             background: None;
@@ -53,6 +49,7 @@ class Styles:
             border-top-right-radius: 10px;
             background-color: #AAAAAA;
             padding: 1px 5px;
+            margin: 0px;
             color: #000000;
         '''
 
@@ -74,8 +71,3 @@ class Colors:
     strawberry = '#FF2F92'
     violett = '#9E7BFF'
     nude = '#FFBFBA'
-
-    @staticmethod
-    def hex_to_rbg(code: str) -> tuple[int, int, int]:
-        color = code.lstrip('#')
-        return tuple(int(color[i: i + 2], 16) for i in (0, 2, 4))

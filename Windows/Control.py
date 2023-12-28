@@ -4,6 +4,8 @@ from PyQt6.QtCore import Qt
 
 from Utility.Layouts import TabWidget, VBoxTitleLayout
 
+from Windows.Laser import LaserVBoxLayout
+
 
 class ControlWindow(TabWidget):
     """
@@ -29,7 +31,7 @@ class ControlWindow(TabWidget):
 
         # Stretch to bottom
         self.mcp_group_vbox.addStretch(1)
-        self.mcp_group_vbox.setAlignment(Qt.AlignmentFlag.AlignRight)
+        self.mcp_group_vbox.setAlignment(Qt.AlignmentFlag.AlignTop)
 
         # Add a parent to the basic_control_vbox and add that to the splitter
         self.mcp_vbox_parent = QWidget(self)
@@ -45,7 +47,7 @@ class ControlWindow(TabWidget):
 
         # Stretch to bottom
         self.ebis_group_vbox.addStretch(1)
-        self.ebis_group_vbox.setAlignment(Qt.AlignmentFlag.AlignRight)
+        self.ebis_group_vbox.setAlignment(Qt.AlignmentFlag.AlignTop)
 
         # Add a parent to the simulationConfigurationListLayout and add that to the splitter
         self.ebis_parent = QWidget(self)
@@ -55,13 +57,29 @@ class ControlWindow(TabWidget):
         self.ebis_parent.setLayout(self.ebis_vbox)
         self.splitter.addWidget(self.ebis_parent)
 
+        # LASER CONTROL
+        self.laser_vbox = VBoxTitleLayout(self, 'LASER', add_stretch=True)
+        self.laser_group_vbox = LaserVBoxLayout()
+
+        # Stretch to bottom
+        self.laser_group_vbox.addStretch(1)
+        self.laser_group_vbox.setAlignment(Qt.AlignmentFlag.AlignTop)
+
+        # Add a parent to the simulationConfigurationListLayout and add that to the splitter
+        self.laser_parent = QWidget(self)
+        self.laser_group = QGroupBox(self)
+        self.laser_group.setLayout(self.laser_group_vbox)
+        self.laser_vbox.addWidget(self.laser_group)
+        self.laser_parent.setLayout(self.laser_vbox)
+        self.splitter.addWidget(self.laser_parent)
+
         # PRESSURE CONTROL
         self.pressure_vbox = VBoxTitleLayout(self, 'Pressure', add_stretch=True)
         self.pressure_group_vbox = QVBoxLayout()
 
         # Stretch to bottom
         self.pressure_group_vbox.addStretch(1)
-        self.pressure_group_vbox.setAlignment(Qt.AlignmentFlag.AlignRight)
+        self.pressure_group_vbox.setAlignment(Qt.AlignmentFlag.AlignTop)
 
         # Add a parent to the simulationConfigurationListLayout and add that to the splitter
         self.pressure_parent = QWidget(self)
@@ -72,6 +90,8 @@ class ControlWindow(TabWidget):
         self.splitter.addWidget(self.pressure_parent)
 
         # Division between columns
-        self.splitter.setStretchFactor(0, 45)
-        self.splitter.setStretchFactor(1, 45)
-        self.splitter.setStretchFactor(2, 10)
+        # TODO: does not work properly
+        self.splitter.setStretchFactor(0, 30)
+        self.splitter.setStretchFactor(1, 30)
+        self.splitter.setStretchFactor(2, 30)
+        self.splitter.setStretchFactor(3, 10)

@@ -1,7 +1,8 @@
+import logging
+
+
 import serial.tools.list_ports as list_ports
 from serial import Serial
-
-import logging
 
 
 def get_comports() -> list[tuple[str, str, str]]:

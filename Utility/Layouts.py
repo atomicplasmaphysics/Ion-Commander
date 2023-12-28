@@ -4,12 +4,13 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-from PyQt6.QtCore import Qt, pyqtSignal
-from PyQt6.QtGui import QIcon
+from PyQt6.QtCore import Qt, pyqtSignal, QByteArray, QSize, QRect, QRectF
+from PyQt6.QtGui import QIcon, QPainter
 from PyQt6.QtWidgets import (
     QHBoxLayout, QLabel, QWidget, QVBoxLayout, QSpinBox, QDoubleSpinBox, QCheckBox, QComboBox,
-    QLineEdit, QPushButton, QListWidget, QListWidgetItem, QApplication
+    QLineEdit, QPushButton, QListWidget, QListWidgetItem, QApplication, QStyleOption
 )
+from PyQt6.QtSvg import QSvgRenderer
 
 import pyqtgraph as pg
 
@@ -17,6 +18,7 @@ import pyqtgraph as pg
 from Config.StylesConf import Colors, Styles
 
 from Utility.ModifyWidget import setWidgetBackground
+from Utility.Functions import hex_to_rgb, brighting_color
 if TYPE_CHECKING:
     from Windows.Main import MainWindow
     from Utility.Fitting import FitMethod
@@ -482,6 +484,154 @@ class ComboBox(QComboBox):
             self.model().item(i, 0).setEnabled(enable)
 
 
+class IndicatorLed(QWidget):
+    """
+    Indicating Led that extends the QWidget class
+    :param parent: parent widget
+    :param state: initial state of indicator
+    :param clickable: if indicator can be toggled via click
+    :param on_color: color if indicator is on
+    :param off_color: color if indicator is off
+    :param size: wanted QSize
+    """
+
+    clicked = pyqtSignal()
+
+    def __init__(
+        self,
+        parent=None,
+        state: bool = False,
+        clickable: bool = False,
+        on_color: str = Colors.lime,
+        off_color: str = '#DDDDDD',
+        size: QSize | None = None,
+        **kwargs
+    ):
+        super().__init__(parent, **kwargs)
+
+        self.state = state
+        self.clickable = clickable
+        self.on_color = on_color
+        self.off_color = off_color
+        self.size = size
+
+        self.pressed = False
+        self.renderer = QSvgRenderer()
+
+    def value(self) -> bool:
+        """Returns its state"""
+
+        return self.state
+
+    def setValue(self, state):
+        """
+        Sets its state
+        :param state: new state
+        """
+
+        self.state = state
+        self.update()
+
+    def toggleValue(self):
+        """Toggles state"""
+
+        self.state = not self.state
+        self.update()
+
+    def sizeHint(self) -> QSize:
+        """Returns its size hint"""
+
+        if self.size is not None:
+            return self.size
+        return QSize(48, 48)
+
+    def paintEvent(self, event):
+        """Paints widget"""
+
+        option = QStyleOption()
+        option.initFrom(self)
+
+        h = option.rect.height()
+        w = option.rect.width()
+        size = min(w, h)
+        x = abs(size - w) / 2.0
+        y = abs(size - h) / 2.0
+        bounds = QRectF(x, y, size, size)
+
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+
+        color = self.on_color
+        if not self.state:
+            color = self.off_color
+
+        svg = f"""
+        <svg height="50.000000px" id="svg9493" width="50.000000px" xmlns="http://www.w3.org/2000/svg">
+            <defs id="defs9495">
+                <linearGradient gradientUnits="userSpaceOnUse" id="linearGradient6650" x1="23.402565" x2="23.389874" xlink:href="#linearGradient6506" y1="44.066776" y2="42.883698"/>
+                <linearGradient id="linearGradient6494">
+                    <stop id="stop6496" offset="0.0000000" style="stop-color:{color};stop-opacity:1.0000000;"/>              
+                    <stop id="stop6498" offset="1.0000000" style="stop-color:{brighting_color(color)};stop-opacity:1.0000000;"/>
+                </linearGradient>
+                <linearGradient gradientUnits="userSpaceOnUse" id="linearGradient6648" x1="23.213980" x2="23.201290" xlink:href="#linearGradient6494" y1="42.754631" y2="43.892632"/>
+                <linearGradient gradientUnits="userSpaceOnUse" id="linearGradient6646" x1="23.349695" x2="23.440580" xlink:href="#linearGradient5756" y1="42.767944" y2="43.710873"/>
+                <linearGradient gradientUnits="userSpaceOnUse" id="linearGradient6644" x1="23.193102" x2="23.200001" xlink:href="#linearGradient5742" y1="42.429230" y2="44.000000"/>
+                <linearGradient id="linearGradient6506">
+                    <stop id="stop6508" offset="0.0000000" style="stop-color:#ffffff;stop-opacity:0.0000000;"/>
+                    <stop id="stop6510" offset="1.0000000" style="stop-color:#ffffff;stop-opacity:0.87450981;"/>
+                </linearGradient>
+                <linearGradient gradientUnits="userSpaceOnUse" id="linearGradient7498" x1="23.402565" x2="23.389874" xlink:href="#linearGradient6506" y1="44.066776" y2="42.883698"/>
+                <linearGradient id="linearGradient7464">
+                    <stop id="stop7466" offset="0.0000000" style="stop-color:#00039a;stop-opacity:1.0000000;"/>
+                    <stop id="stop7468" offset="1.0000000" style="stop-color:#afa5ff;stop-opacity:1.0000000;"/>
+                </linearGradient>
+                <linearGradient gradientUnits="userSpaceOnUse" id="linearGradient7496" x1="23.213980" x2="23.201290" xlink:href="#linearGradient7464" y1="42.754631" y2="43.892632"/>
+                <linearGradient id="linearGradient5756">
+                    <stop id="stop5758" offset="0.0000000" style="stop-color:#828282;stop-opacity:1.0000000;"/>
+                    <stop id="stop5760" offset="1.0000000" style="stop-color:#929292;stop-opacity:0.35294119;"/>
+                </linearGradient>
+                <linearGradient gradientUnits="userSpaceOnUse" id="linearGradient9321" x1="22.935030" x2="23.662106" xlink:href="#linearGradient5756" y1="42.699776" y2="43.892632"/>
+                <linearGradient id="linearGradient5742">
+                    <stop id="stop5744" offset="0.0000000" style="stop-color:#adadad;stop-opacity:1.0000000;"/>
+                    <stop id="stop5746" offset="1.0000000" style="stop-color:#f0f0f0;stop-opacity:1.0000000;"/>
+                </linearGradient>
+                <linearGradient gradientUnits="userSpaceOnUse" id="linearGradient7492" x1="23.193102" x2="23.200001" xlink:href="#linearGradient5742" y1="42.429230" y2="44.000000"/>
+                <linearGradient gradientUnits="userSpaceOnUse" id="linearGradient9527" x1="23.193102" x2="23.200001" xlink:href="#linearGradient5742" y1="42.429230" y2="44.000000"/>
+                <linearGradient gradientUnits="userSpaceOnUse" id="linearGradient9529" x1="22.935030" x2="23.662106" xlink:href="#linearGradient5756" y1="42.699776" y2="43.892632"/>
+                <linearGradient gradientUnits="userSpaceOnUse" id="linearGradient9531" x1="23.213980" x2="23.201290" xlink:href="#linearGradient7464" y1="42.754631" y2="43.892632"/>
+                <linearGradient gradientUnits="userSpaceOnUse" id="linearGradient9533" x1="23.402565" x2="23.389874" xlink:href="#linearGradient6506" y1="44.066776" y2="42.883698"/>
+            </defs>
+            <g id="layer1">
+                <g id="g9447" style="overflow:visible" transform="matrix(31.25000,0.000000,0.000000,31.25000,-625.0232,-1325.000)">
+                    <path d="M 24.000001,43.200001 C 24.000001,43.641601 23.641601,44.000001 23.200001,44.000001 C 22.758401,44.000001 22.400001,43.641601 22.400001,43.200001 C 22.400001,42.758401 22.758401,42.400001 23.200001,42.400001 C 23.641601,42.400001 24.000001,42.758401 24.000001,43.200001 z " id="path6596" style="fill:url(#linearGradient6644);fill-opacity:1.0000000;stroke:none;stroke-width:0.80000001;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:4.0000000;stroke-opacity:1.0000000;overflow:visible" transform="translate(-2.399258,-1.000000e-6)"/>
+                    <path d="M 23.906358,43.296204 C 23.906358,43.625433 23.639158,43.892633 23.309929,43.892633 C 22.980700,43.892633 22.713500,43.625433 22.713500,43.296204 C 22.713500,42.966975 22.980700,42.699774 23.309929,42.699774 C 23.639158,42.699774 23.906358,42.966975 23.906358,43.296204 z " id="path6598" style="fill:url(#linearGradient6646);fill-opacity:1.0000000;stroke:none;stroke-width:0.80000001;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:4.0000000;stroke-opacity:1.0000000;overflow:visible" transform="matrix(1.082474,0.000000,0.000000,1.082474,-4.431649,-3.667015)"/>
+                    <path d="M 23.906358,43.296204 C 23.906358,43.625433 23.639158,43.892633 23.309929,43.892633 C 22.980700,43.892633 22.713500,43.625433 22.713500,43.296204 C 22.713500,42.966975 22.980700,42.699774 23.309929,42.699774 C 23.639158,42.699774 23.906358,42.966975 23.906358,43.296204 z " id="path6600" style="fill:url(#linearGradient6648);fill-opacity:1.0000000;stroke:none;stroke-width:0.80000001;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:4.0000000;stroke-opacity:1.0000000;overflow:visible" transform="matrix(0.969072,0.000000,0.000000,0.969072,-1.788256,1.242861)"/>
+                    <path d="M 23.906358,43.296204 C 23.906358,43.625433 23.639158,43.892633 23.309929,43.892633 C 22.980700,43.892633 22.713500,43.625433 22.713500,43.296204 C 22.713500,42.966975 22.980700,42.699774 23.309929,42.699774 C 23.639158,42.699774 23.906358,42.966975 23.906358,43.296204 z " id="path6602" style="fill:url(#linearGradient6650);fill-opacity:1.0000000;stroke:none;stroke-width:0.80000001;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:4.0000000;stroke-opacity:1.0000000;overflow:visible" transform="matrix(0.773196,0.000000,0.000000,0.597938,2.776856,17.11876)"/>
+                </g>
+            </g>
+        </svg>
+        """
+
+        self.renderer.load(QByteArray(svg.encode('utf8')))
+        self.renderer.render(painter, bounds)
+
+    def mousePressEvent(self, event):
+        """When mouse is pressed"""
+
+        self.pressed = True
+        super().mousePressEvent(event)
+
+    def mouseReleaseEvent(self, event):
+        """When mouse is released"""
+
+        if self.pressed:
+            self.pressed = False
+            if self.clickable:
+                self.toggleValue()
+            self.clicked.emit()
+        super().mouseReleaseEvent(event)
+
+
 class DeleteWidgetList(QListWidget):
     """
     Extends the QListWidget for deletable Items
@@ -725,7 +875,7 @@ class TOFCanvas(pg.PlotWidget):
             y=self.data[1],
             stepMode='left',
             fillLevel=0,
-            brush=(*Colors.hex_to_rbg(Colors.tu_blue), 80)
+            brush=(*hex_to_rgb(Colors.tu_blue), 80)
         )
         self.graph_curve_fit.setData(x=[], y=[])
 
