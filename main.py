@@ -3,15 +3,16 @@ from platform import system
 import logging
 
 
-from PyQt6.QtCore import Qt, QSize
+from PyQt6.QtCore import Qt, QSize, QRectF
 from PyQt6.QtWidgets import QApplication, QSplashScreen
-from PyQt6.QtGui import QPixmap, QIcon
+from PyQt6.QtGui import QIcon
 
 from Config.GlobalConf import GlobalConf
 from Config.StylesConf import Styles
 
 from Windows.Main import MainWindow
 
+from Utility.Layouts import SplashPixmap
 from Utility.Logger import setupLogging
 
 
@@ -44,7 +45,7 @@ def main():
     splash_size = QSize(int(min(620, screen.width() * 0.5)), int(min(300, screen.height() * 0.5)))
 
     # show splashscreen on startup
-    pixmap = QPixmap('icons/splash.png')
+    pixmap = SplashPixmap('icons/splash.png', 'v0.0.1', QRectF(0, 265, 605, 50))
     pixmap = pixmap.scaled(splash_size, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
     splash = QSplashScreen(pixmap)
     splash.show()
@@ -57,4 +58,5 @@ def main():
 
 
 if __name__ == '__main__':
+    print(QApplication.font())
     main()

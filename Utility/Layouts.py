@@ -4,8 +4,8 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-from PyQt6.QtCore import Qt, pyqtSignal, QByteArray, QSize, QRectF
-from PyQt6.QtGui import QIcon, QPainter
+from PyQt6.QtCore import Qt, pyqtSignal, QByteArray, QSize, QRectF, QPointF
+from PyQt6.QtGui import QIcon, QPainter, QPixmap, QFont
 from PyQt6.QtWidgets import (
     QHBoxLayout, QLabel, QWidget, QVBoxLayout, QSpinBox, QDoubleSpinBox, QCheckBox, QComboBox,
     QLineEdit, QPushButton, QListWidget, QListWidgetItem, QApplication, QStyleOption, QTableWidget,
@@ -23,6 +23,39 @@ from Utility.Functions import hex_to_rgb, brighting_color
 if TYPE_CHECKING:
     from Windows.Main import MainWindow
     from Utility.Fitting import FitMethod
+
+
+class SplashPixmap(QPixmap):
+    """
+    Class that extends the QPixmap for generating Splash Screen Images
+
+    :param image: image path
+    :param text: text string
+    :param box: rectangular position for text
+    :param align: alignment for text
+    :param color: color for text
+    :param font_size: font size for text
+    """
+
+    def __init__(
+        self,
+        image: str,
+        text: str,
+        box: QRectF,
+        align: Qt.AlignmentFlag = Qt.AlignmentFlag.AlignRight,
+        color: Qt.GlobalColor = Qt.GlobalColor.black,
+        font_size: int = 20
+    ):
+        super().__init__(image)
+
+        self.painter = QPainter(self)
+        self.painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        self.font = QApplication.font()
+        self.font.setPixelSize(font_size)
+        self.painter.setFont(self.font)
+        self.painter.setPen(color)
+        self.painter.drawText(box, align, text)
+        self.painter.end()
 
 
 class TabWidget(QWidget):
@@ -123,7 +156,6 @@ class InsertingGridLayout(QGridLayout):
         for col, widget in enumerate(widgets):
             if widget is not None:
                 super().addWidget(widget, row, col)
-
 
 
 class InputHBoxLayout(QHBoxLayout):

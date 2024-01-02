@@ -10,8 +10,8 @@
    inkscape:version="1.3 (0e150ed6c4, 2023-07-21)"
    sodipodi:docname="logo.svg"
    inkscape:export-filename="TU Logo.png"
-   inkscape:export-xdpi="508"
-   inkscape:export-ydpi="508"
+   inkscape:export-xdpi="260.09601"
+   inkscape:export-ydpi="260.09601"
    xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
    xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
    xmlns:xlink="http://www.w3.org/1999/xlink"
@@ -32,9 +32,9 @@
      inkscape:cy="135.98309"
      inkscape:window-width="1920"
      inkscape:window-height="1001"
-     inkscape:window-x="-9"
-     inkscape:window-y="41"
-     inkscape:window-maximized="1"
+     inkscape:window-x="-32000"
+     inkscape:window-y="-32000"
+     inkscape:window-maximized="0"
      inkscape:current-layer="layer1" />
   <defs
      id="defs1">
@@ -100,18 +100,5 @@
        inkscape:connector-curvature="0"
        inkscape:label="TU WIEN"
        transform="matrix(0.26458333,0,0,0.26458333,-46.999991,-1104)" />
-    <text
-       xml:space="preserve"
-       style="font-style:normal;font-weight:normal;font-size:10px;line-height:1.25;font-family:sans-serif;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.264583"
-       x="-30.568848"
-       y="38.990593"
-       id="text5"
-       transform="rotate(-45)"
-       inkscape:label="Visualize"><tspan
-         sodipodi:role="line"
-         id="tspan5"
-         style="font-style:normal;font-variant:normal;font-weight:bold;font-stretch:normal;font-size:10px;font-family:Sans;-inkscape-font-specification:'Sans Bold';fill:#006699;fill-opacity:1;stroke-width:0.264583"
-         x="-30.568848"
-         y="38.990593">VISUALIZE</tspan></text>
   </g>
 </svg>
