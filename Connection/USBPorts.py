@@ -32,6 +32,7 @@ class COMConnection:
     :param comport: COM Port
     :param timeout: Timeout [in s]
     :param encoding: Encoding
+    :param baudrate: Baudrate
     :param echo: If device has echo. Will be checked
     :param cleaning: If output cache should be cleared when entering and exiting
     """
@@ -41,18 +42,20 @@ class COMConnection:
         comport: str,
         timeout: float = 0.05,
         encoding: str = 'utf-8',
+        baudrate: int = 9600,
         echo: bool = True,
         cleaning: bool = True
     ):
         self.comport = comport
         self.timeout = timeout
         self.encoding = encoding
+        self.baudrate = baudrate
         self.echo = echo
         self.cleaning = cleaning
 
     def __enter__(self):
         """Enter serial connection and clean possible outputs"""
-        self.serial = Serial(self.comport, timeout=self.timeout)
+        self.serial = Serial(self.comport, baudrate=self.baudrate, timeout=self.timeout)
         self.clean()
         return self
 
@@ -90,7 +93,7 @@ class COMConnection:
         """Reads output line"""
         return self.serial.readline().decode(self.encoding)
 
-    def read(self, count: int) -> str:
+    def read(self, count: int = 1024) -> str:
         """Read defined length of output bytes"""
         return self.serial.read(count).decode(self.encoding)
 

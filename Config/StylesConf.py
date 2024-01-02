@@ -41,17 +41,29 @@ class Styles:
             background-color: #AAAAAA;
             color: #000000;
         }}
+        
+        QTableWidget {{
+            background-color: #444444;
+            color: #FFFFFF;
+            border: none;
+            gridline-color: #555555;
+        }}
+        
+        QHeaderView {{   
+            color: #000000;
+            background-color: #AAAAAA;
+        }}
     '''
 
     title_style_sheet = f'''
-            qproperty-alignment: AlignCenter;
-            border-top-left-radius: 10px;
-            border-top-right-radius: 10px;
-            background-color: #AAAAAA;
-            padding: 1px 5px;
-            margin: 0px;
-            color: #000000;
-        '''
+        qproperty-alignment: AlignCenter;
+        border-top-left-radius: 10px;
+        border-top-right-radius: 10px;
+        background-color: #AAAAAA;
+        padding: 1px 5px;
+        margin: 0px;
+        color: #000000;
+    '''
 
 
 class Colors:

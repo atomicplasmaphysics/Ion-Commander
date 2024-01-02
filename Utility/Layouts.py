@@ -4,11 +4,12 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-from PyQt6.QtCore import Qt, pyqtSignal, QByteArray, QSize, QRect, QRectF
+from PyQt6.QtCore import Qt, pyqtSignal, QByteArray, QSize, QRectF
 from PyQt6.QtGui import QIcon, QPainter
 from PyQt6.QtWidgets import (
     QHBoxLayout, QLabel, QWidget, QVBoxLayout, QSpinBox, QDoubleSpinBox, QCheckBox, QComboBox,
-    QLineEdit, QPushButton, QListWidget, QListWidgetItem, QApplication, QStyleOption
+    QLineEdit, QPushButton, QListWidget, QListWidgetItem, QApplication, QStyleOption, QTableWidget,
+    QTableWidgetItem, QHeaderView, QAbstractItemView, QGridLayout
 )
 from PyQt6.QtSvg import QSvgRenderer
 
@@ -106,6 +107,23 @@ class VBoxTitleLayout(QVBoxLayout):
         else:
             self.title.setText(self.title_str)
             self.title.setStyleSheet(self.title_style)
+
+
+class InsertingGridLayout(QGridLayout):
+    """
+    Extends the QGridLayout such that a row of items can be inserted at once
+    """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def addWidgets(self, *widgets: QWidget):
+        row = self.rowCount()
+
+        for col, widget in enumerate(widgets):
+            if widget is not None:
+                super().addWidget(widget, row, col)
+
 
 
 class InputHBoxLayout(QHBoxLayout):
@@ -295,7 +313,7 @@ class DoubleSpinBox(QDoubleSpinBox):
 
         self.default = default
         self.click_copy = click_copy
-        self.decimals_min = 2
+        self.decimals_min = 1
 
         if step_size is not None:
             self.setSingleStep(step_size)
@@ -545,6 +563,11 @@ class IndicatorLed(QWidget):
             return self.size
         return QSize(48, 48)
 
+    def minimumSizeHint(self) -> QSize:
+        """Returns minimum size hint"""
+
+        return self.sizeHint()
+
     def paintEvent(self, event):
         """Paints widget"""
 
@@ -565,6 +588,7 @@ class IndicatorLed(QWidget):
         if not self.state:
             color = self.off_color
 
+        # TODO: edit svg and move it into StylesConf
         svg = f"""
         <svg height="50.000000px" id="svg9493" width="50.000000px" xmlns="http://www.w3.org/2000/svg">
             <defs id="defs9495">
@@ -630,6 +654,51 @@ class IndicatorLed(QWidget):
                 self.toggleValue()
             self.clicked.emit()
         super().mouseReleaseEvent(event)
+
+
+# TODO: display always minimum of 3 empty rows
+# TODO: height is by default hat 3 rows are shown
+class ErrorTable(QTableWidget):
+    """
+    Simple table that extends the QTableWidget.
+    """
+
+    def __init__(self):
+        super().__init__()
+
+        self.setColumnCount(3)
+        self.setRowCount(1)
+        self.verticalHeader().setVisible(False)
+        self.setHorizontalHeaderLabels(['#', 'Type', 'Description'])
+        self.setColumnWidth(0, 40)
+        self.setColumnWidth(1, 100)
+        self.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
+        self.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
+
+    def insertError(self, error_code: int, error_type: str, error_description: str):
+        """
+        Inserts new row into the table
+
+        :param error_code: code of error
+        :param error_type: type of error
+        :param error_description: description of error
+        """
+
+        row_position = self.rowCount()
+        if row_position == 1 and self.item(0, 0) is None:
+            row_position = 0
+        else:
+            self.insertRow(row_position)
+        self.setItem(row_position, 0, QTableWidgetItem(str(error_code)))
+        self.setItem(row_position, 1, QTableWidgetItem(error_type))
+        self.setItem(row_position, 2, QTableWidgetItem(error_description))
+
+    def resetTable(self):
+        """Resets the table"""
+
+        self.setRowCount(0)
+        self.setRowCount(1)
 
 
 class DeleteWidgetList(QListWidget):
