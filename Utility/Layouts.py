@@ -4,8 +4,8 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-from PyQt6.QtCore import Qt, pyqtSignal, QByteArray, QSize, QRectF, QPointF
-from PyQt6.QtGui import QIcon, QPainter, QPixmap, QFont
+from PyQt6.QtCore import Qt, pyqtSignal, QByteArray, QSize, QRect
+from PyQt6.QtGui import QIcon, QPainter, QPixmap, QColor
 from PyQt6.QtWidgets import (
     QHBoxLayout, QLabel, QWidget, QVBoxLayout, QSpinBox, QDoubleSpinBox, QCheckBox, QComboBox,
     QLineEdit, QPushButton, QListWidget, QListWidgetItem, QApplication, QStyleOption, QTableWidget,
@@ -41,9 +41,9 @@ class SplashPixmap(QPixmap):
         self,
         image: str,
         text: str,
-        box: QRectF,
+        box: QRect,
         align: Qt.AlignmentFlag = Qt.AlignmentFlag.AlignRight,
-        color: Qt.GlobalColor = Qt.GlobalColor.black,
+        color: Qt.GlobalColor | QColor = Qt.GlobalColor.black,
         font_size: int = 20
     ):
         super().__init__(image)
