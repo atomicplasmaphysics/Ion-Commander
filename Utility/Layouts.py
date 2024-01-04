@@ -1,15 +1,16 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING
+from math import log10
 
 
 import numpy as np
 
 from PyQt6.QtCore import Qt, pyqtSignal, QByteArray, QSize, QRect, QRectF
-from PyQt6.QtGui import QIcon, QPainter, QPixmap, QColor
+from PyQt6.QtGui import QIcon, QPainter, QPixmap, QColor, QBrush, QLinearGradient, QPainterPath
 from PyQt6.QtWidgets import (
     QHBoxLayout, QLabel, QWidget, QVBoxLayout, QSpinBox, QDoubleSpinBox, QCheckBox, QComboBox,
     QLineEdit, QPushButton, QListWidget, QListWidgetItem, QApplication, QStyleOption, QTableWidget,
-    QTableWidgetItem, QHeaderView, QAbstractItemView, QGridLayout
+    QTableWidgetItem, QHeaderView, QAbstractItemView, QGridLayout, QLCDNumber
 )
 from PyQt6.QtSvg import QSvgRenderer
 
@@ -640,6 +641,189 @@ class IndicatorLed(QWidget):
                 self.toggleValue()
             self.clicked.emit()
         super().mouseReleaseEvent(event)
+
+
+class PressureWidget(QWidget):
+    """
+    Widget that extends the QWidget to display the pressure
+
+    :param input_range: input range as tuple of (maximum exponent, minimum exponent)
+    """
+
+    def __init__(self, input_range: tuple[float, float] = (-2, -10)):
+        super().__init__()
+
+        self.input_range = input_range
+
+        self.main_layout = QVBoxLayout()
+        self.main_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
+        self.setLayout(self.main_layout)
+
+        self.stack_widget = StackWidget(
+            color_top=Colors.cooperate_lime,
+            color_bottom=Colors.cooperate_strawberry,
+            color_grayed=Colors.app_background_event
+        )
+        self.main_layout.addWidget(self.stack_widget, alignment=Qt.AlignmentFlag.AlignHCenter)
+
+        self.pressure = 0
+        self.pressure_label = QLabel('', self)
+        self.main_layout.addWidget(self.pressure_label, alignment=Qt.AlignmentFlag.AlignHCenter)
+
+        self.setPressure(self.pressure)
+
+    def setPressure(self, pressure: float):
+        """
+        Sets the pressure
+
+        :param pressure: pressure in mbar
+        """
+
+        self.pressure = pressure
+        percentage = 1
+        label_text = 'No pressure available'
+        exponent = self.input_range[0] + 1
+
+        if pressure:
+            pressure_string_split = f'{self.pressure:E}'.split('E')
+            exponent = int(pressure_string_split[1])
+            label_text = f'{pressure_string_split[0]} x 10<sup>{exponent}</sup> mbar'
+
+            percentage = 1 - (log10(pressure) - self.input_range[0]) / (self.input_range[1] - self.input_range[0])
+            percentage = max(percentage, 0)
+            percentage = min(percentage, 1)
+
+        self.pressure_label.setText(label_text)
+        self.stack_widget.changePercentage(percentage)
+
+        if exponent > self.input_range[0]:
+            self.stack_widget.enableDigit(False)
+        else:
+            self.stack_widget.enableDigit(True)
+            self.stack_widget.setValue(-exponent)
+
+
+class StackWidget(QLCDNumber):
+    """
+    Graphical widget that extends the QLCDNumber to display a value
+
+    :param layers: number of layers
+    :param antialiased: antialiasing enabled
+    :param size: size of widget
+    :param border_radius: radius of borders
+    :param color_top: top color
+    :param color_bottom: bottom color
+    :param color_grayed: grayed out color
+    :param percentage_grey: greyed out percentage
+    :param enable_digits: display digit
+    """
+
+    def __init__(
+        self,
+        layers: int = 7,
+        antialiased: bool = True,
+        size: QSize = QSize(100, 100),
+        border_radius: float = 5,
+        spacing: float = 1,
+        color_top: QColor | Qt.GlobalColor | str = '#FF0000',
+        color_bottom: QColor | Qt.GlobalColor | str = '#FFFF00',
+        color_grayed: QColor | Qt.GlobalColor | str = '#555555',
+        percentage_grey: float = 0,
+        enable_digits: bool = False
+    ):
+        super().__init__(1)
+
+        self.layers = layers
+        self.antialiased = antialiased
+        self.size = size
+        self.border_radius = border_radius
+        self.spacing = spacing
+        self.color_top = QColor(color_top)
+        self.color_bottom = QColor(color_bottom)
+        self.color_grayed = QColor(color_grayed)
+        self.enable_digits = enable_digits
+
+        self.layer_height = (self.size.height() - (self.layers - 1) * self.spacing) / self.layers
+        self.percentage_grey = 0
+        self.percentage_offset = 0.001
+        self.color_middle = self.color_top
+        self.changePercentage(percentage_grey)
+
+        self.setAutoFillBackground(True)
+
+    def sizeHint(self) -> QSize:
+        """Returns the optimal size of the widget"""
+
+        return self.size
+
+    def minimumSizeHint(self) -> QSize:
+        """Returns the minimum size of the widget"""
+
+        return self.size
+
+    def setValue(self, value: int):
+        """
+        Sets its own value
+
+        :param value: integer to be displayed
+        """
+
+        self.setDigitCount(len(str(value)))
+        self.display(value)
+
+    def enableDigit(self, enable_digits: bool):
+        """
+        Enables digits to be displayed
+
+        :param enable_digits: if digits should be displayed
+        """
+
+        self.enable_digits = enable_digits
+
+    def changePercentage(self, percentage_grey: float):
+        """
+        Changes the greyed out percentage level
+
+        :param percentage_grey: greyed out percentage
+        """
+
+        if not 0 <= percentage_grey <= 1:
+            raise ValueError('percentage_grey should be in range [0, 1]')
+
+        self.color_middle = QColor(
+            int(self.color_top.red() * (1 - percentage_grey) + percentage_grey * self.color_bottom.red()),
+            int(self.color_top.green() * (1 - percentage_grey) + percentage_grey * self.color_bottom.green()),
+            int(self.color_top.blue() * (1 - percentage_grey) + percentage_grey * self.color_bottom.blue())
+        )
+        self.percentage_grey = percentage_grey
+
+    def paintEvent(self, event):
+        """Called when Widget is drawn"""
+
+        painter = QPainter(self)
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing, self.antialiased)
+
+        gradient = QLinearGradient(0, 0, 0, self.size.height())
+        gradient.setColorAt(0, self.color_grayed)
+        gradient.setColorAt(self.percentage_grey - self.percentage_offset, self.color_grayed)
+        gradient.setColorAt(self.percentage_grey, self.color_middle)
+        gradient.setColorAt(1, self.color_bottom)
+
+        brush = QBrush(gradient)
+        painter.setBrush(brush)
+
+        for i in range(self.layers):
+            path = QPainterPath()
+            path.addRoundedRect(
+                QRectF(0, i * (self.layer_height + self.spacing), self.size.width(), self.layer_height),
+                self.border_radius,
+                self.border_radius
+            )
+            painter.drawPath(path)
+
+        if self.enable_digits:
+            super().paintEvent(event)
 
 
 class ErrorTable(QTableWidget):

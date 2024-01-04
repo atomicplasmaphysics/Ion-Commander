@@ -5,6 +5,7 @@ from PyQt6.QtCore import Qt
 from Utility.Layouts import TabWidget, VBoxTitleLayout
 
 from Windows.Laser import LaserVBoxLayout
+from Windows.Pressure import PressureVBoxLayout
 
 
 class ControlWindow(TabWidget):
@@ -75,7 +76,7 @@ class ControlWindow(TabWidget):
 
         # PRESSURE CONTROL
         self.pressure_vbox = VBoxTitleLayout(self, 'Pressure', add_stretch=True)
-        self.pressure_group_vbox = QVBoxLayout()
+        self.pressure_group_vbox = PressureVBoxLayout()
 
         # Stretch to bottom
         self.pressure_group_vbox.addStretch(1)

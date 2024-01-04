@@ -1,5 +1,5 @@
 from PyQt6.QtCore import Qt, QSize
-from PyQt6.QtWidgets import QVBoxLayout,  QHBoxLayout, QLabel, QPushButton
+from PyQt6.QtWidgets import QVBoxLayout, QHBoxLayout, QLabel, QPushButton
 
 
 from Config.StylesConf import Colors
