@@ -1,5 +1,4 @@
 /venv/
-/.idea/
 /data/
 /compile
 !compile/pyinstaller.py
