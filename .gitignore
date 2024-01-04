@@ -1,7 +1,9 @@
 /venv/
 /.idea/
-/data/
+
 /compile
 !compile/pyinstaller.py
 /Ion Commander*.exe
+
+/data/
 /tests/
