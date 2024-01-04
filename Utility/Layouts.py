@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-from PyQt6.QtCore import Qt, pyqtSignal, QByteArray, QSize, QRect
+from PyQt6.QtCore import Qt, pyqtSignal, QByteArray, QSize, QRect, QRectF
 from PyQt6.QtGui import QIcon, QPainter, QPixmap, QColor
 from PyQt6.QtWidgets import (
     QHBoxLayout, QLabel, QWidget, QVBoxLayout, QSpinBox, QDoubleSpinBox, QCheckBox, QComboBox,
@@ -16,10 +16,10 @@ from PyQt6.QtSvg import QSvgRenderer
 import pyqtgraph as pg
 
 
-from Config.StylesConf import Colors, Styles
+from Config.StylesConf import Colors, Styles, Forms
 
 from Utility.ModifyWidget import setWidgetBackground
-from Utility.Functions import hex_to_rgb, brighting_color
+from Utility.Functions import hexToRgb
 if TYPE_CHECKING:
     from Windows.Main import MainWindow
     from Utility.Fitting import FitMethod
@@ -552,8 +552,8 @@ class IndicatorLed(QWidget):
         parent=None,
         state: bool = False,
         clickable: bool = False,
-        on_color: str = Colors.lime,
-        off_color: str = '#DDDDDD',
+        on_color: str = Colors.cooperate_lime,
+        off_color: str = Colors.app_background,
         size: QSize | None = None,
         **kwargs
     ):
@@ -620,53 +620,7 @@ class IndicatorLed(QWidget):
         if not self.state:
             color = self.off_color
 
-        # TODO: edit svg and move it into StylesConf
-        svg = f"""
-        <svg height="50.000000px" id="svg9493" width="50.000000px" xmlns="http://www.w3.org/2000/svg">
-            <defs id="defs9495">
-                <linearGradient gradientUnits="userSpaceOnUse" id="linearGradient6650" x1="23.402565" x2="23.389874" xlink:href="#linearGradient6506" y1="44.066776" y2="42.883698"/>
-                <linearGradient id="linearGradient6494">
-                    <stop id="stop6496" offset="0.0000000" style="stop-color:{color};stop-opacity:1.0000000;"/>              
-                    <stop id="stop6498" offset="1.0000000" style="stop-color:{brighting_color(color)};stop-opacity:1.0000000;"/>
-                </linearGradient>
-                <linearGradient gradientUnits="userSpaceOnUse" id="linearGradient6648" x1="23.213980" x2="23.201290" xlink:href="#linearGradient6494" y1="42.754631" y2="43.892632"/>
-                <linearGradient gradientUnits="userSpaceOnUse" id="linearGradient6646" x1="23.349695" x2="23.440580" xlink:href="#linearGradient5756" y1="42.767944" y2="43.710873"/>
-                <linearGradient gradientUnits="userSpaceOnUse" id="linearGradient6644" x1="23.193102" x2="23.200001" xlink:href="#linearGradient5742" y1="42.429230" y2="44.000000"/>
-                <linearGradient id="linearGradient6506">
-                    <stop id="stop6508" offset="0.0000000" style="stop-color:#ffffff;stop-opacity:0.0000000;"/>
-                    <stop id="stop6510" offset="1.0000000" style="stop-color:#ffffff;stop-opacity:0.87450981;"/>
-                </linearGradient>
-                <linearGradient gradientUnits="userSpaceOnUse" id="linearGradient7498" x1="23.402565" x2="23.389874" xlink:href="#linearGradient6506" y1="44.066776" y2="42.883698"/>
-                <linearGradient id="linearGradient7464">
-                    <stop id="stop7466" offset="0.0000000" style="stop-color:#00039a;stop-opacity:1.0000000;"/>
-                    <stop id="stop7468" offset="1.0000000" style="stop-color:#afa5ff;stop-opacity:1.0000000;"/>
-                </linearGradient>
-                <linearGradient gradientUnits="userSpaceOnUse" id="linearGradient7496" x1="23.213980" x2="23.201290" xlink:href="#linearGradient7464" y1="42.754631" y2="43.892632"/>
-                <linearGradient id="linearGradient5756">
-                    <stop id="stop5758" offset="0.0000000" style="stop-color:#828282;stop-opacity:1.0000000;"/>
-                    <stop id="stop5760" offset="1.0000000" style="stop-color:#929292;stop-opacity:0.35294119;"/>
-                </linearGradient>
-                <linearGradient gradientUnits="userSpaceOnUse" id="linearGradient9321" x1="22.935030" x2="23.662106" xlink:href="#linearGradient5756" y1="42.699776" y2="43.892632"/>
-                <linearGradient id="linearGradient5742">
-                    <stop id="stop5744" offset="0.0000000" style="stop-color:#adadad;stop-opacity:1.0000000;"/>
-                    <stop id="stop5746" offset="1.0000000" style="stop-color:#f0f0f0;stop-opacity:1.0000000;"/>
-                </linearGradient>
-                <linearGradient gradientUnits="userSpaceOnUse" id="linearGradient7492" x1="23.193102" x2="23.200001" xlink:href="#linearGradient5742" y1="42.429230" y2="44.000000"/>
-                <linearGradient gradientUnits="userSpaceOnUse" id="linearGradient9527" x1="23.193102" x2="23.200001" xlink:href="#linearGradient5742" y1="42.429230" y2="44.000000"/>
-                <linearGradient gradientUnits="userSpaceOnUse" id="linearGradient9529" x1="22.935030" x2="23.662106" xlink:href="#linearGradient5756" y1="42.699776" y2="43.892632"/>
-                <linearGradient gradientUnits="userSpaceOnUse" id="linearGradient9531" x1="23.213980" x2="23.201290" xlink:href="#linearGradient7464" y1="42.754631" y2="43.892632"/>
-                <linearGradient gradientUnits="userSpaceOnUse" id="linearGradient9533" x1="23.402565" x2="23.389874" xlink:href="#linearGradient6506" y1="44.066776" y2="42.883698"/>
-            </defs>
-            <g id="layer1">
-                <g id="g9447" style="overflow:visible" transform="matrix(31.25000,0.000000,0.000000,31.25000,-625.0232,-1325.000)">
-                    <path d="M 24.000001,43.200001 C 24.000001,43.641601 23.641601,44.000001 23.200001,44.000001 C 22.758401,44.000001 22.400001,43.641601 22.400001,43.200001 C 22.400001,42.758401 22.758401,42.400001 23.200001,42.400001 C 23.641601,42.400001 24.000001,42.758401 24.000001,43.200001 z " id="path6596" style="fill:url(#linearGradient6644);fill-opacity:1.0000000;stroke:none;stroke-width:0.80000001;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:4.0000000;stroke-opacity:1.0000000;overflow:visible" transform="translate(-2.399258,-1.000000e-6)"/>
-                    <path d="M 23.906358,43.296204 C 23.906358,43.625433 23.639158,43.892633 23.309929,43.892633 C 22.980700,43.892633 22.713500,43.625433 22.713500,43.296204 C 22.713500,42.966975 22.980700,42.699774 23.309929,42.699774 C 23.639158,42.699774 23.906358,42.966975 23.906358,43.296204 z " id="path6598" style="fill:url(#linearGradient6646);fill-opacity:1.0000000;stroke:none;stroke-width:0.80000001;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:4.0000000;stroke-opacity:1.0000000;overflow:visible" transform="matrix(1.082474,0.000000,0.000000,1.082474,-4.431649,-3.667015)"/>
-                    <path d="M 23.906358,43.296204 C 23.906358,43.625433 23.639158,43.892633 23.309929,43.892633 C 22.980700,43.892633 22.713500,43.625433 22.713500,43.296204 C 22.713500,42.966975 22.980700,42.699774 23.309929,42.699774 C 23.639158,42.699774 23.906358,42.966975 23.906358,43.296204 z " id="path6600" style="fill:url(#linearGradient6648);fill-opacity:1.0000000;stroke:none;stroke-width:0.80000001;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:4.0000000;stroke-opacity:1.0000000;overflow:visible" transform="matrix(0.969072,0.000000,0.000000,0.969072,-1.788256,1.242861)"/>
-                    <path d="M 23.906358,43.296204 C 23.906358,43.625433 23.639158,43.892633 23.309929,43.892633 C 22.980700,43.892633 22.713500,43.625433 22.713500,43.296204 C 22.713500,42.966975 22.980700,42.699774 23.309929,42.699774 C 23.639158,42.699774 23.906358,42.966975 23.906358,43.296204 z " id="path6602" style="fill:url(#linearGradient6650);fill-opacity:1.0000000;stroke:none;stroke-width:0.80000001;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:4.0000000;stroke-opacity:1.0000000;overflow:visible" transform="matrix(0.773196,0.000000,0.000000,0.597938,2.776856,17.11876)"/>
-                </g>
-            </g>
-        </svg>
-        """
+        svg = Forms.svgIndicatorLed(color)
 
         self.renderer.load(QByteArray(svg.encode('utf8')))
         self.renderer.render(painter, bounds)
@@ -688,22 +642,26 @@ class IndicatorLed(QWidget):
         super().mouseReleaseEvent(event)
 
 
-# TODO: display always minimum of 3 empty rows
-# TODO: height is by default hat 3 rows are shown
 class ErrorTable(QTableWidget):
     """
     Simple table that extends the QTableWidget.
+
+    :param default_rows: number of rows to be displayed
     """
 
-    def __init__(self):
+    def __init__(self, default_rows: int = 3):
         super().__init__()
 
+        self.actual_row = 0
+        self.default_rows = default_rows
+
         self.setColumnCount(3)
-        self.setRowCount(1)
+        self.setRowCount(self.default_rows)
         self.verticalHeader().setVisible(False)
         self.setHorizontalHeaderLabels(['#', 'Type', 'Description'])
         self.setColumnWidth(0, 40)
         self.setColumnWidth(1, 100)
+        self.setColumnWidth(2, 300)
         self.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
         self.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
@@ -717,20 +675,28 @@ class ErrorTable(QTableWidget):
         :param error_description: description of error
         """
 
-        row_position = self.rowCount()
-        if row_position == 1 and self.item(0, 0) is None:
-            row_position = 0
-        else:
-            self.insertRow(row_position)
-        self.setItem(row_position, 0, QTableWidgetItem(str(error_code)))
-        self.setItem(row_position, 1, QTableWidgetItem(error_type))
-        self.setItem(row_position, 2, QTableWidgetItem(error_description))
+        if self.rowCount() <= self.actual_row:
+            self.insertRow(self.actual_row)
+        self.setItem(self.actual_row, 0, QTableWidgetItem(str(error_code)))
+        self.setItem(self.actual_row, 1, QTableWidgetItem(error_type))
+        self.setItem(self.actual_row, 2, QTableWidgetItem(error_description))
+        self.actual_row += 1
 
     def resetTable(self):
         """Resets the table"""
-
         self.setRowCount(0)
-        self.setRowCount(1)
+        self.setRowCount(self.default_rows)
+        self.actual_row = 0
+
+    def sizeHint(self) -> QSize:
+        """Returns an optimal size for itself"""
+        size = super().sizeHint()
+        size.setHeight(self.horizontalHeader().height() + self.rowHeight(0) * 3)
+        return size
+
+    def minimumSizeHint(self) -> QSize:
+        """Returns a minimum size for itself"""
+        return self.sizeHint()
 
 
 class DeleteWidgetList(QListWidget):
@@ -942,8 +908,8 @@ class TOFCanvas(pg.PlotWidget):
         self.setLabel('bottom', 'TOF [ns]')
         self.sigRangeChanged.connect(self.updateLimits)
 
-        self.graph_curve: pg.PlotDataItem = self.plotItem.plot(pen=pg.mkPen(color=Colors.tu_blue, width=1))
-        self.graph_curve_fit: pg.PlotDataItem = self.plotItem.plot(pen=pg.mkPen(color=Colors.orange, width=2))
+        self.graph_curve: pg.PlotDataItem = self.plotItem.plot(pen=pg.mkPen(color=Colors.cooperate_tu_blue, width=1))
+        self.graph_curve_fit: pg.PlotDataItem = self.plotItem.plot(pen=pg.mkPen(color=Colors.cooperate_orange, width=2))
         self.setLimits(yMin=0, xMin=0)
 
         self.bars: list[pg.InfiniteLine] = []
@@ -976,7 +942,7 @@ class TOFCanvas(pg.PlotWidget):
             y=self.data[1],
             stepMode='left',
             fillLevel=0,
-            brush=(*hex_to_rgb(Colors.tu_blue), 80)
+            brush=(*hexToRgb(Colors.cooperate_tu_blue), 80)
         )
         self.graph_curve_fit.setData(x=[], y=[])
 
@@ -1107,9 +1073,9 @@ class FittingBar(pg.InfiniteLine):
             'pos': pos,
             'movable': True,
             'label': name,
-            'labelOpts': {'color': Colors.lime, 'position': label_position},
-            'pen': pg.mkPen(color=Colors.lime, width=2),
-            'hoverPen': pg.mkPen(color=Colors.strawberry, width=3),
+            'labelOpts': {'color': Colors.cooperate_lime, 'position': label_position},
+            'pen': pg.mkPen(color=Colors.cooperate_lime, width=2),
+            'hoverPen': pg.mkPen(color=Colors.cooperate_strawberry, width=3),
         }
         super_dict.update(kwargs)
 

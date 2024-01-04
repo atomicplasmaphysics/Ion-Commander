@@ -20,26 +20,26 @@ class Thyracont(LucidControl):
         )
 
     @staticmethod
-    def voltage_to_pressure(voltage: float) -> float:
+    def voltageToPressure(voltage: float) -> float:
         """Convert voltage to pressure in mbar"""
         return pow(10, (voltage - 6.8) / 0.6)
 
     @staticmethod
-    def pressure_to_voltage(pressure: float) -> float:
+    def pressureToVoltage(pressure: float) -> float:
         """Convert pressure in mbar to voltage"""
         return 0.6 * log(pressure, 10) + 6.8
 
-    def get_temperature(self, channel: int) -> float:
+    def getTemperature(self, channel: int) -> float:
         """Return pressure in mbar off one channel"""
-        return self.voltage_to_pressure(self.io_get(channel))
+        return self.voltageToPressure(self.ioGet(channel))
 
-    def get_temperature_all(self) -> tuple[float, ...]:
+    def getTemperatureAll(self) -> tuple[float, ...]:
         """Return pressure in mbar off all channels"""
-        voltages = self.io_group_get(tuple([True] * self.channels))
+        voltages = self.ioGroupGet(tuple([True] * self.channels))
         pressure = []
         for voltage in voltages:
             if 1.2 < voltage < 8.7:
-                pressure.append(self.voltage_to_pressure(voltage))
+                pressure.append(self.voltageToPressure(voltage))
             else:
                 pressure.append(0)
         return tuple(pressure)
@@ -47,7 +47,7 @@ class Thyracont(LucidControl):
 
 def main():
     with Thyracont('COM3') as thyracont:
-        print(thyracont.get_temperature_all())
+        print(thyracont.getTemperatureAll())
 
 
 if __name__ == '__main__':

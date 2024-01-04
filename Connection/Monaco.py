@@ -200,7 +200,7 @@ from datetime import datetime
 from Telnet import TelnetConnection
 
 
-def try_float(inp, fallback: float = -1) -> float:
+def tryConvertToFloat(inp, fallback: float = -1) -> float:
     """
     Tries to convert given input into a float; if not successful, the fallback is used
 
@@ -240,12 +240,12 @@ class MonacoConnection(TelnetConnection):
 
         self.terminating_string = '\r\nMonaco> '
 
-    def read_init(self):
+    def readInit(self):
         """Reads initial """
         self.read(1024 * 16)
-        self.parse_read()
+        self.parseRead()
 
-    def parse_read(self, count: int = 1024) -> str:
+    def parseRead(self, count: int = 1024) -> str:
         """Reads output and strips cursor for next input"""
         recv = self.read(count)
         if not recv.endswith(self.terminating_string):
@@ -254,18 +254,18 @@ class MonacoConnection(TelnetConnection):
             )
         return recv[:-len(self.terminating_string)]
 
-    def _query_and_return(self, cmd: str) -> str:
+    def _queryAndReturn(self, cmd: str) -> str:
         """Queries command and returns result"""
         self.write(cmd)
-        return self.parse_read()
+        return self.parseRead()
 
-    def _query_and_return_float(self, cmd: str) -> float:
+    def _queryAndReturnFloat(self, cmd: str) -> float:
         """Queries command and returns result as float. If float conversion fails, -1 will be returned."""
-        return try_float(self._query_and_return(cmd))
+        return tryConvertToFloat(self._queryAndReturn(cmd))
 
-    def _query_and_return_int(self, cmd: str) -> int:
+    def _queryAndReturnInt(self, cmd: str) -> int:
         """Queries command and returns result as integer. If integer conversion fails, -1 will be returned."""
-        return int(self._query_and_return_float(cmd))
+        return int(self._queryAndReturnFloat(cmd))
 
     def __exit__(self, exception_type, exception_value, exception_traceback):
         """Close Monaco connection"""
@@ -275,472 +275,472 @@ class MonacoConnection(TelnetConnection):
     def __enter__(self):
         """Enters Monaco connection"""
         super().__enter__()
-        self.read_init()
+        self.readInit()
         return self
 
-    def altmod_get(self) -> int:
+    def altmodGet(self) -> int:
         """Gets the pulse energy modulation mode"""
-        return self._query_and_return_int(f'?ALTMOD')
+        return self._queryAndReturnInt(f'?ALTMOD')
 
-    def altmod_set(self, mode: int | bool):
+    def altmodSet(self, mode: int | bool):
         """
         Sets the pulse energy modulation mode:
             n=0 sets control to Extended Interface pin 15
             n=1 sets control to EXT MOD mini BNC connector
         """
-        self._query_and_return(f'ALTMOD={int(mode)}')
+        self._queryAndReturn(f'ALTMOD={int(mode)}')
 
-    def amp3h_get(self) -> float:
+    def amp3hGet(self) -> float:
         """Returns the laser amplifier hours"""
-        return self._query_and_return_float('?AMP3H')
+        return self._queryAndReturnFloat('?AMP3H')
 
-    def amp3sn_get(self) -> str:
+    def amp3snGet(self) -> str:
         """Returns the laser amplifier serial number"""
-        return self._query_and_return('?AMP3SN')
+        return self._queryAndReturn('?AMP3SN')
 
-    def autoip_set(self, mode: int | bool):
+    def autoipSet(self, mode: int | bool):
         """
         Sets Enable flag to scan for an available IP address:
             n = 0 disabled
             n = 1 enabled
         """
-        self._query_and_return(f'AUTOIP={int(mode)}')
+        self._queryAndReturn(f'AUTOIP={int(mode)}')
 
-    def autoip_get(self) -> int:
+    def autoipGet(self) -> int:
         """Returns the AUTOIP function status"""
-        return self._query_and_return_int('?AUTOIP')
+        return self._queryAndReturnInt('?AUTOIP')
 
-    def bat_get(self) -> float:
+    def batGet(self) -> float:
         """Returns battery voltage, nominal 3V"""
-        return self._query_and_return_float('?BAT')
+        return self._queryAndReturnFloat('?BAT')
 
     def boot(self):
         """Entering this command will reboot the firmware"""
-        self._query_and_return('BOOT=1')
+        self._queryAndReturn('BOOT=1')
 
-    def bp_set(self, burst: int):
+    def bpSet(self, burst: int):
         """Sets the number of pulses in a burst. Allowed range is 1 to 4,294,967,295 pulses."""
-        self._query_and_return(f'BP={burst}')
+        self._queryAndReturn(f'BP={burst}')
 
-    def bp_get(self) -> int:
+    def bpGet(self) -> int:
         """Returns the number of pulses in a burst"""
-        return self._query_and_return_int('?BP')
+        return self._queryAndReturnInt('?BP')
 
-    def bt_get(self) -> float:
+    def btGet(self) -> float:
         """Returns laser head baseplate measured temperature in °C"""
-        return self._query_and_return_float('?BT')
+        return self._queryAndReturnFloat('?BT')
 
-    def chen_set(self, mode: int | bool):
+    def chenSet(self, mode: int | bool):
         """
         Set chiller enable:
             n = 0 turns off the chiller
             n = 1 turns on the chiller
         """
-        self._query_and_return(f'CHEN={int(mode)}')
+        self._queryAndReturn(f'CHEN={int(mode)}')
 
-    def chen_get(self) -> int:
+    def chenGet(self) -> int:
         """Returns status of chiller enable"""
-        return self._query_and_return_int('?CHEN')
+        return self._queryAndReturnInt('?CHEN')
 
-    def chf_get(self) -> float:
+    def chfGet(self) -> float:
         """Returns chiller flow"""
-        return self._query_and_return_float('?CHF')
+        return self._queryAndReturnFloat('?CHF')
 
     # TODO: better faults
-    def chfault_get(self) -> str:
+    def chfaultGet(self) -> str:
         """Returns chiller faults"""
-        return self._query_and_return('?CHFAULT')
+        return self._queryAndReturn('?CHFAULT')
 
-    def chfh_get(self) -> float:
+    def chfhGet(self) -> float:
         """Returns chiller high flow rate warning limit"""
-        return self._query_and_return_float('?CHFH')
+        return self._queryAndReturnFloat('?CHFH')
 
-    def chfl_get(self) -> float:
+    def chflGet(self) -> float:
         """Returns chiller low flow rate warning limit"""
-        return self._query_and_return_float('?CHFL')
+        return self._queryAndReturnFloat('?CHFL')
 
-    def chflf_get(self) -> float:
+    def chflfGet(self) -> float:
         """Returns chiller low flow rate fault limit"""
-        return self._query_and_return_float('?CHFLF')
+        return self._queryAndReturnFloat('?CHFLF')
 
-    def chp_get(self) -> float:
+    def chpGet(self) -> float:
         """Returns chiller pressure"""
-        return self._query_and_return_float('?CHP')
+        return self._queryAndReturnFloat('?CHP')
 
-    def chph_get(self) -> float:
+    def chphGet(self) -> float:
         """Returns chiller maximum pressure"""
-        return self._query_and_return_float('?CHPH')
+        return self._queryAndReturnFloat('?CHPH')
 
-    def chpl_get(self) -> float:
+    def chplGet(self) -> float:
         """Returns chiller minimum pressure"""
-        return self._query_and_return_float('?CHPL')
+        return self._queryAndReturnFloat('?CHPL')
 
-    def chserven_get(self) -> int:
+    def chservenGet(self) -> int:
         """Get chiller service warning enable"""
-        return self._query_and_return_int('?CHSERVEN')
+        return self._queryAndReturnInt('?CHSERVEN')
 
-    def chserviced_set(self, service: str):
+    def chservicedSet(self, service: str):
         """Setting n=1 will clear the chiller service warning, and resets the service start time"""
-        self._query_and_return(f'?CHSERVICED={service}')
+        self._queryAndReturn(f'?CHSERVICED={service}')
 
-    def chservicehrsrem_get(self) -> float:
+    def chservicehrsremGet(self) -> float:
         """Displays the remaining hours before chiller service is required."""
-        return self._query_and_return_float('?CHSERVICEHRSREM')
+        return self._queryAndReturnFloat('?CHSERVICEHRSREM')
 
-    def chservoperiod_get(self) -> float:
+    def chservoperiodGet(self) -> float:
         """Returns light loop period"""
-        return self._query_and_return_float('?CHSERVOPERIOD')
+        return self._queryAndReturnFloat('?CHSERVOPERIOD')
 
-    def chservstart_get(self) -> float:
+    def chservstartGet(self) -> float:
         """Get start chiller service timer"""
-        return self._query_and_return_float('?CHSERVSTART')
+        return self._queryAndReturnFloat('?CHSERVSTART')
 
-    def chsn_get(self) -> str:
+    def chsnGet(self) -> str:
         """Returns chiller serial number"""
-        return self._query_and_return('?CHSN')
+        return self._queryAndReturn('?CHSN')
 
-    def chst_get(self) -> float:
+    def chstGet(self) -> float:
         """Returns chiller set point"""
-        return self._query_and_return_float('?CHST')
+        return self._queryAndReturnFloat('?CHST')
 
-    def cht_get(self) -> float:
+    def chtGet(self) -> float:
         """Returns chiller temperature"""
-        return self._query_and_return_float('?CHT')
+        return self._queryAndReturnFloat('?CHT')
 
-    def chth_get(self) -> float:
+    def chthGet(self) -> float:
         """Returns chiller high temperature limit"""
-        return self._query_and_return_float('?CHTH')
+        return self._queryAndReturnFloat('?CHTH')
 
-    def chtl_get(self) -> float:
+    def chtlGet(self) -> float:
         """Returns chiller low temperature limit"""
-        return self._query_and_return_float('?CHTL')
+        return self._queryAndReturnFloat('?CHTL')
 
-    def cpumt_get(self) -> float:
+    def cpumtGet(self) -> float:
         """Returns CPU package temperature"""
-        return self._query_and_return_float('?CPUMT')
+        return self._queryAndReturnFloat('?CPUMT')
 
-    def cput_get(self) -> float:
+    def cputGet(self) -> float:
         """Returns CPU chip temperature"""
-        return self._query_and_return_float('?CPUT')
+        return self._queryAndReturnFloat('?CPUT')
 
     # TODO: better errors
-    def daf_get(self) -> str:
+    def dafGet(self) -> str:
         """Returns descriptions of active faults"""
-        return self._query_and_return('?DAF')
+        return self._queryAndReturn('?DAF')
 
     # TODO: better data get
-    def data_get(self, cmd: str) -> str:
+    def dataGet(self, cmd: str) -> str:
         """Returns data from the datalogger"""
-        return self._query_and_return(f'?DATA {cmd}')
+        return self._queryAndReturn(f'?DATA {cmd}')
 
-    def datasheet_get(self) -> str:
+    def datasheetGet(self) -> str:
         """Returns name of datasheet"""
-        return self._query_and_return(f'?DATASHEET')
+        return self._queryAndReturn(f'?DATASHEET')
 
-    def d1h_get(self) -> float:
+    def d1hGet(self) -> float:
         """Returns the number of operating hours on laser diode 1"""
-        return self._query_and_return_float('?D1H')
+        return self._queryAndReturnFloat('?D1H')
 
-    def d1rc_get(self) -> float:
+    def d1rcGet(self) -> float:
         """Returns the set maximum current of diode 1 in Amps"""
-        return self._query_and_return_float('?D1RC')
+        return self._queryAndReturnFloat('?D1RC')
 
-    def d1sn_get(self) -> str:
+    def d1snGet(self) -> str:
         """Returns serial number of the diode 1"""
-        return self._query_and_return('?D1SN')
+        return self._queryAndReturn('?D1SN')
 
-    def d2h_get(self) -> float:
+    def d2hGet(self) -> float:
         """Returns the number of operating hours on laser diode 2"""
-        return self._query_and_return_float('?D2H')
+        return self._queryAndReturnFloat('?D2H')
 
-    def d2rc_get(self) -> float:
+    def d2rcGet(self) -> float:
         """Returns the set maximum current of diode 2 in Amps"""
-        return self._query_and_return_float('?D2RC')
+        return self._queryAndReturnFloat('?D2RC')
 
-    def d2sn_get(self) -> str:
+    def d2snGet(self) -> str:
         """Returns serial number of the diode 2"""
-        return self._query_and_return('?D2SN')
+        return self._queryAndReturn('?D2SN')
 
-    def d3h_get(self) -> float:
+    def d3hGet(self) -> float:
         """Returns the number of operating hours on laser diode 3"""
-        return self._query_and_return_float('?D3H')
+        return self._queryAndReturnFloat('?D3H')
 
-    def d3llen_get(self) -> int:
+    def d3llenGet(self) -> int:
         """Returns the D3 light loop enable"""
-        return self._query_and_return_int('?D3LLEN')
+        return self._queryAndReturnInt('?D3LLEN')
 
-    def d3rc_get(self) -> float:
+    def d3rcGet(self) -> float:
         """Returns the set maximum current of diode 3 in Amps"""
-        return self._query_and_return_float('?D3RC')
+        return self._queryAndReturnFloat('?D3RC')
 
-    def d3rcll_get(self) -> float:
+    def d3rcllGet(self) -> float:
         """Returns the D3 rated current before light loop"""
-        return self._query_and_return_float('?D3RCLL')
+        return self._queryAndReturnFloat('?D3RCLL')
 
-    def d3sn_get(self) -> str:
+    def d3snGet(self) -> str:
         """Returns serial number of the diode 3"""
-        return self._query_and_return('?D3SN')
+        return self._queryAndReturn('?D3SN')
 
-    def dhcp_set(self, mode: int | bool):
+    def dhcpSet(self, mode: int | bool):
         """
         Enables or disables the dynamic host configuration protocol (DHCP):
             n = 0 DHCP is disabled
             n = 1 DHCP is enabled
         """
-        self._query_and_return(f'DHCP={int(mode)}')
+        self._queryAndReturn(f'DHCP={int(mode)}')
 
-    def dhcp_get(self) -> int:
+    def dhcpGet(self) -> int:
         """Returns the status of DHCP"""
-        return self._query_and_return_int('?DHCP')
+        return self._queryAndReturnInt('?DHCP')
 
-    def dns_set(self, dns: str):
+    def dnsSet(self, dns: str):
         """Sets the DNS address when DHCP is disabled"""
-        self._query_and_return(f'DNS={dns}')
+        self._queryAndReturn(f'DNS={dns}')
 
-    def dns_get(self) -> str:
+    def dnsGet(self) -> str:
         """Returns the DNS server address"""
-        return self._query_and_return('?DNS')
+        return self._queryAndReturn('?DNS')
 
-    def dsh_get(self) -> float:
+    def dshGet(self) -> float:
         """Returns the hours of DS"""
-        return self._query_and_return_float('?DSH')
+        return self._queryAndReturnFloat('?DSH')
 
-    def dsllen_get(self) -> int:
+    def dsllenGet(self) -> int:
         """Returns DS light loop enable"""
-        return self._query_and_return_int('?DSLLEN')
+        return self._queryAndReturnInt('?DSLLEN')
 
-    def dsrc_get(self) -> float:
+    def dsrcGet(self) -> float:
         """Returns the DS rated current"""
-        return self._query_and_return_float('?DSRC')
+        return self._queryAndReturnFloat('?DSRC')
 
-    def dssn_get(self) -> str:
+    def dssnGet(self) -> str:
         """Returns the serial number for DS"""
-        return self._query_and_return('?DSSN')
+        return self._queryAndReturn('?DSSN')
 
-    def echo_set(self, mode: int | bool):
+    def echoSet(self, mode: int | bool):
         """
         Turns the Characters transmitted to the laser (echoed) on or off
             n = 0 turns off echo
             n = 1 turns on echo
         """
-        self._query_and_return(f'ECHO={int(mode)}')
+        self._queryAndReturn(f'ECHO={int(mode)}')
 
-    def echo_get(self) -> int:
+    def echoGet(self) -> int:
         """Returns echo mode"""
-        return self._query_and_return_int('?ECHO')
+        return self._queryAndReturnInt('?ECHO')
 
-    def eg_set(self, mode: int | bool):
+    def egSet(self, mode: int | bool):
         """
         Enable the external gate:
             n = 0 disables PulseEQ external gate (default)
             n = 1 turns on PulseEQ external gate
         """
-        self._query_and_return(f'EG={int(mode)}')
+        self._queryAndReturn(f'EG={int(mode)}')
 
-    def eg_get(self) -> int:
+    def egGet(self) -> int:
         """Returns the status of DHCP"""
-        return self._query_and_return_int('?EG')
+        return self._queryAndReturnInt('?EG')
 
-    def em_set(self, mode: int | bool):
+    def emSet(self, mode: int | bool):
         """Sets external modulation"""
-        self._query_and_return(f'EM={int(mode)}')
+        self._queryAndReturn(f'EM={int(mode)}')
 
-    def em_get(self) -> int:
+    def emGet(self) -> int:
         """Returns external modulation status"""
-        return self._query_and_return_int('?EM')
+        return self._queryAndReturnInt('?EM')
 
-    def en_set(self, mode: int | bool):
+    def enSet(self, mode: int | bool):
         """Enable enhanced notifications"""
-        self._query_and_return(f'EN={int(mode)}')
+        self._queryAndReturn(f'EN={int(mode)}')
 
-    def en_get(self) -> int:
+    def enGet(self) -> int:
         """Returns enhanced notifications status"""
-        return self._query_and_return_int('?EN')
+        return self._queryAndReturnInt('?EN')
 
-    def ep_set(self, mode: int):
+    def epSet(self, mode: int):
         """Enhanced serial protocol"""
-        self._query_and_return(f'EP={mode}')
+        self._queryAndReturn(f'EP={mode}')
 
-    def ep_get(self) -> int:
+    def epGet(self) -> int:
         """Returns enhanced serial protocol"""
-        return self._query_and_return_int('?EP')
+        return self._queryAndReturnInt('?EP')
 
-    def exit_set(self):
+    def exitSet(self):
         """Closes an Ethernet connection"""
-        self._query_and_return('EXIT')
+        self._queryAndReturn('EXIT')
 
     # TODO: better faults
-    def f_get(self) -> str:
+    def fGet(self) -> str:
         """
         Displays a list of faults, if present.
         Use ?FNAME command to show a description of a particular fault.
         If a fault is present, it will turn off the laser.
         """
-        return self._query_and_return('?F')
+        return self._queryAndReturn('?F')
 
-    def fack_set(self):
+    def fackSet(self):
         """Acknowledge faults and return the laser to a ready state if the fault condition is lifted"""
-        self._query_and_return('FACK=1')
+        self._queryAndReturn('FACK=1')
 
     # TODO: better faults
-    def faults_get(self) -> str:
+    def faultsGet(self) -> str:
         """Returns a list of numbered codes of all active faults. separated by an &, or returns “System OK” if no active faults"""
-        return self._query_and_return('?FAULTS')
+        return self._queryAndReturn('?FAULTS')
 
     # TODO: better faults
-    def fh_get(self) -> str:
+    def fhGet(self) -> str:
         """
         Returns the fault history with index numbers delimited by “&” sign with no spaces.
         Faults are recorded in chronological order since last AC power up or last FHC command.
         Fault history is limited to the last 20 faults.
         """
-        return self._query_and_return('?FH')
+        return self._queryAndReturn('?FH')
 
-    def fhc_set(self):
+    def fhcSet(self):
         """Clears the fault history"""
-        self._query_and_return('FHC')
+        self._queryAndReturn('FHC')
 
-    def fname_get(self, code: int) -> str:
+    def fnameGet(self, code: int) -> str:
         """Returns the description of fault code or warning code nn"""
-        return self._query_and_return(f'?FNAME:{code}')
+        return self._queryAndReturn(f'?FNAME:{code}')
 
-    def fv_get(self) -> str:
+    def fvGet(self) -> str:
         """Returns the version number of the FPGA firmware of the laser"""
-        return self._query_and_return('?FV')
+        return self._queryAndReturn('?FV')
 
-    def gateway_set(self, gateway: str):
+    def gatewaySet(self, gateway: str):
         """Set the gateway when DHCP is disabled"""
-        self._query_and_return(f'GATEWAY={gateway}')
+        self._queryAndReturn(f'GATEWAY={gateway}')
 
-    def gateway_get(self) -> str:
+    def gatewayGet(self) -> str:
         """Returns the Ethernet gateway"""
-        return self._query_and_return('?GATEWAY')
+        return self._queryAndReturn('?GATEWAY')
 
-    def grr_set(self, rate: float):
+    def grrSet(self, rate: float):
         """Sets the PulseEQ internal repetition rate to {rate}kHz"""
-        self._query_and_return(f'GRR={rate}')
+        self._queryAndReturn(f'GRR={rate}')
 
-    def grr_get(self) -> float:
+    def grrGet(self) -> float:
         """Returns the Ethernet gateway"""
-        return self._query_and_return_float('?GRR')
+        return self._queryAndReturnFloat('?GRR')
 
-    def grren_set(self, mode: int | bool):
+    def grrenSet(self, mode: int | bool):
         """
         Enables the internal repetition rate gate:
             n = 0 disables PulseEQ Internal triggering
             n = 1 enables PulseEQ Internal triggering
         """
-        self._query_and_return(f'GRREN={int(mode)}')
+        self._queryAndReturn(f'GRREN={int(mode)}')
 
-    def grren_get(self) -> int:
+    def grrenGet(self) -> int:
         """Returns the status of the internal repetition rate gate"""
-        return self._query_and_return_int('?GRREN')
+        return self._queryAndReturnInt('?GRREN')
 
-    def gui_get(self) -> str:
+    def guiGet(self) -> str:
         """Returns the status of the internal repetition rate gate"""
-        return self._query_and_return('?GUI')
+        return self._queryAndReturn('?GUI')
 
-    def hb_set(self, time: int):
+    def hbSet(self, time: int):
         """Sets the heartbeat timeout in secs, 0 or 5-300 (0=disabled)"""
-        self._query_and_return(f'HB={time}')
+        self._queryAndReturn(f'HB={time}')
 
-    def hb_get(self) -> int:
+    def hbGet(self) -> int:
         """Returns the heartbeat timeout in seconds (0=disabled)"""
-        return self._query_and_return_int('?HB')
+        return self._queryAndReturnInt('?HB')
 
     # TODO: better help
-    def help_get(self, search: str = '') -> str:
+    def helpGet(self, search: str = '') -> str:
         """Query commands, with optional filter"""
         cmd = '?HELP'
         if search:
             cmd += f' {search}'
-        return self._query_and_return(cmd)
+        return self._queryAndReturn(cmd)
 
-    def hh_get(self) -> float:
+    def hhGet(self) -> float:
         """Returns the number of operating hours on the system head"""
-        return self._query_and_return_float('?HH')
+        return self._queryAndReturnFloat('?HH')
 
-    def hhl_get(self) -> float:
+    def hhlGet(self) -> float:
         """Returns the laser head humidity warning limit"""
-        return self._query_and_return_float('?HHL')
+        return self._queryAndReturnFloat('?HHL')
 
-    def hostname_set(self, hostname: str):
+    def hostnameSet(self, hostname: str):
         """Sets host name for Ethernet connection"""
-        self._query_and_return(f'HOSTNAME={hostname}')
+        self._queryAndReturn(f'HOSTNAME={hostname}')
 
-    def hostname_get(self) -> str:
+    def hostnameGet(self) -> str:
         """Returns host name of Ethernet connection"""
-        return self._query_and_return('?HOSTNAME')
+        return self._queryAndReturn('?HOSTNAME')
 
-    def hsn_get(self) -> str:
+    def hsnGet(self) -> str:
         """Returns serial number of the laser head"""
-        return self._query_and_return('?HSN')
+        return self._queryAndReturn('?HSN')
 
-    def hsv_get(self) -> str:
+    def hsvGet(self) -> str:
         """Returns firmware version of the laser head as HEAD rev x.xx, date"""
-        return self._query_and_return('?HSV')
+        return self._queryAndReturn('?HSV')
 
-    def hv_get(self) -> str:
+    def hvGet(self) -> str:
         """Displays the internal revision level of major hardware components"""
-        return self._query_and_return('?HV')
+        return self._queryAndReturn('?HV')
 
-    def ip_set(self, ip: str):
+    def ipSet(self, ip: str):
         """Sets the static IP address"""
-        self._query_and_return(f'IP={ip}')
+        self._queryAndReturn(f'IP={ip}')
 
-    def ip_get(self) -> str:
+    def ipGet(self) -> str:
         """Returns the IP address for Ethernet"""
-        return self._query_and_return('?IP')
+        return self._queryAndReturn('?IP')
 
-    def ipmax_set(self, ip: str):
+    def ipmaxSet(self, ip: str):
         """Sets end of range for AutoIP scan"""
-        self._query_and_return(f'IPMAX={ip}')
+        self._queryAndReturn(f'IPMAX={ip}')
 
-    def ipmax_get(self) -> str:
+    def ipmaxGet(self) -> str:
         """Returns end of range for AutoIP scan"""
-        return self._query_and_return('?IPMAX')
+        return self._queryAndReturn('?IPMAX')
 
-    def ipmin_set(self, ip: str):
+    def ipminSet(self, ip: str):
         """Sets start of range for AutoIP scan"""
-        self._query_and_return(f'IPMIN={ip}')
+        self._queryAndReturn(f'IPMIN={ip}')
 
-    def ipmin_get(self) -> str:
+    def ipminGet(self) -> str:
         """Returns start of range for AutoIP scan"""
-        return self._query_and_return('?IPMIN')
+        return self._queryAndReturn('?IPMIN')
 
-    def ire_get(self) -> float:
+    def ireGet(self) -> float:
         """Returns the IR energy"""
-        return self._query_and_return_float('?IRE')
+        return self._queryAndReturnFloat('?IRE')
 
-    def irec_get(self) -> int:
+    def irecGet(self) -> int:
         """Returns the IR count"""
-        return self._query_and_return_int('?IREC')
+        return self._queryAndReturnInt('?IREC')
 
-    def irep1_set(self, value: float):
+    def irep1Set(self, value: float):
         """Sets the IR point 1 calibration"""
-        self._query_and_return(f'IREP1={value}')
+        self._queryAndReturn(f'IREP1={value}')
 
-    def irep2_set(self, value: float):
+    def irep2Set(self, value: float):
         """Sets the IR point 2 calibration"""
-        self._query_and_return(f'IREP2={value}')
+        self._queryAndReturn(f'IREP2={value}')
 
-    def k_get(self) -> int:
+    def kGet(self) -> int:
         """
         Returns laser enable keyswitch state:
             0 = laser in Standby (laser diodes cannot be turned on)
             1 = laser enabled
         """
-        return self._query_and_return_int('?K')
+        return self._queryAndReturnInt('?K')
 
-    def l_set(self, state: int | bool):
+    def lSet(self, state: int | bool):
         """
         Sets the laser state:
             0 = turns off laser
             1 = turns on laser
         """
-        self._query_and_return(f'L={int(state)}')
+        self._queryAndReturn(f'L={int(state)}')
 
-    def l_get(self) -> int:
+    def lGet(self) -> int:
         """
         Returns laser state:
             0 = if the laser is in STANDBY, key-switch is off
@@ -748,132 +748,132 @@ class MonacoConnection(TelnetConnection):
             2 = if the laser is READY, key-switch is on but the diodes are off
             24 = if the laser is ON, all the diodes are on and the laser is ready to produce output pulses
         """
-        return self._query_and_return_int('?L')
+        return self._queryAndReturnInt('?L')
 
-    def lip_get(self) -> str:
+    def lipGet(self) -> str:
         """Returns last used static IP address"""
-        return self._query_and_return('?LIP')
+        return self._queryAndReturn('?LIP')
 
-    def lm_get(self) -> str:
+    def lmGet(self) -> str:
         """Returns the laser model"""
-        return self._query_and_return('?LM')
+        return self._queryAndReturn('?LM')
 
-    def lname_get(self, state: int) -> str:
+    def lnameGet(self, state: int) -> str:
         """Returns name of the specified laser state"""
-        return self._query_and_return(f'?LNAME={state}')
+        return self._queryAndReturn(f'?LNAME={state}')
 
-    def lock_get(self) -> str:
+    def lockGet(self) -> str:
         """Returns locked commands"""
-        return self._query_and_return('?LOCK')
+        return self._queryAndReturn('?LOCK')
 
-    def lockout_set(self, mode: int | bool):
+    def lockoutSet(self, mode: int | bool):
         """
         Sets laser LOCKOUT control state (only one connection can have exclusive control of laser at any given time):
             n = 0 unlocks laser to release control to other remote control device. The next remote device issuing a command will have exclusive
                   control, which sets LOCKOUT=1 for that device.
             n = 1 locks out other remote devices from controlling laser; only current control device has exclusive control of laser (default)
         """
-        self._query_and_return(f'LOCKOUT={int(mode)}')
+        self._queryAndReturn(f'LOCKOUT={int(mode)}')
 
-    def lockout_get(self) -> int:
+    def lockoutGet(self) -> int:
         """
         Returns LOCKOUT state of laser control:
             0 = laser is unlocked from current connection for control by another remote control device or connection.
             1 = laser remote control is locked out: only current connection has exclusive control of the laser
             x = a connection from device X has exclusive control of the laser
         """
-        return self._query_and_return_int('?LOCKOUT')
+        return self._queryAndReturnInt('?LOCKOUT')
 
     # TODO: better implementation
-    def lookup_reprates_names_get(self) -> str:
+    def lookupRepratesNamesGet(self) -> str:
         """
         Returns a list of the laser repetition rates/seeder burst lengths that are available in the format:
         {reprate in kHz}:{seeder burst length}
         """
-        return self._query_and_return('?LOOKUP REPRATES NAMES')
+        return self._queryAndReturn('?LOOKUP REPRATES NAMES')
 
-    def lpssn_get(self) -> str:
+    def lpssnGet(self) -> str:
         """Returns low power stage serial number"""
-        return self._query_and_return('?LPSSN')
+        return self._queryAndReturn('?LPSSN')
 
-    def mac_get(self) -> str:
+    def macGet(self) -> str:
         """Returns the MAC address of the Ethernet interface"""
-        return self._query_and_return('?MAC')
+        return self._queryAndReturn('?MAC')
 
-    def manual_get(self) -> str:
+    def manualGet(self) -> str:
         """Returns the operator's manual filename"""
-        return self._query_and_return('?MANUAL')
+        return self._queryAndReturn('?MANUAL')
 
-    def mrr_get(self) -> float:
+    def mrrGet(self) -> float:
         """Returns the laser amplifier repetition rate (in kHz)"""
-        return self._query_and_return_float('?MRR')
+        return self._queryAndReturnFloat('?MRR')
 
-    def msc_get(self) -> int:
+    def mscGet(self) -> int:
         """Get machine safe shutter count"""
-        return self._query_and_return_int('?MSC')
+        return self._queryAndReturnInt('?MSC')
 
-    def msi_get(self) -> int:
+    def msiGet(self) -> int:
         """Get machine safe shutter installed"""
-        return self._query_and_return_int('?MSI')
+        return self._queryAndReturnInt('?MSI')
 
     # TODO: better output
-    def new_get(self) -> str:
+    def newGet(self) -> str:
         """Returns every parameter that has changed"""
-        return self._query_and_return('?NEW')
+        return self._queryAndReturn('?NEW')
 
-    def password_set(self, password: str):
+    def passwordSet(self, password: str):
         """Sets up or changes the user password"""
-        self._query_and_return(f'PASSWORD={password}')
+        self._queryAndReturn(f'PASSWORD={password}')
 
-    def pc_set(self, mode: int | bool):
+    def pcSet(self, mode: int | bool):
         """
         Sets pulse control:
             n = 0 is pulse control off
             n = 1 is pulse control on
         """
-        self._query_and_return(f'PC={int(mode)}')
+        self._queryAndReturn(f'PC={int(mode)}')
 
-    def pc_get(self) -> int:
+    def pcGet(self) -> int:
         """Returns the status of pulse control"""
-        return self._query_and_return_int('?PC')
+        return self._queryAndReturnInt('?PC')
 
-    def pd3t_get(self) -> float:
+    def pd3tGet(self) -> float:
         """Returns the status of pulse control"""
-        return self._query_and_return_float('?PD3T')
+        return self._queryAndReturnFloat('?PD3T')
 
-    def pd4opten_get(self) -> int:
+    def pd4optenGet(self) -> int:
         """
         Returns PD4 optimization enable status:
             0 = PD4 optimization off
             1 = PD4 optimization on
         """
-        return self._query_and_return_int('?PD4OPTEN')
+        return self._queryAndReturnInt('?PD4OPTEN')
 
-    def pdsv_get(self) -> float:
+    def pdsvGet(self) -> float:
         """Returns seed photodiode voltage"""
-        return self._query_and_return_float('?PDSV')
+        return self._queryAndReturnFloat('?PDSV')
 
-    def penrgv_get(self) -> float:
+    def penrgvGet(self) -> float:
         """Returns the external pulse energy control voltage"""
-        return self._query_and_return_float('?PENRGV')
+        return self._queryAndReturnFloat('?PENRGV')
 
-    def pep_set(self, percentage: float):
+    def pepSet(self, percentage: float):
         """Sets the output pulse energy as percentage of maximum, 0 to 100"""
-        self._query_and_return(f'PEP={percentage}')
+        self._queryAndReturn(f'PEP={percentage}')
 
-    def pep_get(self) -> float:
+    def pepGet(self) -> float:
         """Returns the current pulse energy percentage"""
-        return self._query_and_return_float('?PEP')
+        return self._queryAndReturnFloat('?PEP')
 
-    def period_set(self, period: float):
+    def periodSet(self, period: float):
         """Set how often to report new data"""
-        self._query_and_return(f'PERIOD={period}')
+        self._queryAndReturn(f'PERIOD={period}')
 
-    def period_get(self) -> float:
+    def periodGet(self) -> float:
         """Return how often to report new data"""
-        return self._query_and_return_float('?PERIOD')
+        return self._queryAndReturnFloat('?PERIOD')
 
-    def pm_set(self, mode: int):
+    def pmSet(self, mode: int):
         """
         Sets the pulse mode:
             n = 0 for Continuous pulsing
@@ -883,148 +883,148 @@ class MonacoConnection(TelnetConnection):
             n = 4 for Burst mode
             n = 5 for Burst and Divided mode
         """
-        self._query_and_return(f'PM={mode}')
+        self._queryAndReturn(f'PM={mode}')
 
-    def pm_get(self) -> int:
+    def pmGet(self) -> int:
         """Returns the pulse mode"""
-        return self._query_and_return_int('?PM')
+        return self._queryAndReturnInt('?PM')
 
-    def prompt_set(self, mode: int | bool):
+    def promptSet(self, mode: int | bool):
         """
         Sets the mode of prompt:
             n = 0 turns off “Monaco Laser >” prompt
             n = 1 turns on “Monaco Laser >” prompt
         """
-        self._query_and_return(f'PROMPT={int(mode)}')
+        self._queryAndReturn(f'PROMPT={int(mode)}')
 
-    def prompt_get(self) -> int:
+    def promptGet(self) -> int:
         """Return the mode of prompt"""
-        return self._query_and_return_int('?PROMPT')
+        return self._queryAndReturnInt('?PROMPT')
 
-    def pscode_get(self) -> int:
+    def pscodeGet(self) -> int:
         """Return the power supply family code"""
-        return self._query_and_return_int('?PSCODE')
+        return self._queryAndReturnInt('?PSCODE')
 
-    def psid_get(self) -> int:
+    def psidGet(self) -> int:
         """Return the power supply ID"""
-        return self._query_and_return_int('?PSID')
+        return self._queryAndReturnInt('?PSID')
 
-    def pssn_get(self) -> str:
+    def pssnGet(self) -> str:
         """Returns the power supply serial number"""
-        return self._query_and_return('?PSSN')
+        return self._queryAndReturn('?PSSN')
 
-    def pw_set(self, width: float):
+    def pwSet(self, width: float):
         """Sets the pulse width in femtoseconds"""
-        self._query_and_return(f'PW={width}')
+        self._queryAndReturn(f'PW={width}')
 
-    def pw_get(self) -> float:
+    def pwGet(self) -> float:
         """Return the pulse width in femtoseconds"""
-        return self._query_and_return_float('?PW')
+        return self._queryAndReturnFloat('?PW')
 
-    def pwfine_set(self, tuning: float):
+    def pwfineSet(self, tuning: float):
         """
         Sets the pulse width fine tuning in %, range of -100 to 100.
         This works in conjunction with the Peak Power Optimizer.
         """
-        self._query_and_return(f'PWFINE={tuning}')
+        self._queryAndReturn(f'PWFINE={tuning}')
 
-    def pwfine_get(self) -> float:
+    def pwfineGet(self) -> float:
         """Returns the pulse width fine tuning in %"""
-        return self._query_and_return_float('?PWFINE')
+        return self._queryAndReturnFloat('?PWFINE')
 
-    def pws_get(self) -> float:
+    def pwsGet(self) -> float:
         """Returns the pulse width set point"""
-        return self._query_and_return_float('?PWS')
+        return self._queryAndReturnFloat('?PWS')
 
-    def quit_set(self):
+    def quitSet(self):
         """Closes an Ethernet connection"""
-        self._query_and_return('QUIT')
+        self._queryAndReturn('QUIT')
 
-    def ready_get(self) -> int:
+    def readyGet(self) -> int:
         """Returns laser ready status"""
-        return self._query_and_return_int('?READY')
+        return self._queryAndReturnInt('?READY')
 
-    def relh_get(self) -> float:
+    def relhGet(self) -> float:
         """Returns the relative humidity"""
-        return self._query_and_return_float('?RELH')
+        return self._queryAndReturnFloat('?RELH')
 
-    def relho_get(self) -> float:
+    def relhoGet(self) -> float:
         """Returns the relative humidity offset"""
-        return self._query_and_return_float('?RELHO')
+        return self._queryAndReturnFloat('?RELHO')
 
-    def ren_set(self, mode: int | bool):
+    def renSet(self, mode: int | bool):
         """
         Enables or disables the air recirculator inside the laser head:
             n = 0 disables the recirculator
             n = 1 enables the recirculator
         """
-        self._query_and_return(f'REN={int(mode)}')
+        self._queryAndReturn(f'REN={int(mode)}')
 
-    def ren_get(self) -> int:
+    def renGet(self) -> int:
         """Returns recirculator control status"""
-        return self._query_and_return_int('?REN')
+        return self._queryAndReturnInt('?REN')
 
-    def rl_set(self, percentage: float):
+    def rlSet(self, percentage: float):
         """Sets the Output AOM voltage as percentage of maximum, from 0 to 100"""
-        self._query_and_return(f'RL={percentage}')
+        self._queryAndReturn(f'RL={percentage}')
 
-    def rl_get(self) -> float:
+    def rlGet(self) -> float:
         """Returns the Output AOM voltage as percentage of maximum"""
-        return self._query_and_return_float('?RL')
+        return self._queryAndReturnFloat('?RL')
 
-    def rr_get(self) -> float:
+    def rrGet(self) -> float:
         """Returns the laser pulse or seeder burst output repetition rate in Hz"""
-        return self._query_and_return_float('?RR')
+        return self._queryAndReturnFloat('?RR')
 
-    def rrd_set(self, divisor: int):
+    def rrdSet(self, divisor: int):
         """Allows the amplifier laser pulse repetition rate to be divided by an integer"""
-        self._query_and_return(f'RRD={divisor}')
+        self._queryAndReturn(f'RRD={divisor}')
 
-    def rrd_get(self) -> int:
+    def rrdGet(self) -> int:
         """Returns the laser pulse repetition rate divisor"""
-        return self._query_and_return_int('?RRD')
+        return self._queryAndReturnInt('?RRD')
 
-    def s_set(self, mode: int | bool):
+    def sSet(self, mode: int | bool):
         """
         Sets the shutter state:
             n = 0 closes external shutter
             n = 1 opens external shutter
         """
-        self._query_and_return(f'S={int(mode)}')
+        self._queryAndReturn(f'S={int(mode)}')
 
-    def s_get(self) -> int:
+    def sGet(self) -> int:
         """Returns the shutter cycle counter value"""
-        return self._query_and_return_int('?SC')
+        return self._queryAndReturnInt('?SC')
 
-    def sc_get(self) -> int:
+    def scGet(self) -> int:
         """Returns inversion of shutter control input value"""
-        return self._query_and_return_int('?SCI')
+        return self._queryAndReturnInt('?SCI')
 
-    def sci_set(self, mode: int | bool):
+    def sciSet(self, mode: int | bool):
         """
         Shutter control inversion:
             n = 0 disables inversion (default)
             n = 1 enables inversion
         """
-        self._query_and_return(f'SCI={int(mode)}')
+        self._queryAndReturn(f'SCI={int(mode)}')
 
-    def sci_get(self) -> int:
+    def sciGet(self) -> int:
         """Returns inversion of shutter control input value"""
-        return self._query_and_return_int('?SCI')
+        return self._queryAndReturnInt('?SCI')
 
-    def scoi_set(self, mode: int | bool):
+    def scoiSet(self, mode: int | bool):
         """
         Shutter control output inversion:
             n = 0 disables output inversion (default)
             n = 1 enables output inversion
         """
-        self._query_and_return(f'SCOI={int(mode)}')
+        self._queryAndReturn(f'SCOI={int(mode)}')
 
-    def scoi_get(self) -> int:
+    def scoiGet(self) -> int:
         """Returns inversion of shutter control output inversion"""
-        return self._query_and_return_int('?SCOI')
+        return self._queryAndReturnInt('?SCOI')
 
-    def se_get(self) -> int:
+    def seGet(self) -> int:
         """
         Returns the shutter control (pin 17) state:
             0 = pin 17 at GND and S = 0 (both are off)
@@ -1032,14 +1032,14 @@ class MonacoConnection(TelnetConnection):
             2 = pin 17 is high and S = 0
             3 = pin 17 is high and S = 1 (both are on)
         """
-        return self._query_and_return_int('?SE')
+        return self._queryAndReturnInt('?SE')
 
     # TODO: better output
-    def sessions_get(self) -> str:
+    def sessionsGet(self) -> str:
         """Lists the active connections"""
-        return self._query_and_return('?SESSIONS')
+        return self._queryAndReturn('?SESSIONS')
 
-    def set_set(
+    def setSet(
         self,
         mrr: float = -1,
         pw: float = -1,
@@ -1077,10 +1077,10 @@ class MonacoConnection(TelnetConnection):
         if eg != -1:
             cmd += f' EG={eg}'
 
-        self._query_and_return(cmd)
+        self._queryAndReturn(cmd)
 
     # TODO: better output variables
-    def set_get(self) -> tuple[float, float, int, int]:
+    def setGet(self) -> tuple[float, float, int, int]:
         """
         Returns the current values for the laser parameters:
             MRR: amplifier repetition rate in kHz
@@ -1088,173 +1088,173 @@ class MonacoConnection(TelnetConnection):
             RRD: repetition rate divisor
             SB: number of seeder bursts
         """
-        query = self._query_and_return('?SET').split(',')
+        query = self._queryAndReturn('?SET').split(',')
         query.extend(['0'] * (4 - len(query)))
         return (
-            try_float(query[0]),
-            try_float(query[1]),
-            int(try_float(query[2])),
-            int(try_float(query[3]))
+            tryConvertToFloat(query[0]),
+            tryConvertToFloat(query[1]),
+            int(tryConvertToFloat(query[2])),
+            int(tryConvertToFloat(query[3]))
         )
 
-    def sis_get(self) -> int:
+    def sisGet(self) -> int:
         """
         Returns the status of the shutter interlock sense:
             0 = shutter interlock closed
             1 = shutter interlock open
         """
-        return self._query_and_return_int('?SIS')
+        return self._queryAndReturnInt('?SIS')
 
-    def srr_get(self) -> float:
+    def srrGet(self) -> float:
         """Returns the seed laser pulse repetition rate"""
-        return self._query_and_return_float('?SRR')
+        return self._queryAndReturnFloat('?SRR')
 
-    def ssi_get(self) -> int:
+    def ssiGet(self) -> int:
         """
         Returns the status of the shutter installation:
             0 = Shutter not installed
             1 = Shutter installed
         """
-        return self._query_and_return_int('?SSI')
+        return self._queryAndReturnInt('?SSI')
 
-    def ssn_get(self) -> str:
+    def ssnGet(self) -> str:
         """Get Seed serial number"""
-        return self._query_and_return('?SSN')
+        return self._queryAndReturn('?SSN')
 
-    def ssp_set(self, position: str):
+    def sspSet(self, position: str):
         """Sets the SESAM spot position"""
-        self._query_and_return(f'SSP={position}')
+        self._queryAndReturn(f'SSP={position}')
 
-    def ssp_int(self) -> int:
+    def sspGet(self) -> int:
         """Returns current SESAM spot position"""
-        return self._query_and_return_int('?SSP')
+        return self._queryAndReturnInt('?SSP')
 
-    def sspc_int(self) -> int:
+    def sspcGet(self) -> int:
         """Returns the SESAM spot transition count"""
-        return self._query_and_return_int('?SSPC')
+        return self._queryAndReturnInt('?SSPC')
 
-    def ssph_int(self) -> float:
+    def ssphGet(self) -> float:
         """Returns current SESAM spot hours"""
-        return self._query_and_return_float('?SSPH')
+        return self._queryAndReturnFloat('?SSPH')
 
-    def ssps_int(self) -> int:
+    def sspsGet(self) -> int:
         """Returns SESAM spot status"""
-        return self._query_and_return_int('?SSPS')
+        return self._queryAndReturnInt('?SSPS')
 
-    def st_get(self) -> str:
+    def stGet(self) -> str:
         """Returns the name of the current laser state"""
-        return self._query_and_return('?ST')
+        return self._queryAndReturn('?ST')
 
-    def subnet_set(self, subnet: str):
+    def subnetSet(self, subnet: str):
         """Sets the subnet when DHCP is disabled"""
-        self._query_and_return(f'SUBNET={subnet}')
+        self._queryAndReturn(f'SUBNET={subnet}')
 
-    def subnet_get(self) -> str:
+    def subnetGet(self) -> str:
         """Returns the Ethernet subnet"""
-        return self._query_and_return('?SUBNET')
+        return self._queryAndReturn('?SUBNET')
 
-    def sv_get(self) -> str:
+    def svGet(self) -> str:
         """Displays the revision level of major software components"""
-        return self._query_and_return('?SV')
+        return self._queryAndReturn('?SV')
 
-    def sync1_set(self, mode: int | bool):
+    def sync1Set(self, mode: int | bool):
         """
         Sets the output from the Sync 1 HD-BNC connector on the back of the laser head:
             n = 0 provides a representation of the drive signal for AOM1
                   (if shutter closed/pulsing off then output is the amplifier rep rate)
             n = 1 provides a representation of the seeder pulses
         """
-        self._query_and_return(f'SYNC1={int(mode)}')
+        self._queryAndReturn(f'SYNC1={int(mode)}')
 
-    def sync1_get(self) -> int:
+    def sync1Get(self) -> int:
         """Returns the output setting from the Sync 1 HD-BNC connector"""
-        return self._query_and_return_int('?SYNC1')
+        return self._queryAndReturnInt('?SYNC1')
 
-    def sync2_set(self, mode: int | bool):
+    def sync2Set(self, mode: int | bool):
         """
         Sets the output from the Sync 2 HD-BNC connector on the back of the laser head:
             n = 0 provides a representation of the drive signal for AOM2
                   (if shutter closed/pulsing off then output is the amplifier rep rate)
             n = 1 provides a representation of the seeder pulses
         """
-        self._query_and_return(f'SYNC2={int(mode)}')
+        self._queryAndReturn(f'SYNC2={int(mode)}')
 
-    def sync2_get(self) -> int:
+    def sync2Get(self) -> int:
         """Returns the output setting from the Sync 2 HD-BNC connector"""
-        return self._query_and_return_int('?SYNC2')
+        return self._queryAndReturnInt('?SYNC2')
 
-    def time_set(self, date_time: datetime | None):
+    def timeSet(self, date_time: datetime | None):
         """Sets local time on the laser clock. If left empty the current time will be used."""
         if date_time is None:
             date_time = datetime.now()
-        self._query_and_return(f'TIME={date_time.strftime("%Y-%m-%d %H:%M")}')
+        self._queryAndReturn(f'TIME={date_time.strftime("%Y-%m-%d %H:%M")}')
 
-    def time_get(self) -> datetime:
+    def timeGet(self) -> datetime:
         """Returns local time on the laser clock"""
-        query = self._query_and_return('?TIME')
+        query = self._queryAndReturn('?TIME')
         try:
             return datetime.strptime(query, '%Y-%m-%d %H:%M.%S')
         except ValueError:
             return datetime(1, 1, 1)
 
-    def timezone_set(self, timezone: str):
+    def timezoneSet(self, timezone: str):
         """Sets local time zone on the laser clock"""
-        self._query_and_return(f'TIMEZONE={timezone}')
+        self._queryAndReturn(f'TIMEZONE={timezone}')
 
-    def timezone_get(self) -> str:
+    def timezoneGet(self) -> str:
         """Returns local time zone on the laser clock"""
-        return self._query_and_return('?TIMEZONE')
+        return self._queryAndReturn('?TIMEZONE')
 
     # TODO: better returning
-    def timezones_get(self) -> str:
+    def timezonesGet(self) -> str:
         """Returns available time zones for this laser"""
-        return self._query_and_return('?TIMEZONES')
+        return self._queryAndReturn('?TIMEZONES')
 
-    def tstl_get(self) -> int:
+    def tstlGet(self) -> int:
         """Checks if all temperature servos are tight locked"""
-        return self._query_and_return_int('?TSTL')
+        return self._queryAndReturnInt('?TSTL')
 
-    def tstls_get(self) -> str:
+    def tstlsGet(self) -> str:
         """Returns the temperature servos tight locked status"""
-        return self._query_and_return('?TSTLS')
+        return self._queryAndReturn('?TSTLS')
 
-    def usb_set(self, connection: str):
+    def usbSet(self, connection: str):
         """Set the mode for the USB connection"""
-        self._query_and_return(f'USB={connection}')
+        self._queryAndReturn(f'USB={connection}')
 
-    def usb_get(self) -> str:
+    def usbGet(self) -> str:
         """Returns the USB connection mode"""
-        return self._query_and_return('?USB')
+        return self._queryAndReturn('?USB')
 
     # TODO: better output
-    def w_get(self) -> str:
+    def wGet(self) -> str:
         """Displays a list of warnings"""
-        return self._query_and_return('?W')
+        return self._queryAndReturn('?W')
 
     # TODO: better output
-    def wh_get(self) -> str:
+    def whGet(self) -> str:
         """Displays the warning history"""
-        return self._query_and_return('?WH')
+        return self._queryAndReturn('?WH')
 
-    def whc_set(self):
+    def whcSet(self):
         """Clears the warning history"""
-        self._query_and_return('WHC')
+        self._queryAndReturn('WHC')
 
-    def wname_get(self, code: int) -> str:
+    def wnameGet(self, code: int) -> str:
         """Returns the description of a warning code"""
-        return self._query_and_return(f'?WNAME={code}')
+        return self._queryAndReturn(f'?WNAME={code}')
 
     def identification(self) -> str:
         """Get the laser identification"""
-        return f'Connected to {self.lm_get()} with S/N {self.hsn_get()}'
+        return f'Connected to {self.lmGet()} with S/N {self.hsnGet()}'
 
 
 def main():
     with MonacoConnection() as monaco:
         for func in dir(monaco):
-            if not func.endswith('_get'):
+            if not func.endswith('Get'):
                 continue
-            if func in ['faults_get', 'help_get', 'new_get', 'sessions_get', 'timezones_get']:
+            if func in ['faultsGet', 'helpGet', 'newGet', 'sessionsGet', 'timezonesGet']:
                 continue
 
             try:
@@ -1263,133 +1263,133 @@ def main():
                 pass
 
     """
-    altmod_get: 1
-    amp3h_get: 712.996
-    amp3sn_get: K0073943
-    autoip_get: 1
-    bat_get: 3.045
-    bp_get: 1
-    bt_get: 27.582
-    chen_get: 1
-    chf_get: 5.1
-    chfault_get: There are no active chiller faults
-    chfh_get: 5.3
-    chfl_get: 4.7
-    chflf_get: 4.2
-    chp_get: 20.0
-    chph_get: 35.0
-    chpl_get: 3.0
-    chserven_get: 1
-    chservicehrsrem_get: 1296.253
-    chservoperiod_get: 5.0
-    chservstart_get: 1.0
-    chsn_get: Not set
-    chst_get: 28.0
-    cht_get: 28.0
-    chth_get: 33.0
-    chtl_get: 12.0
-    cpumt_get: 51.0
-    cput_get: 51.0
-    d1h_get: 809.508
-    d1rc_get: 0.25
-    d1sn_get: 
-    d2h_get: 806.365
-    d2rc_get: 0.5
-    d2sn_get: 
-    d3h_get: 712.996
-    d3llen_get: 1
-    d3rc_get: 8.4
-    d3rcll_get: 0.0
-    d3sn_get: NC7666
-    daf_get: SYSTEM OK-
-    datasheet_get: The datasheet is not installed
-    dhcp_get: 1
-    dns_get: Not set yet
-    dsh_get: 809.507
-    dsllen_get: 1
-    dsrc_get: 0.078
-    dssn_get: 
-    echo_get: 0
-    eg_get: 0
-    em_get: 0
-    en_get: 0
-    ep_get: 0
-    f_get: SYSTEM OK
-    fh_get: SYSTEM OK
-    fv_get: 7.154_50MHz.48
-    gateway_get: Not set yet
-    grr_get: 1000.0
-    grren_get: 0
-    gui_get: 3.82.104
-    hb_get: 0
-    hh_get: 5664.783
-    hhl_get: 8.0
-    hostname_get: 
-    hsn_get: G0123251815
-    hsv_get: 42.4.462
-    hv_get: HD:AL, A1:2.0, FPGA:7.154_50MHz.48, MODULE: Colibri_T20_512MB
-    ip_get: No network connections found, is the Ethernet cable connected?
-    ipmax_get: 192.9.200.255
-    ipmin_get: 192.9.200.1
-    ire_get: -1
-    irec_get: -1
-    k_get: 0
-    l_get: 0
-    lip_get: Error, bad command
-    lm_get: Monaco 1035-40-40
-    lock_get: No commands are locked
-    lockout_get: -1
-    lookup_reprates_names_get: 200:5:'', 200:5:'PulseEQ', 250:4:'', 250:4:'PulseEQ', 330:3:'', 330:3:'PulseEQ', 500:2:'', 500:2:'PulseEQ', 1000:5:'', 1000:10:'', 1000:15:'', 1000:20:'', 1000:1:'', 1000:1:'PulseEQ', 2000:1:'', 4000:1:'', 10000:1:'', 50000:1:''
-    lpssn_get: P1122249858
-    mac_get: 00-1B-1C-04-F1-D2
-    manual_get: FC626346 Monaco_IR_1297688_RevAE.pdf
-    mrr_get: 0.0
-    msc_get: 0
-    msi_get: 0
-    pc_get: 0
-    pd3t_get: 56.017
-    pd4opten_get: 0
-    pdsv_get: 0.001
-    penrgv_get: 4.636
-    pep_get: 100.0
-    period_get: -1.0
-    pm_get: 2
-    prompt_get: 1
-    pscode_get: 0
-    psid_get: 0
-    pssn_get: Not set
-    pw_get: -1
-    pwfine_get: 0.0
-    pws_get: 276.0
-    ready_get: 0
-    relh_get: 0.0
-    relho_get: 0.0
-    ren_get: 1
-    rl_get: 29.0
-    rr_get: 0.0
-    rrd_get: 10
-    s_get: 2533
-    sc_get: 0
-    sci_get: 0
-    scoi_get: 0
-    se_get: 2
-    set_get: (1000.0, 276.0, 10, 1)
-    sis_get: -1
-    srr_get: 0.0
-    ssi_get: 1
-    ssn_get: Not set
-    st_get: Standby
-    subnet_get: Not set yet
-    sv_get: HD:42.4.462, A1:91.0, IM:2.1, OS:7.0, CH:0.0, WEB:0.6.462, JSON:0.8.462, POST:0.030.8, UP:3.0.462
-    sync1_get: 0
-    sync2_get: 0
-    time_get: 2023-12-28 13:33:23
-    timezone_get: (UTC+01:00) Amsterdam, Berlin, Bern, Rome, Stockholm, Vienna
-    tstl_get: 0
-    tstls_get: No crystal temperature servos are present
-    usb_get: RNDIS
-    w_get: SYSTEM OK
-    wh_get: SYSTEM OK
+    altmodGet: 1
+    amp3hGet: 712.996
+    amp3snGet: K0073943
+    autoipGet: 1
+    batGet: 3.045
+    bpGet: 1
+    btGet: 27.582
+    chenGet: 1
+    chfGet: 5.1
+    chfaultGet: There are no active chiller faults
+    chfhGet: 5.3
+    chflGet: 4.7
+    chflfGet: 4.2
+    chpGet: 20.0
+    chphGet: 35.0
+    chplGet: 3.0
+    chservenGet: 1
+    chservicehrsremGet: 1296.253
+    chservoperiodGet: 5.0
+    chservstartGet: 1.0
+    chsnGet: Not set
+    chstGet: 28.0
+    chtGet: 28.0
+    chthGet: 33.0
+    chtlGet: 12.0
+    cpumtGet: 51.0
+    cputGet: 51.0
+    d1hGet: 809.508
+    d1rcGet: 0.25
+    d1snGet: 
+    d2hGet: 806.365
+    d2rcGet: 0.5
+    d2snGet: 
+    d3hGet: 712.996
+    d3llenGet: 1
+    d3rcGet: 8.4
+    d3rcllGet: 0.0
+    d3snGet: NC7666
+    dafGet: SYSTEM OK-
+    datasheetGet: The datasheet is not installed
+    dhcpGet: 1
+    dnsGet: Not set yet
+    dshGet: 809.507
+    dsllenGet: 1
+    dsrcGet: 0.078
+    dssnGet: 
+    echoGet: 0
+    egGet: 0
+    emGet: 0
+    enGet: 0
+    epGet: 0
+    fGet: SYSTEM OK
+    fhGet: SYSTEM OK
+    fvGet: 7.154_50MHz.48
+    gatewayGet: Not set yet
+    grrGet: 1000.0
+    grrenGet: 0
+    guiGet: 3.82.104
+    hbGet: 0
+    hhGet: 5664.783
+    hhlGet: 8.0
+    hostnameGet: 
+    hsnGet: G0123251815
+    hsvGet: 42.4.462
+    hvGet: HD:AL, A1:2.0, FPGA:7.154_50MHz.48, MODULE: Colibri_T20_512MB
+    ipGet: No network connections found, is the Ethernet cable connected?
+    ipmaxGet: 192.9.200.255
+    ipminGet: 192.9.200.1
+    ireGet: -1
+    irecGet: -1
+    kGet: 0
+    lGet: 0
+    lipGet: Error, bad command
+    lmGet: Monaco 1035-40-40
+    lockGet: No commands are locked
+    lockoutGet: -1
+    lookup_reprates_namesGet: 200:5:'', 200:5:'PulseEQ', 250:4:'', 250:4:'PulseEQ', 330:3:'', 330:3:'PulseEQ', 500:2:'', 500:2:'PulseEQ', 1000:5:'', 1000:10:'', 1000:15:'', 1000:20:'', 1000:1:'', 1000:1:'PulseEQ', 2000:1:'', 4000:1:'', 10000:1:'', 50000:1:''
+    lpssnGet: P1122249858
+    macGet: 00-1B-1C-04-F1-D2
+    manualGet: FC626346 Monaco_IR_1297688_RevAE.pdf
+    mrrGet: 0.0
+    mscGet: 0
+    msiGet: 0
+    pcGet: 0
+    pd3tGet: 56.017
+    pd4optenGet: 0
+    pdsvGet: 0.001
+    penrgvGet: 4.636
+    pepGet: 100.0
+    periodGet: -1.0
+    pmGet: 2
+    promptGet: 1
+    pscodeGet: 0
+    psidGet: 0
+    pssnGet: Not set
+    pwGet: -1
+    pwfineGet: 0.0
+    pwsGet: 276.0
+    readyGet: 0
+    relhGet: 0.0
+    relhoGet: 0.0
+    renGet: 1
+    rlGet: 29.0
+    rrGet: 0.0
+    rrdGet: 10
+    sGet: 2533
+    scGet: 0
+    sciGet: 0
+    scoiGet: 0
+    seGet: 2
+    setGet: (1000.0, 276.0, 10, 1)
+    sisGet: -1
+    srrGet: 0.0
+    ssiGet: 1
+    ssnGet: Not set
+    stGet: Standby
+    subnetGet: Not set yet
+    svGet: HD:42.4.462, A1:91.0, IM:2.1, OS:7.0, CH:0.0, WEB:0.6.462, JSON:0.8.462, POST:0.030.8, UP:3.0.462
+    sync1Get: 0
+    sync2Get: 0
+    timeGet: 2023-12-28 13:33:23
+    timezoneGet: (UTC+01:00) Amsterdam, Berlin, Bern, Rome, Stockholm, Vienna
+    tstlGet: 0
+    tstlsGet: No crystal temperature servos are present
+    usbGet: RNDIS
+    wGet: SYSTEM OK
+    whGet: SYSTEM OK
     """
 
 

@@ -43,7 +43,7 @@ class TelnetConnection:
         self.socket.send(cmd.encode(self.encoding))
         logging.info(f'Command {cmd} was written to {self.host}:{self.port}')
 
-    def read_line(self) -> str:
+    def readline(self) -> str:
         """Reads until linebreak"""
         line = ''
         while True:

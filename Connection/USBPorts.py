@@ -5,15 +5,15 @@ import serial.tools.list_ports as list_ports
 from serial import Serial
 
 
-def get_comports() -> list[tuple[str, str, str]]:
+def getComports() -> list[tuple[str, str, str]]:
     """Returns list of comports as tuple of (name, description, hardware id)"""
     return sorted(list_ports.comports())
 
 
-def print_comports():
+def printComports():
     """Prints all available com ports"""
 
-    ports = get_comports()
+    ports = getComports()
 
     print('List of COM Ports:')
     if not ports:

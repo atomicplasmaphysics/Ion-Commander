@@ -2,7 +2,6 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$USER_HOME$/Desktop/AOC/.idea/AOC.iml" filepath="$USER_HOME$/Desktop/AOC/.idea/AOC.iml" />
       <module fileurl="file://$PROJECT_DIR$/.idea/Ion Commander.iml" filepath="$PROJECT_DIR$/.idea/Ion Commander.iml" />
     </modules>
   </component>

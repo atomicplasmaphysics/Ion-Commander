@@ -215,7 +215,7 @@ class LucidControl:
         self.write(opc, p1, p2, p1a, data)
         return self.read()
 
-    def get_parameter(
+    def parameterGet(
         self,
         p_addr: ParamAddress,
         channel: int
@@ -235,7 +235,7 @@ class LucidControl:
 
         return self.query(self.OpCode.GETPARAM, channel, 0, data=data_write)
 
-    def set_parameter(
+    def parameterSet(
         self,
         p_addr: ParamAddress,
         channel: int,
@@ -291,13 +291,13 @@ class LucidControl:
             device_snr=struct.unpack("<I", query[7:11])[0]
         )
 
-    def serial_number(self) -> int:
+    def serialNumberGet(self) -> int:
         """Returns serial number of device"""
         if not self.id.valid_data:
             return -1
         return self.id.device_snr
 
-    def device_class(self) -> str:
+    def deviceClassGet(self) -> str:
         """Returns name of device class"""
         if not self.id.valid_data:
             return 'Device not registered'
@@ -307,7 +307,7 @@ class LucidControl:
                 return device_class.value[1]
         return f'Device Class {self.id.device_class} not defined'
 
-    def device_type(self) -> str:
+    def deviceTypeGet(self) -> str:
         """Returns name of device type"""
         if not self.id.valid_data:
             return 'Device not registered'
@@ -317,26 +317,26 @@ class LucidControl:
                 return device_type.value[1]
         return f'Device Type {self.id.device_type} not defined'
 
-    def revision_firmware(self) -> int:
+    def revisionFirmwareGet(self) -> int:
         """Returns the firmware revision number"""
         if not self.id.valid_data:
             return -1
         return self.id.revision_fw
 
-    def revision_hardware(self) -> int:
+    def revisionHardwareGet(self) -> int:
         """Returns the hardware revision number"""
         if not self.id.valid_data:
             return -1
         return self.id.revision_hw
 
-    def io_get(self, channel: int) -> float:
+    def ioGet(self, channel: int) -> float:
         """Return voltage on one channel"""
         if channel >= self.channels:
             raise ValueError(f'Channel {channel} out of range, must be in [0-{self.channels}]')
         query = self.query(self.OpCode.GETIO, channel, 0x1D)  # 0x1D is opcode for 4 byte voltage value
         return struct.unpack("<i", query)[0] / 1000000.0
 
-    def io_group_get(self, channels: tuple[bool, ...]) -> tuple[float, ...]:
+    def ioGroupGet(self, channels: tuple[bool, ...]) -> tuple[float, ...]:
         """Return voltage for multiple channels"""
         if len(channels) != self.channels:
             raise ValueError(f'Exactly {self.channels} must be defined. There were {len(channels)} channels defined')
@@ -366,61 +366,61 @@ class LucidControl:
 
         return tuple(output)
 
-    def value_get(self, channel: int) -> int:
+    def valueGet(self, channel: int) -> int:
         """Returns the configuration parameter 'Value' for one channel"""
-        data = self.get_parameter(self.ParamAddress.VALUE, channel)
+        data = self.parameterGet(self.ParamAddress.VALUE, channel)
         return struct.unpack("<H", data)[0]
 
-    def mode_set(self, channel: int, mode: int, persistent: bool = False) -> bool:
+    def modeSet(self, channel: int, mode: int, persistent: bool = False) -> bool:
         """Sets the mode for one channel"""
         data = bytearray([mode])
-        return self.set_parameter(self.ParamAddress.MODE, channel, persistent, data=data)
+        return self.parameterSet(self.ParamAddress.MODE, channel, persistent, data=data)
 
-    def mode_set_default(self, channel: int, persistent: bool = False) -> bool:
+    def modeSetDefault(self, channel: int, persistent: bool = False) -> bool:
         """Resets the mode for one channel"""
-        return self.set_parameter(self.ParamAddress.MODE, channel, persistent, default=True)
+        return self.parameterSet(self.ParamAddress.MODE, channel, persistent, default=True)
 
-    def mode_get(self, channel: int) -> int:
+    def modeGet(self, channel: int) -> int:
         """Returns the mode for one channel"""
-        return self.get_parameter(self.ParamAddress.MODE, channel)[0]
+        return self.parameterGet(self.ParamAddress.MODE, channel)[0]
 
-    def flags_set_default(self, channel: int, persistent: bool = False) -> bool:
+    def flagsSetDefault(self, channel: int, persistent: bool = False) -> bool:
         """Resets the flags for one channel"""
-        return self.set_parameter(self.ParamAddress.FLAGS, channel, persistent)
+        return self.parameterSet(self.ParamAddress.FLAGS, channel, persistent)
 
-    def sample_number_set(self, channel: int, sample_number: int, persistent: bool = False) -> bool:
+    def sampleNumberSet(self, channel: int, sample_number: int, persistent: bool = False) -> bool:
         """Sets the number of samples for one channel"""
         if sample_number < 0:
             raise ValueError('Sample number must be above 0')
         data = bytearray(struct.pack("<H", sample_number))
-        return self.set_parameter(self.ParamAddress.NR_SAMPLES, channel, persistent, data=data)
+        return self.parameterSet(self.ParamAddress.NR_SAMPLES, channel, persistent, data=data)
 
-    def sample_number_set_default(self, channel: int, persistent: bool = False) -> bool:
+    def sampleNumberSetDefault(self, channel: int, persistent: bool = False) -> bool:
         """Resets the number of samples to default for one channel"""
-        return self.set_parameter(self.ParamAddress.NR_SAMPLES, channel, persistent, default=True)
+        return self.parameterSet(self.ParamAddress.NR_SAMPLES, channel, persistent, default=True)
 
-    def sample_number_get(self, channel: int) -> int:
+    def sampleNumberGet(self, channel: int) -> int:
         """Returns the number of samples for one channel"""
-        data = self.get_parameter(self.ParamAddress.NR_SAMPLES, channel)
+        data = self.parameterGet(self.ParamAddress.NR_SAMPLES, channel)
         if not data:
             return 0
         else:
             return struct.unpack("<H", data)[0]
 
-    def offset_set(self, channel: int, offset: int, persistent: bool = False) -> bool:
+    def offsetSet(self, channel: int, offset: int, persistent: bool = False) -> bool:
         """Sets the offset for one channel"""
         if offset < -pow(2, 15) or offset >= pow(2, 16):
             raise ValueError('Offset out of range [-2^15 to 2^16] are allowed')
         data = bytearray(struct.pack("<h", offset))
-        return self.set_parameter(self.ParamAddress.OFFSET, channel, persistent, data=data)
+        return self.parameterSet(self.ParamAddress.OFFSET, channel, persistent, data=data)
 
-    def offset_set_default(self, channel: int, persistent: bool = False) -> bool:
+    def offsetSetDefault(self, channel: int, persistent: bool = False) -> bool:
         """Resets the offset to default for one channel"""
-        return self.set_parameter(self.ParamAddress.OFFSET, channel, persistent, default=True)
+        return self.parameterSet(self.ParamAddress.OFFSET, channel, persistent, default=True)
 
-    def offset_get(self, channel: int) -> int:
+    def offsetGet(self, channel: int) -> int:
         """Returns the offset for one channel"""
-        data = self.get_parameter(self.ParamAddress.OFFSET, channel)
+        data = self.parameterGet(self.ParamAddress.OFFSET, channel)
         if not data:
             return 0
         else:
@@ -430,9 +430,9 @@ class LucidControl:
 def main():
     logging.basicConfig(level=logging.INFO)
     with LucidControl('COM3') as lc:
-        print(lc.io_get(0))
-        print(lc.io_get(1))
-        print(lc.io_group_get((True, True, False, False)))
+        print(lc.ioGet(0))
+        print(lc.ioGet(1))
+        print(lc.ioGroupGet((True, True, False, False)))
 
 
 if __name__ == '__main__':

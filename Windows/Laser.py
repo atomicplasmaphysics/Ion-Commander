@@ -22,7 +22,7 @@ class LaserVBoxLayout(QVBoxLayout):
 
         # Connection
         self.label_connection = QLabel('Connection')
-        self.indicator_connection = IndicatorLed(clickable=True, size=indicator_size, off_color=Colors.error)
+        self.indicator_connection = IndicatorLed(clickable=True, size=indicator_size, off_color=Colors.cooperate_error)
         self.status_connection = QLabel('Not connected to Laser')
         self.indicator_grid.addWidgets(
             self.label_connection,
@@ -113,6 +113,7 @@ class LaserVBoxLayout(QVBoxLayout):
         self.indicator_system_faults = IndicatorLed(clickable=True, size=indicator_size)
         self.status_system_faults = QLabel('No faults')
         self.button_system_faults = QPushButton('Clear')
+        self.button_system_faults.clicked.connect(lambda: self.table_system_faults.resetTable())
         self.indicator_grid.addWidgets(
             self.label_system_faults,
             self.indicator_system_faults,
@@ -124,7 +125,7 @@ class LaserVBoxLayout(QVBoxLayout):
         self.table_system_faults = ErrorTable()
         self.addWidget(self.table_system_faults)
 
-        for i in range(10):
+        for i in range(5):
             self.table_system_faults.insertError(i, f'Type {i}', f'Pretty long and unusefull description of error from state {i}')
 
         # Laser Settings Grid
