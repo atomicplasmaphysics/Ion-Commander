@@ -151,7 +151,7 @@ class InsertingGridLayout(QGridLayout):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-    def addWidgets(self, *widgets: QWidget):
+    def addWidgets(self, *widgets: QWidget | None):
         row = self.rowCount()
 
         for col, widget in enumerate(widgets):
@@ -720,7 +720,7 @@ class StackWidget(QLCDNumber):
 
     def __init__(
         self,
-        layers: int = 7,
+        layers: int = 8,
         antialiased: bool = True,
         size: QSize = QSize(100, 100),
         border_radius: float = 5,

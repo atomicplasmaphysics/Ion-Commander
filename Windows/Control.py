@@ -4,6 +4,8 @@ from PyQt6.QtCore import Qt
 
 from Utility.Layouts import TabWidget, VBoxTitleLayout
 
+
+from Windows.EBIS import EBISVBoxLayout
 from Windows.Laser import LaserVBoxLayout
 from Windows.Pressure import PressureVBoxLayout
 
@@ -44,7 +46,7 @@ class ControlWindow(TabWidget):
 
         # EBIS CONTROL
         self.ebis_vbox = VBoxTitleLayout(self, 'EBIS', add_stretch=True)
-        self.ebis_group_vbox = QVBoxLayout()
+        self.ebis_group_vbox = EBISVBoxLayout()
 
         # Stretch to bottom
         self.ebis_group_vbox.addStretch(1)

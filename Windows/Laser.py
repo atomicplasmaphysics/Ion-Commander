@@ -20,10 +20,12 @@ class LaserVBoxLayout(QVBoxLayout):
         self.indicator_grid = InsertingGridLayout()
         self.indicator_hbox.addLayout(self.indicator_grid)
 
+        # TODO: remove clickable from all <IndicatorLed> instances
+
         # Connection
         self.label_connection = QLabel('Connection')
         self.indicator_connection = IndicatorLed(clickable=True, size=indicator_size, off_color=Colors.cooperate_error)
-        self.status_connection = QLabel('Not connected to Laser')
+        self.status_connection = QLabel('Not connected')
         self.indicator_grid.addWidgets(
             self.label_connection,
             self.indicator_connection,
@@ -164,8 +166,3 @@ class LaserVBoxLayout(QVBoxLayout):
             QLabel('Pulse Width'),
             self.spinbox_settings_pulsewidth
         )
-
-
-
-
-
