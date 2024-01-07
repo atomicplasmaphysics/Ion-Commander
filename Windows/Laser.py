@@ -1,42 +1,48 @@
 from PyQt6.QtCore import Qt, QSize
-from PyQt6.QtWidgets import QVBoxLayout, QHBoxLayout, QLabel, QPushButton
+from PyQt6.QtWidgets import QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QGroupBox
 
 
 from Config.StylesConf import Colors
 
-from Utility.Layouts import InsertingGridLayout, IndicatorLed, ErrorTable, DoubleSpinBox, ComboBox
+from Utility.Layouts import InsertingGridLayout, IndicatorLed, ErrorTable, DoubleSpinBox, ComboBox, DisplayLabel
 
 
 class LaserVBoxLayout(QVBoxLayout):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
+        # TODO: make indicator sizes global somewhere
         indicator_size = QSize(20, 20)
 
-        # Indicator Grid
-        self.indicator_hbox = QHBoxLayout()
-        self.indicator_hbox.setAlignment(Qt.AlignmentFlag.AlignLeft)
-        self.addLayout(self.indicator_hbox)
-        self.indicator_grid = InsertingGridLayout()
-        self.indicator_hbox.addLayout(self.indicator_grid)
+        # Connection Group Box
+        self.connection_group_box = QGroupBox('Connection and Status')
+        self.addWidget(self.connection_group_box)
+
+        self.connection_hbox = QHBoxLayout()
+        self.connection_hbox.setAlignment(Qt.AlignmentFlag.AlignLeft)
+        self.connection_group_box.setLayout(self.connection_hbox)
+
+        self.connection_grid = InsertingGridLayout()
+        self.connection_hbox.addLayout(self.connection_grid)
 
         # TODO: remove clickable from all <IndicatorLed> instances
+        # TODO: change values of <DisplayLabel> instances to None
 
         # Connection
         self.label_connection = QLabel('Connection')
         self.indicator_connection = IndicatorLed(clickable=True, size=indicator_size, off_color=Colors.cooperate_error)
         self.status_connection = QLabel('Not connected')
-        self.indicator_grid.addWidgets(
+        self.connection_grid.addWidgets(
             self.label_connection,
             self.indicator_connection,
-            self.status_connection
+            (self.status_connection, 2)
         )
 
         # Key-switch
         self.label_key_switch = QLabel('Key-Switch')
         self.indicator_key_switch = IndicatorLed(clickable=True, size=indicator_size)
         self.status_key_switch = QLabel('Key off')
-        self.indicator_grid.addWidgets(
+        self.connection_grid.addWidgets(
             self.label_key_switch,
             self.indicator_key_switch,
             self.status_key_switch
@@ -47,7 +53,7 @@ class LaserVBoxLayout(QVBoxLayout):
         self.indicator_shutter = IndicatorLed(clickable=True, size=indicator_size)
         self.status_shutter = QLabel('Closed')
         self.button_shutter = QPushButton('Open')
-        self.indicator_grid.addWidgets(
+        self.connection_grid.addWidgets(
             self.label_shutter,
             self.indicator_shutter,
             self.status_shutter,
@@ -59,7 +65,7 @@ class LaserVBoxLayout(QVBoxLayout):
         self.indicator_pulsing = IndicatorLed(clickable=True, size=indicator_size)
         self.status_pulsing = QLabel('Off')
         self.button_pulsing = QPushButton('On')
-        self.indicator_grid.addWidgets(
+        self.connection_grid.addWidgets(
             self.label_pulsing,
             self.indicator_pulsing,
             self.status_pulsing,
@@ -71,19 +77,30 @@ class LaserVBoxLayout(QVBoxLayout):
         self.indicator_system_status = IndicatorLed(clickable=True, size=indicator_size)
         self.status_system_status = QLabel('Standby')
         self.button_system_status = QPushButton('Start')
-        self.indicator_grid.addWidgets(
+        self.connection_grid.addWidgets(
             self.label_system_status,
             self.indicator_system_status,
             self.status_system_status,
             self.button_system_status
         )
 
+        # Chiller Group Box
+        self.chiller_group_box = QGroupBox('Chiller')
+        self.addWidget(self.chiller_group_box)
+
+        self.chiller_hbox = QHBoxLayout()
+        self.chiller_hbox.setAlignment(Qt.AlignmentFlag.AlignLeft)
+        self.chiller_group_box.setLayout(self.chiller_hbox)
+
+        self.chiller_grid = InsertingGridLayout()
+        self.chiller_hbox.addLayout(self.chiller_grid)
+
         # Chiller Temperature
         self.label_chiller_temperature = QLabel('Chiller Temperature')
         self.indicator_chiller_temperature = IndicatorLed(clickable=True, size=indicator_size)
-        self.status_chiller_temperature = QLabel('28 °C')
+        self.status_chiller_temperature = DisplayLabel(0.8, unit='°C', alignment_flag=Qt.AlignmentFlag.AlignLeft)
         self.spinbox_chiller_temperature = DoubleSpinBox(step_size=0.1, input_range=(18, 35), decimals=1, buttons=True)
-        self.indicator_grid.addWidgets(
+        self.chiller_grid.addWidgets(
             self.label_chiller_temperature,
             self.indicator_chiller_temperature,
             self.status_chiller_temperature,
@@ -93,8 +110,8 @@ class LaserVBoxLayout(QVBoxLayout):
         # Baseplate Temperature
         self.label_baseplate_temperature = QLabel('Baseplate Temperature')
         self.indicator_baseplate_temperature = IndicatorLed(clickable=True, size=indicator_size)
-        self.status_baseplate_temperature = QLabel('27.7 °C')
-        self.indicator_grid.addWidgets(
+        self.status_baseplate_temperature = DisplayLabel(0.75, unit='°C', alignment_flag=Qt.AlignmentFlag.AlignLeft)
+        self.chiller_grid.addWidgets(
             self.label_baseplate_temperature,
             self.indicator_baseplate_temperature,
             self.status_baseplate_temperature
@@ -103,37 +120,54 @@ class LaserVBoxLayout(QVBoxLayout):
         # Chiller Flow
         self.label_chiller_flow = QLabel('Chiller Flow')
         self.indicator_chiller_flow = IndicatorLed(clickable=True, size=indicator_size)
-        self.status_chiller_flow = QLabel('25 lpm')
-        self.indicator_grid.addWidgets(
+        self.status_chiller_flow = DisplayLabel(0.1, unit='lpm', alignment_flag=Qt.AlignmentFlag.AlignLeft)
+        self.chiller_grid.addWidgets(
             self.label_chiller_flow,
             self.indicator_chiller_flow,
             self.status_chiller_flow
         )
 
+        # Faults Group Box
+        self.faults_group_box = QGroupBox('Faults')
+        self.addWidget(self.faults_group_box)
+
+        self.faults_vbox = QVBoxLayout()
+        self.faults_group_box.setLayout(self.faults_vbox)
+
+        self.faults_hbox = QHBoxLayout()
+        self.faults_hbox.setAlignment(Qt.AlignmentFlag.AlignLeft)
+        self.faults_vbox.addLayout(self.faults_hbox)
+
+        self.faults_grid = InsertingGridLayout()
+        self.faults_hbox.addLayout(self.faults_grid)
+
         # System faults
-        self.label_system_faults = QLabel('System Faults')
+        self.button_system_faults = QPushButton('Clear')
+        # TODO: change connected lambda-function
+        self.button_system_faults.clicked.connect(lambda: self.table_system_faults.resetTable())
         self.indicator_system_faults = IndicatorLed(clickable=True, size=indicator_size)
         self.status_system_faults = QLabel('No faults')
-        self.button_system_faults = QPushButton('Clear')
-        self.button_system_faults.clicked.connect(lambda: self.table_system_faults.resetTable())
-        self.indicator_grid.addWidgets(
-            self.label_system_faults,
+        self.faults_grid.addWidgets(
+            self.button_system_faults,
             self.indicator_system_faults,
-            self.status_system_faults,
-            self.button_system_faults
+            self.status_system_faults
         )
 
         # System faults table
         self.table_system_faults = ErrorTable()
-        self.addWidget(self.table_system_faults)
+        self.faults_vbox.addWidget(self.table_system_faults)
 
         for i in range(5):
             self.table_system_faults.insertError(i, f'Type {i}', f'Pretty long and unusefull description of error from state {i}')
 
-        # Laser Settings Grid
+        # Settings Group Box
+        self.settings_group_box = QGroupBox('Settings')
+        self.addWidget(self.settings_group_box)
+
         self.settings_hbox = QHBoxLayout()
         self.settings_hbox.setAlignment(Qt.AlignmentFlag.AlignLeft)
-        self.addLayout(self.settings_hbox)
+        self.settings_group_box.setLayout(self.settings_hbox)
+
         self.settings_grid = InsertingGridLayout()
         self.settings_hbox.addLayout(self.settings_grid)
 
@@ -146,7 +180,7 @@ class LaserVBoxLayout(QVBoxLayout):
 
         # Output Settings
         self.combobox_settings_output = ComboBox()
-        self.status_settings_output = QLabel('Actual: 99.93 kHz')
+        self.status_settings_output = DisplayLabel(1, unit='Hz', alignment_flag=Qt.AlignmentFlag.AlignLeft)
         self.settings_grid.addWidgets(
             QLabel('Output'),
             self.combobox_settings_output,

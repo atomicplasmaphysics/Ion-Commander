@@ -1,10 +1,11 @@
-from PyQt6.QtWidgets import QSplitter, QVBoxLayout, QWidget, QGroupBox, QBoxLayout
+from PyQt6.QtWidgets import QSplitter, QWidget, QGroupBox, QBoxLayout
 from PyQt6.QtCore import Qt
 
 
 from Utility.Layouts import TabWidget, VBoxTitleLayout
 
 
+from Windows.PSU import PSUVBoxLayout
 from Windows.EBIS import EBISVBoxLayout
 from Windows.Laser import LaserVBoxLayout
 from Windows.Pressure import PressureVBoxLayout
@@ -28,21 +29,23 @@ class ControlWindow(TabWidget):
         self.splitter.setChildrenCollapsible(False)
         self.main_layout.addWidget(self.splitter)
 
-        # MCP CONTROL
-        self.mcp_vbox = VBoxTitleLayout(self, 'MCP', add_stretch=True)
-        self.mcp_group_vbox = QVBoxLayout()
+        # TODO: Add tooltips to everything
+
+        # PSU CONTROL
+        self.psu_vbox = VBoxTitleLayout(self, 'PSU', add_stretch=True)
+        self.psu_group_vbox = PSUVBoxLayout()
 
         # Stretch to bottom
-        self.mcp_group_vbox.addStretch(1)
-        self.mcp_group_vbox.setAlignment(Qt.AlignmentFlag.AlignTop)
+        self.psu_group_vbox.addStretch(1)
+        self.psu_group_vbox.setAlignment(Qt.AlignmentFlag.AlignTop)
 
         # Add a parent to the basic_control_vbox and add that to the splitter
-        self.mcp_vbox_parent = QWidget(self)
-        self.mcp_group = QGroupBox(self)
-        self.mcp_group.setLayout(self.mcp_group_vbox)
-        self.mcp_vbox.addWidget(self.mcp_group)
-        self.mcp_vbox_parent.setLayout(self.mcp_vbox)
-        self.splitter.addWidget(self.mcp_vbox_parent)
+        self.psu_vbox_parent = QWidget(self)
+        self.psu_group = QGroupBox(self)
+        self.psu_group.setLayout(self.psu_group_vbox)
+        self.psu_vbox.addWidget(self.psu_group)
+        self.psu_vbox_parent.setLayout(self.psu_vbox)
+        self.splitter.addWidget(self.psu_vbox_parent)
 
         # EBIS CONTROL
         self.ebis_vbox = VBoxTitleLayout(self, 'EBIS', add_stretch=True)

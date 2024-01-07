@@ -10,7 +10,7 @@ from PyQt6.QtGui import QIcon, QPainter, QPixmap, QColor, QBrush, QLinearGradien
 from PyQt6.QtWidgets import (
     QHBoxLayout, QLabel, QWidget, QVBoxLayout, QSpinBox, QDoubleSpinBox, QCheckBox, QComboBox,
     QLineEdit, QPushButton, QListWidget, QListWidgetItem, QApplication, QStyleOption, QTableWidget,
-    QTableWidgetItem, QHeaderView, QAbstractItemView, QGridLayout, QLCDNumber
+    QTableWidgetItem, QHeaderView, QAbstractItemView, QGridLayout, QLCDNumber, QFrame
 )
 from PyQt6.QtSvg import QSvgRenderer
 
@@ -20,7 +20,7 @@ import pyqtgraph as pg
 from Config.StylesConf import Colors, Styles, Forms
 
 from Utility.ModifyWidget import setWidgetBackground
-from Utility.Functions import hexToRgb
+from Utility.Functions import hexToRgb, linearInterpolateColor, getPrefix, qColorToHex
 if TYPE_CHECKING:
     from Windows.Main import MainWindow
     from Utility.Fitting import FitMethod
@@ -99,9 +99,18 @@ class VBoxTitleLayout(QVBoxLayout):
                         if integer: addSpacing(addStretch) after title
     """
 
-    def __init__(self, parent, title: str, title_style: str = Styles.title_style_sheet,
-                 title_style_busy: str = Styles.title_style_sheet, busy_symbol: str = '⧖',
-                 spacing: int = 0, add_stretch: bool | int = 0, *args, **kwargs):
+    def __init__(
+        self,
+        parent,
+        title: str,
+        title_style: str = Styles.title_style_sheet,
+        title_style_busy: str = Styles.title_style_sheet,
+        busy_symbol: str = '⧖',
+        spacing: int = 0,
+        add_stretch: bool | int = 0,
+        *args,
+        **kwargs
+    ):
         super().__init__(*args, **kwargs)
         self.parent = parent
         self.title_str = title
@@ -151,12 +160,70 @@ class InsertingGridLayout(QGridLayout):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-    def addWidgets(self, *widgets: QWidget | None):
+        self.lines: list[tuple[QFrame, int]] = []
+        self.max_width = 0
+
+    def _resizeHorizontalLines(self):
+        """Resizes all horizontal lines to fit the widest row"""
+
+        for line, row in self.lines:
+            self.addWidget(line, row, 0, 1, self.max_width)
+
+    def addHorizontalLine(
+        self,
+        fixed_columns: int = 0,
+        frame_shadow: QFrame.Shadow = QFrame.Shadow.Sunken,
+        color: QColor | Qt.GlobalColor | str = Colors.app_background_event
+    ):
+        """
+        Adds a horizontal line
+
+        :param fixed_columns: sets a fixed colum size
+        :param frame_shadow: frame shadow mode
+        :param color: color of line
+        """
+
         row = self.rowCount()
 
+        enable_rescaling = bool(fixed_columns)
+        if not enable_rescaling:
+            fixed_columns = self.max_width
+
+        line = QFrame()
+        line.setFrameShape(QFrame.Shape.HLine)
+        line.setFrameShadow(frame_shadow)
+        line.setStyleSheet(f'background-color: {qColorToHex(QColor(color))};')
+
+        if enable_rescaling:
+            self.lines.append((line, row))
+
+        self.addWidget(line, row, 0, 1, fixed_columns)
+
+    def addWidgets(self, *widgets: QWidget | tuple[QWidget, int] | None):
+        """
+        Adds Widgets as new row
+
+        :param widgets: widget - widget that takes one column
+                        tuple[widget, columns] - widget that spans over multiple columns
+                        None - left out column
+        """
+
+        row = self.rowCount()
+        width = 0
+
         for col, widget in enumerate(widgets):
-            if widget is not None:
-                super().addWidget(widget, row, col)
+            width += 1
+            if widget is None:
+                continue
+
+            if isinstance(widget, tuple):
+                width += 1
+                self.addWidget(widget[0], row, col, 1, widget[1])
+            else:
+                self.addWidget(widget, row, col)
+
+        self.max_width = max(self.max_width, width)
+        self._resizeHorizontalLines()
 
 
 class InputHBoxLayout(QHBoxLayout):
@@ -172,9 +239,18 @@ class InputHBoxLayout(QHBoxLayout):
     :param checkbox_connected: (optional) determines if the widget should be enabled/disabled depending on the checkbox state
     """
 
-    def __init__(self, label: str, widget: QWidget | None, tooltip: str = None, split: int = 50,
-                 disabled: bool = False, hidden: bool = False,
-                 checkbox: bool = None, checkbox_connected: bool = True, **kwargs):
+    def __init__(
+        self,
+        label: str,
+        widget: QWidget | None,
+        tooltip: str = None,
+        split: int = 50,
+        disabled: bool = False,
+        hidden: bool = False,
+        checkbox: bool = None,
+        checkbox_connected: bool = True,
+        **kwargs
+    ):
         super().__init__(**kwargs)
 
         self.checkbox = None
@@ -296,8 +372,15 @@ class SpinBox(QSpinBox):
     :param buttons: (optional) if buttons for increasing/decreasing should be displayed
     """
 
-    def __init__(self, default: float | int = 0, step_size: int = None, input_range: tuple[float, float] = None,
-                 scroll: bool = False, buttons: bool = False, **kwargs):
+    def __init__(
+        self,
+        default: float | int = 0,
+        step_size: int = None,
+        input_range: tuple[float, float] = None,
+        scroll: bool = False,
+        buttons: bool = False,
+        **kwargs
+    ):
         super().__init__(**kwargs)
 
         self.setMinimumSize(50, 20)
@@ -337,9 +420,18 @@ class DoubleSpinBox(QDoubleSpinBox):
     :param click_copy: (optional) copies its data into the clipboard - automatically sets readonly
     """
 
-    def __init__(self, default: float = 0, step_size: float = None, input_range: tuple[float, float] = None,
-                 scroll: bool = False, decimals: int = None, buttons: bool = False, readonly: bool = False,
-                 click_copy: bool = False, **kwargs):
+    def __init__(
+        self,
+        default: float = 0,
+        step_size: float = None,
+        input_range: tuple[float, float] = None,
+        scroll: bool = False,
+        decimals: int = None,
+        buttons: bool = False,
+        readonly: bool = False,
+        click_copy: bool = False,
+        **kwargs
+    ):
         super().__init__(**kwargs)
 
         self.setMinimumSize(50, 20)
@@ -403,8 +495,15 @@ class LineEdit(QLineEdit):
     :param click_copy: (optional) copies its data into the clipboard - automatically sets readonly
     """
 
-    def __init__(self, default: str = '', placeholder: str = None, max_length: int = None, readonly: bool = False,
-                 click_copy: bool = False, **kwargs):
+    def __init__(
+        self,
+        default: str = '',
+        placeholder: str = None,
+        max_length: int = None,
+        readonly: bool = False,
+        click_copy: bool = False,
+        **kwargs
+    ):
         super().__init__(**kwargs)
 
         self.default = default
@@ -447,9 +546,18 @@ class ComboBox(QComboBox):
     :param disabled_list: (optional) enable/disable choices
     """
 
-    def __init__(self, default: int = 0, entries: list[str] = None, tooltips: list[str] = None,
-                 entries_save: list = None, numbering: int = None, label_default: bool = False,
-                 disabled_list: list[int] = None, scroll: bool = False, **kwargs):
+    def __init__(
+        self,
+        default: int = 0,
+        entries: list[str] = None,
+        tooltips: list[str] = None,
+        entries_save: list = None,
+        numbering: int = None,
+        label_default: bool = False,
+        disabled_list: list[int] = None,
+        scroll: bool = False,
+        **kwargs
+    ):
         super().__init__(**kwargs)
 
         self.default = default
@@ -705,7 +813,8 @@ class PressureWidget(QWidget):
 
 class StackWidget(QLCDNumber):
     """
-    Graphical widget that extends the QLCDNumber to display a value
+    Graphical widget that extends the QLCDNumber to display a LCD-styled number inside a colored stack.
+    The color of the spack can be set in relation with how "good" the number is
 
     :param layers: number of layers
     :param antialiased: antialiasing enabled
@@ -725,9 +834,9 @@ class StackWidget(QLCDNumber):
         size: QSize = QSize(100, 100),
         border_radius: float = 5,
         spacing: float = 1,
-        color_top: QColor | Qt.GlobalColor | str = '#FF0000',
-        color_bottom: QColor | Qt.GlobalColor | str = '#FFFF00',
-        color_grayed: QColor | Qt.GlobalColor | str = '#555555',
+        color_top: QColor | Qt.GlobalColor | str = Colors.cooperate_lime,
+        color_bottom: QColor | Qt.GlobalColor | str = Colors.cooperate_strawberry,
+        color_grayed: QColor | Qt.GlobalColor | str = Colors.app_background_event,
         percentage_grey: float = 0,
         enable_digits: bool = False
     ):
@@ -787,18 +896,15 @@ class StackWidget(QLCDNumber):
         :param percentage_grey: greyed out percentage
         """
 
-        if not 0 <= percentage_grey <= 1:
-            raise ValueError('percentage_grey should be in range [0, 1]')
-
-        self.color_middle = QColor(
-            int(self.color_top.red() * (1 - percentage_grey) + percentage_grey * self.color_bottom.red()),
-            int(self.color_top.green() * (1 - percentage_grey) + percentage_grey * self.color_bottom.green()),
-            int(self.color_top.blue() * (1 - percentage_grey) + percentage_grey * self.color_bottom.blue())
-        )
+        self.color_middle = linearInterpolateColor(self.color_top, self.color_bottom, percentage_grey)
         self.percentage_grey = percentage_grey
 
     def paintEvent(self, event):
-        """Called when Widget is drawn"""
+        """
+        Called when Widget is drawn
+
+        :param event: draw event
+        """
 
         painter = QPainter(self)
         painter.setPen(Qt.PenStyle.NoPen)
@@ -824,6 +930,196 @@ class StackWidget(QLCDNumber):
 
         if self.enable_digits:
             super().paintEvent(event)
+
+
+class DisplayLabel(QLabel):
+    """
+    Graphical widget that extends the QLabel to display a value and color it how far the current value is away from the target value
+
+    :param value: current value
+    :param target_value: target value
+    :param deviation: deviation value
+    :param unit: unit to be displayed
+    :param f_format: formatting part of f-string
+    :param enable_prefix: enable prefixing
+    :param alignment_flag: alignment flag
+    :param antialiased: antialiasing enabled
+    :param color_good: top color
+    :param color_bad: bottom color
+    :param color_grayed: grayed out color
+    """
+
+    def __init__(
+        self,
+        value: float | None = 0,
+        target_value: float = 1,
+        deviation: float = 1,
+        unit: str = '',
+        f_format: str = '.2f',
+        enable_prefix: bool = False,
+        alignment_flag: Qt.AlignmentFlag = Qt.AlignmentFlag.AlignRight,
+        antialiased: bool = True,
+        color_good: QColor | Qt.GlobalColor | str = Colors.cooperate_lime,
+        color_bad: QColor | Qt.GlobalColor | str = Colors.cooperate_strawberry,
+        color_grayed: QColor | Qt.GlobalColor | str = Colors.app_background_event
+    ):
+        super().__init__()
+
+        self.value = value
+        self.target_value = target_value
+        self.deviation = deviation
+        self.unit = unit
+        self.f_format = f_format
+        self.enable_prefix = enable_prefix
+        self.antialiased = antialiased
+        self.color_good = QColor(color_good)
+        self.color_bad = QColor(color_bad)
+        self.color_grayed = QColor(color_grayed)
+
+        self.setAlignment(alignment_flag)
+        self.setContentsMargins(5, 5, 5, 5)
+        self._writeOwnText()
+
+    def _writeOwnText(self):
+        """Writes its own text"""
+
+        text = 'xxx'
+        value = self.value
+        addon = self.unit
+
+        if self.value is not None:
+            if self.enable_prefix:
+                value, prefix = getPrefix(value)
+                addon = prefix + addon
+            text = f'{value:{self.f_format}}'
+        if addon:
+            text += ' ' + addon
+
+        self.setText(text)
+
+    def setValue(self, value: float):
+        """
+        Set a new value
+
+        :param value: new value
+        """
+
+        self.value = value
+        self._writeOwnText()
+
+    def setTargetValue(self, target_value: float):
+        """
+        Set a new target value
+
+        :param target_value: new target value
+        """
+
+        self.target_value = target_value
+        self._writeOwnText()
+
+    def setDeviation(self, deviation: float):
+        """
+        Set a new deviation
+
+        :param deviation: new deviation
+        """
+
+        self.deviation = deviation
+        self._writeOwnText()
+
+    def paintEvent(self, event):
+        """
+        Called when Widget is drawn
+
+        :param event: draw event
+        """
+
+        painter = QPainter(self)
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing, self.antialiased)
+
+        brush = QBrush(self.color_grayed)
+        if self.value is not None:
+            percentage = abs(self.value - self.target_value) / self.deviation
+            percentage = min(percentage, 1)
+            new_color = linearInterpolateColor(self.color_good, self.color_bad, percentage)
+            new_color.setAlpha(90)
+            brush.setColor(new_color)
+        painter.setBrush(brush)
+
+        painter.drawRect(QRectF(0, 0, self.width(), self.height()))
+
+        super().paintEvent(event)
+
+
+class PolarityButton(QWidget):
+    """
+    Combination of two Buttons for controlling positive and negative polarity
+
+    :param color_positive: positive enabled color
+    :param color_negative: negative enabled color
+    :param color_grayed: grayed out color
+    :param connected_buttons: buttons are connected to color change
+    """
+
+    def __init__(
+        self,
+        color_positive: QColor | Qt.GlobalColor | str = Colors.cooperate_lime,
+        color_negative: QColor | Qt.GlobalColor | str = Colors.cooperate_strawberry,
+        color_grayed: QColor | Qt.GlobalColor | str = Colors.app_background_event,
+        connected_buttons: bool = True
+    ):
+        super().__init__()
+
+        self.color_positive = qColorToHex(QColor(color_positive))
+        self.color_negative = qColorToHex(QColor(color_negative))
+        self.color_grayed = qColorToHex(QColor(color_grayed))
+
+        self.state = None
+
+        self.main_layout = QHBoxLayout(self)
+        self.main_layout.setAlignment(Qt.AlignmentFlag.AlignLeft)
+        self.main_layout.setContentsMargins(0, 0, 0, 0)
+        self.setLayout(self.main_layout)
+
+        self.positive_button = QPushButton(self)
+        self.positive_button.setIcon(QIcon('icons/positive.png'))
+        self.main_layout.addWidget(self.positive_button)
+
+        self.negative_button = QPushButton(self)
+        self.negative_button.setIcon(QIcon('icons/negative.png'))
+        self.main_layout.addWidget(self.negative_button)
+
+        if connected_buttons:
+            self.positive_button.clicked.connect(lambda: self.polarityChange(True))
+            self.negative_button.clicked.connect(lambda: self.polarityChange(False))
+
+        self._setButtonColors()
+
+    def polarityChange(self, polarity: bool):
+        """
+        Called when the polarity has changed
+
+        :param polarity: polarity of button (True = positive; False = negative)
+        """
+
+        if self.state == polarity:
+            self.state = None
+        else:
+            self.state = polarity
+
+        self._setButtonColors()
+
+    def _setButtonColors(self):
+        """Sets colors of buttons"""
+
+        self.positive_button.setStyleSheet(f'background-color: {self.color_grayed};')
+        self.negative_button.setStyleSheet(f'background-color: {self.color_grayed};')
+
+        if self.state is True:
+            self.positive_button.setStyleSheet(f'background-color: {self.color_positive};')
+        elif self.state is False:
+            self.negative_button.setStyleSheet(f'background-color: {self.color_negative};')
 
 
 class ErrorTable(QTableWidget):
@@ -963,7 +1259,15 @@ class DeleteWidgetListItem(QWidget):
 
     deleted = pyqtSignal()
 
-    def __init__(self, parent, path: str, *args, tac: int = -1, delay: float = 0, **kwargs):
+    def __init__(
+        self,
+        parent,
+        path: str,
+        *args,
+        tac: int = -1,
+        delay: float = 0,
+        **kwargs
+    ):
         super().__init__(parent, *args, **kwargs)
 
         self.parent = parent
@@ -998,7 +1302,13 @@ class StackedVBoxLayout(QVBoxLayout):
     :param click_copy: (optional) copies its contents
     """
 
-    def __init__(self, labels: dict[tuple[int, int], str], *args, click_copy: bool = True, **kwargs):
+    def __init__(
+        self,
+        labels: dict[tuple[int, int], str],
+        *args,
+        click_copy: bool = True,
+        **kwargs
+    ):
         super().__init__(*args, **kwargs)
 
         self.setAlignment(Qt.AlignmentFlag.AlignTop)
@@ -1054,7 +1364,13 @@ class FittingWidget(QWidget):
     :param click_copy: (optional) copies its contents
     """
 
-    def __init__(self, labels: dict[tuple[int, int], str], *args, click_copy: bool = True, **kwargs):
+    def __init__(
+        self,
+        labels: dict[tuple[int, int], str],
+        *args,
+        click_copy: bool = True,
+        **kwargs
+    ):
         super().__init__(*args, **kwargs)
 
         self.main_layout = StackedVBoxLayout(labels, *args, click_copy=click_copy, **kwargs)
@@ -1080,7 +1396,14 @@ class TOFCanvas(pg.PlotWidget):
     :param fit_class: fitting method
     """
 
-    def __init__(self, parent, data: tuple[np.ndarray, np.ndarray], fit_class: FitMethod, *args, **kwargs):
+    def __init__(
+        self,
+        parent,
+        data: tuple[np.ndarray, np.ndarray],
+        fit_class: FitMethod,
+        *args,
+        **kwargs
+    ):
         super().__init__(parent, *args, **kwargs)
 
         self.data = data

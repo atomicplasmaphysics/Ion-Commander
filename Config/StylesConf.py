@@ -19,7 +19,7 @@ class Colors:
     cooperate_rosa = '#FF818E'
     cooperate_error = '#D6002E'
     cooperate_lime = '#8EFA00'
-    cooperate_torquoise = '#00FDFF'
+    cooperate_turquoise = '#00FDFF'
     cooperate_strawberry = '#FF2F92'
     cooperate_violett = '#9E7BFF'
     cooperate_nude = '#FFBFBA'

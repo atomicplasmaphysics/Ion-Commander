@@ -1,26 +1,32 @@
 from PyQt6.QtCore import Qt, QSize
-from PyQt6.QtWidgets import QVBoxLayout, QHBoxLayout, QLabel, QPushButton
+from PyQt6.QtWidgets import QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QGroupBox
 
 
 from Config.StylesConf import Colors
 
-from Utility.Layouts import InsertingGridLayout, IndicatorLed, DoubleSpinBox
+from Utility.Layouts import InsertingGridLayout, IndicatorLed, DoubleSpinBox, DisplayLabel
 
 
 class EBISVBoxLayout(QVBoxLayout):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
+        # TODO: make indicator sizes global somewhere
         indicator_size = QSize(20, 20)
 
-        # Connection Grid
+        # Connection Group Box
+        self.connection_group_box = QGroupBox('Connection')
+        self.addWidget(self.connection_group_box)
+
         self.connection_hbox = QHBoxLayout()
         self.connection_hbox.setAlignment(Qt.AlignmentFlag.AlignLeft)
-        self.addLayout(self.connection_hbox)
+        self.connection_group_box.setLayout(self.connection_hbox)
+
         self.connection_grid = InsertingGridLayout()
         self.connection_hbox.addLayout(self.connection_grid)
 
         # TODO: remove clickable from all <IndicatorLed> instances
+        # TODO: change values of <DisplayLabel> instances to None
 
         # Connection
         self.label_connection = QLabel('Connection')
@@ -29,13 +35,13 @@ class EBISVBoxLayout(QVBoxLayout):
         self.connection_grid.addWidgets(
             self.label_connection,
             self.indicator_connection,
-            self.status_connection
+            (self.status_connection, 2)
         )
 
         # High Voltage
         self.label_high_voltage = QLabel('High Voltage')
         self.indicator_high_voltage = IndicatorLed(clickable=True, size=indicator_size)
-        self.status_high_voltage = QLabel('Disbled')
+        self.status_high_voltage = QLabel('Disabled')
         self.button_high_voltage = QPushButton('Enable')
         self.connection_grid.addWidgets(
             self.label_high_voltage,
@@ -44,114 +50,147 @@ class EBISVBoxLayout(QVBoxLayout):
             self.button_high_voltage
         )
 
-        # Control Grid
-        self.control_hbox = QHBoxLayout()
-        self.control_hbox.setAlignment(Qt.AlignmentFlag.AlignLeft)
-        self.addLayout(self.control_hbox)
-        self.control_grid = InsertingGridLayout()
-        self.control_hbox.addLayout(self.control_grid)
+        # Potentials Group Box
+        self.potential_group_box = QGroupBox('Potentials')
+        self.addWidget(self.potential_group_box)
+
+        self.potential_hbox = QHBoxLayout()
+        self.potential_hbox.setAlignment(Qt.AlignmentFlag.AlignLeft)
+        self.potential_group_box.setLayout(self.potential_hbox)
+
+        self.potential_grid = InsertingGridLayout()
+        self.potential_hbox.addLayout(self.potential_grid)
+
+        # Labels
+        self.potential_grid.addWidgets(
+            None,
+            QLabel('Set [V]'),
+            QLabel('Voltage'),
+            QLabel('Current'),
+            (QLabel('High Voltage'), 2)
+        )
 
         # Cathode Potential
-        self.label_cathode = QLabel('Cathode')
-        self.spinbox_cathode = DoubleSpinBox(step_size=0.1, input_range=(0, 10000), decimals=1, buttons=True)
-        self.status_voltage_cathode = QLabel('0V')
-        self.status_current_cathode = QLabel('0A')
-        self.indicator_cathode = IndicatorLed(clickable=True, size=indicator_size)
-        self.button_cathode = QPushButton('Enable')
-        self.control_grid.addWidgets(
-            self.label_cathode,
-            self.spinbox_cathode,
-            self.status_voltage_cathode,
-            self.status_current_cathode,
-            self.indicator_cathode,
-            self.button_cathode
+        self.label_1 = QLabel('Cathode')
+        self.spinbox_1 = DoubleSpinBox(step_size=0.1, input_range=(0, 10000), decimals=1, buttons=True)
+        self.status_voltage_1 = DisplayLabel(0.5, unit='V')
+        self.status_current_1 = DisplayLabel(0.1, unit='A', enable_prefix=True)
+        self.indicator_1 = IndicatorLed(clickable=True, size=indicator_size)
+        self.button_1 = QPushButton('Enable')
+        self.potential_grid.addWidgets(
+            self.label_1,
+            self.spinbox_1,
+            self.status_voltage_1,
+            self.status_current_1,
+            self.indicator_1,
+            self.button_1
         )
 
         # Drift Tube 1
-        self.label_drift_tube_1 = QLabel('Drift Tube 1')
-        self.spinbox_drift_tube_1 = DoubleSpinBox(step_size=0.1, input_range=(0, 10000), decimals=1, buttons=True)
-        self.status_voltage_drift_tube_1 = QLabel('0V')
-        self.status_current_drift_tube_1 = QLabel('0A')
-        self.indicator_drift_tube_1 = IndicatorLed(clickable=True, size=indicator_size)
-        self.button_drift_tube_1 = QPushButton('Enable')
-        self.control_grid.addWidgets(
-            self.label_drift_tube_1,
-            self.spinbox_drift_tube_1,
-            self.status_voltage_drift_tube_1,
-            self.status_current_drift_tube_1,
-            self.indicator_drift_tube_1,
-            self.button_drift_tube_1
+        self.label_2 = QLabel('Drift Tube 1')
+        self.spinbox_2 = DoubleSpinBox(step_size=0.1, input_range=(0, 10000), decimals=1, buttons=True)
+        self.status_voltage_2 = DisplayLabel(0.6, unit='V')
+        self.status_current_2 = DisplayLabel(0.4, unit='A', enable_prefix=True)
+        self.indicator_2 = IndicatorLed(clickable=True, size=indicator_size)
+        self.button_2 = QPushButton('Enable')
+        self.potential_grid.addWidgets(
+            self.label_2,
+            self.spinbox_2,
+            self.status_voltage_2,
+            self.status_current_2,
+            self.indicator_2,
+            self.button_2
         )
 
         # Drift Tube 2
-        self.label_drift_tube_2 = QLabel('Drift Tube 2')
-        self.spinbox_drift_tube_2 = DoubleSpinBox(step_size=0.1, input_range=(0, 10000), decimals=1, buttons=True)
-        self.status_voltage_drift_tube_2 = QLabel('0V')
-        self.status_current_drift_tube_2 = QLabel('0A')
-        self.indicator_drift_tube_2 = IndicatorLed(clickable=True, size=indicator_size)
-        self.button_drift_tube_2 = QPushButton('Enable')
-        self.control_grid.addWidgets(
-            self.label_drift_tube_2,
-            self.spinbox_drift_tube_2,
-            self.status_voltage_drift_tube_2,
-            self.status_current_drift_tube_2,
-            self.indicator_drift_tube_2,
-            self.button_drift_tube_2
+        self.label_3 = QLabel('Drift Tube 2')
+        self.spinbox_3 = DoubleSpinBox(step_size=0.1, input_range=(0, 10000), decimals=1, buttons=True)
+        self.status_voltage_3 = DisplayLabel(0, unit='V')
+        self.status_current_3 = DisplayLabel(1, unit='A', enable_prefix=True)
+        self.indicator_3 = IndicatorLed(clickable=True, size=indicator_size)
+        self.button_3 = QPushButton('Enable')
+        self.potential_grid.addWidgets(
+            self.label_3,
+            self.spinbox_3,
+            self.status_voltage_3,
+            self.status_current_3,
+            self.indicator_3,
+            self.button_3
         )
 
         # Drift Tube 3
-        self.label_drift_tube_3 = QLabel('Drift Tube 3')
-        self.spinbox_drift_tube_3 = DoubleSpinBox(step_size=0.1, input_range=(0, 10000), decimals=1, buttons=True)
-        self.status_voltage_drift_tube_3 = QLabel('0V')
-        self.status_current_drift_tube_3 = QLabel('0A')
-        self.indicator_drift_tube_3 = IndicatorLed(clickable=True, size=indicator_size)
-        self.button_drift_tube_3 = QPushButton('Enable')
-        self.control_grid.addWidgets(
-            self.label_drift_tube_3,
-            self.spinbox_drift_tube_3,
-            self.status_voltage_drift_tube_3,
-            self.status_current_drift_tube_3,
-            self.indicator_drift_tube_3,
-            self.button_drift_tube_3
+        self.label_4 = QLabel('Drift Tube 3')
+        self.spinbox_4 = DoubleSpinBox(step_size=0.1, input_range=(0, 10000), decimals=1, buttons=True)
+        self.status_voltage_4 = DisplayLabel(0.9, unit='V')
+        self.status_current_4 = DisplayLabel(0.8, unit='A', enable_prefix=True)
+        self.indicator_4 = IndicatorLed(clickable=True, size=indicator_size)
+        self.button_4 = QPushButton('Enable')
+        self.potential_grid.addWidgets(
+            self.label_4,
+            self.spinbox_4,
+            self.status_voltage_4,
+            self.status_current_4,
+            self.indicator_4,
+            self.button_4
         )
 
         # Repeller
-        self.label_repeller = QLabel('Repeller')
-        self.spinbox_repeller = DoubleSpinBox(step_size=0.1, input_range=(0, 10000), decimals=1, buttons=True)
-        self.status_voltage_repeller = QLabel('0V')
-        self.status_current_repeller = QLabel('0A')
-        self.indicator_repeller = IndicatorLed(clickable=True, size=indicator_size)
-        self.button_repeller = QPushButton('Enable')
-        self.control_grid.addWidgets(
-            self.label_repeller,
-            self.spinbox_repeller,
-            self.status_voltage_repeller,
-            self.status_current_repeller,
-            self.indicator_repeller,
-            self.button_repeller
+        self.label_5 = QLabel('Repeller')
+        self.spinbox_5 = DoubleSpinBox(step_size=0.1, input_range=(0, 10000), decimals=1, buttons=True)
+        self.status_voltage_5 = DisplayLabel(0.7, unit='V')
+        self.status_current_5 = DisplayLabel(0.4, unit='A', enable_prefix=True)
+        self.indicator_5 = IndicatorLed(clickable=True, size=indicator_size)
+        self.button_5 = QPushButton('Enable')
+        self.potential_grid.addWidgets(
+            self.label_5,
+            self.spinbox_5,
+            self.status_voltage_5,
+            self.status_current_5,
+            self.indicator_5,
+            self.button_5
+        )
+
+        # Heating Group Box
+        self.heating_group_box = QGroupBox('Heating')
+        self.addWidget(self.heating_group_box)
+
+        self.heating_hbox = QHBoxLayout()
+        self.heating_hbox.setAlignment(Qt.AlignmentFlag.AlignLeft)
+        self.heating_group_box.setLayout(self.heating_hbox)
+
+        self.heating_grid = InsertingGridLayout()
+        self.heating_hbox.addLayout(self.heating_grid)
+
+        # Labels
+        self.heating_grid.addWidgets(
+            None,
+            QLabel('Set Value'),
+            QLabel('Actual Value'),
+            None,
+            (QLabel('High Voltage'), 2)
         )
 
         # Cathode Heating Voltage
-        self.label_cathode_voltage = QLabel('Cathode Heating Voltage')
-        self.spinbox_cathode_voltage = DoubleSpinBox(step_size=0.1, input_range=(0, 5), decimals=1, buttons=True)
-        self.status_cathode_voltage = QLabel('0V')
-        self.indicator_cathode_heating = IndicatorLed(clickable=True, size=indicator_size)
-        self.button_cathode_heating = QPushButton('Enable')
-        self.control_grid.addWidgets(
-            self.label_cathode_voltage,
-            self.spinbox_cathode_voltage,
-            self.status_cathode_voltage,
+        self.label_6_voltage = QLabel('Heating Voltage')
+        self.spinbox_6_voltage = DoubleSpinBox(step_size=0.1, input_range=(0, 5), decimals=1, buttons=True)
+        self.status_6_voltage = DisplayLabel(0.3, unit='V')
+        self.indicator_6 = IndicatorLed(clickable=True, size=indicator_size)
+        self.button_6 = QPushButton('Enable')
+        self.heating_grid.addWidgets(
+            self.label_6_voltage,
+            self.spinbox_6_voltage,
+            self.status_6_voltage,
             None,
-            self.indicator_cathode_heating,
-            self.button_cathode_heating
+            self.indicator_6,
+            self.button_6
         )
 
         # Cathode Heating Current
-        self.label_cathode_current = QLabel('Cathode Heating Current')
-        self.spinbox_cathode_current = DoubleSpinBox(step_size=0.01, input_range=(0, 5), decimals=1, buttons=True)
-        self.status_cathode_current = QLabel('0A')
-        self.control_grid.addWidgets(
-            self.label_cathode_current,
-            self.spinbox_cathode_current,
-            self.status_cathode_current,
+        self.label_6_current = QLabel('Heating Current')
+        self.spinbox_6_current = DoubleSpinBox(step_size=0.01, input_range=(0, 5), decimals=1, buttons=True)
+        self.status_6_current = DisplayLabel(0.9, unit='A')
+        self.heating_grid.addWidgets(
+            self.label_6_current,
+            self.spinbox_6_current,
+            self.status_6_current,
         )
