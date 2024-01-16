@@ -45,7 +45,7 @@ def main():
     splash_size = QSize(int(min(620, screen.width() * 0.5)), int(min(300, screen.height() * 0.5)))
 
     # show splashscreen on startup
-    pixmap = SplashPixmap('icons/splash.png', 'v0.0.6', QRect(0, 265, 605, 50))
+    pixmap = SplashPixmap('icons/splash.png', 'v0.0.7', QRect(0, 265, 605, 50))
     pixmap = pixmap.scaled(splash_size, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
     splash = QSplashScreen(pixmap)
     splash.show()

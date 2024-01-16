@@ -197,7 +197,7 @@ COMMAND        ACCESS    TYPE MIN  MAX     DESCRIPTION
 from datetime import datetime
 
 
-from Telnet import TelnetConnection
+from Connection.Telnet import TelnetConnection
 
 
 def tryConvertToFloat(inp, fallback: float = -1) -> float:

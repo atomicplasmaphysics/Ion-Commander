@@ -42,7 +42,7 @@ class LucidControlId:
         self.valid_data = True
 
 
-class LucidControl:
+class LucidControlConnection:
     """
     Context manager for serial connection to LucidControl
 
@@ -429,7 +429,7 @@ class LucidControl:
 
 def main():
     logging.basicConfig(level=logging.INFO)
-    with LucidControl('COM3') as lc:
+    with LucidControlConnection('COM3') as lc:
         print(lc.ioGet(0))
         print(lc.ioGet(1))
         print(lc.ioGroupGet((True, True, False, False)))

@@ -5,9 +5,13 @@ import serial.tools.list_ports as list_ports
 from serial import Serial
 
 
+from Connection.VirtualDevice import VirtualSerial
+
+
 def getComports() -> list[tuple[str, str, str]]:
-    """Returns list of comports as tuple of (name, description, hardware id)"""
-    return sorted(list_ports.comports())
+    """Returns list of comports as tuple of (port, description, hardware id)"""
+
+    return [(port, description, hardware_id) for port, description, hardware_id in sorted(list_ports.comports())]
 
 
 def printComports():
@@ -53,14 +57,34 @@ class COMConnection:
         self.echo = echo
         self.cleaning = cleaning
 
+        self.serial: Serial | None = None
+
     def __enter__(self):
         """Enter serial connection and clean possible outputs"""
-        self.serial = Serial(self.comport, baudrate=self.baudrate, timeout=self.timeout)
+        if self.comport != 'virtual':
+            self.serial = Serial(self.comport, baudrate=self.baudrate, timeout=self.timeout)
+        else:
+            self.serial = VirtualSerial()
+
+        self.clean()
+        return self
+
+    def open(self):
+        """Opens the connection"""
+        if self.comport != 'virtual':
+            self.serial = Serial(self.comport, baudrate=self.baudrate, timeout=self.timeout)
+        else:
+            self.serial = VirtualSerial()
+
         self.clean()
         return self
 
     def __exit__(self, exception_type, exception_value, exception_traceback):
         """Clean possible outputs and close connection"""
+        self.close()
+
+    def close(self):
+        """Closes the connection"""
         self.clean()
         self.serial.close()
 
@@ -99,9 +123,11 @@ class COMConnection:
 
 
 def main():
-    with COMConnection('COM4') as com:
+    print(getComports())
+
+    with COMConnection('virtual', echo=False, cleaning=False) as com:
         com.write('*IDN?')
-        print(com.readline().strip())
+        print(com.readline())
 
 
 if __name__ == '__main__':

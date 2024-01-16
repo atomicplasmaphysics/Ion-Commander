@@ -1,10 +1,10 @@
 from math import pow, log
 
 
-from Connection.LucidControl import LucidControl
+from Connection.LucidControl import LucidControlConnection
 
 
-class Thyracont(LucidControl):
+class ThyracontConnection(LucidControlConnection):
     def __init__(
         self,
         comport: str,
@@ -46,7 +46,7 @@ class Thyracont(LucidControl):
 
 
 def main():
-    with Thyracont('COM3') as thyracont:
+    with ThyracontConnection('COM3') as thyracont:
         print(thyracont.getTemperatureAll())
 
 

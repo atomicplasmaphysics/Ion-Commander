@@ -4,7 +4,10 @@ from PyQt6.QtWidgets import QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QGrou
 
 from Config.StylesConf import Colors
 
-from Utility.Layouts import InsertingGridLayout, IndicatorLed, DoubleSpinBox, DisplayLabel
+from Utility.Layouts import InsertingGridLayout, IndicatorLed, DoubleSpinBox, DisplayLabel, ComboBox
+
+from Connection.USBPorts import getComports
+from Connection.ISEG import ISEGConnection
 
 
 class EBISVBoxLayout(QVBoxLayout):
@@ -13,6 +16,10 @@ class EBISVBoxLayout(QVBoxLayout):
 
         # TODO: make indicator sizes global somewhere
         indicator_size = QSize(20, 20)
+
+        self.comports = getComports()
+        self.comport_ports = [port for port, description, hardware_id in self.comports]
+        self.comport_description = [f'{port}: {description} [{hardware_id}]' for port, description, hardware_id in self.comports]
 
         # Connection Group Box
         self.connection_group_box = QGroupBox('Connection')
@@ -32,10 +39,14 @@ class EBISVBoxLayout(QVBoxLayout):
         self.label_connection = QLabel('Connection')
         self.indicator_connection = IndicatorLed(clickable=True, size=indicator_size, off_color=Colors.cooperate_error)
         self.status_connection = QLabel('Not connected')
+        self.combobox_connection = ComboBox(entries=self.comport_ports, tooltips=self.comport_description)
+        self.button_connection = QPushButton('Connect')
         self.connection_grid.addWidgets(
             self.label_connection,
             self.indicator_connection,
-            (self.status_connection, 2)
+            (self.status_connection, 2),
+            self.combobox_connection,
+            self.button_connection
         )
 
         # High Voltage
@@ -194,3 +205,9 @@ class EBISVBoxLayout(QVBoxLayout):
             self.spinbox_6_current,
             self.status_6_current,
         )
+
+    def closeEvent(self):
+        """Must be called when application is closed"""
+        pass
+
+

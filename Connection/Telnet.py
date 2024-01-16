@@ -1,6 +1,8 @@
 import socket
-
 import logging
+
+
+from Connection.VirtualDevice import VirtualSocket
 
 
 class TelnetConnection:
@@ -27,9 +29,12 @@ class TelnetConnection:
 
     def __enter__(self):
         """Enter telnet socket connection"""
-        self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.socket.settimeout(self.timeout)
-        self.socket.connect((self.host, self.port))
+        if self.host != 'virtual':
+            self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            self.socket.settimeout(self.timeout)
+            self.socket.connect((self.host, self.port))
+        else:
+            self.socket = VirtualSocket()
         return self
 
     def __exit__(self, exception_type, exception_value, exception_traceback):
@@ -60,7 +65,7 @@ class TelnetConnection:
 
 
 def main():
-    with TelnetConnection('monaco_g0123251') as telnet:
+    with TelnetConnection('virtual') as telnet:
         print(telnet.read(2048))
         while True:
             telnet.write(input(telnet.read(4096)))

@@ -67,7 +67,7 @@ class TabWidget(QWidget):
     """
 
     def __init__(self, parent: MainWindow):
-        super().__init__(parent)
+        super().__init__(parent=parent)
         self.main_window = parent
 
     def checkClosable(self) -> bool:
@@ -211,16 +211,16 @@ class InsertingGridLayout(QGridLayout):
         row = self.rowCount()
         width = 0
 
-        for col, widget in enumerate(widgets):
+        for widget in widgets:
             width += 1
             if widget is None:
                 continue
 
             if isinstance(widget, tuple):
-                width += 1
-                self.addWidget(widget[0], row, col, 1, widget[1])
+                self.addWidget(widget[0], row, width - 1, 1, widget[1])
+                width += widget[1] - 1
             else:
-                self.addWidget(widget, row, col)
+                self.addWidget(widget, row, width - 1)
 
         self.max_width = max(self.max_width, width)
         self._resizeHorizontalLines()

@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 
 
-from USBPorts import COMConnection
+from Connection.USBPorts import COMConnection
 
 
 def convertInUnitList(data: list, unit: str = '') -> list[str | float]:

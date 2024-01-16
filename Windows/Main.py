@@ -234,11 +234,11 @@ class MainWindow(QMainWindow):
         :param event: close event
         """
 
-        # check for unsaved changes/running simulations
+        # TODO: make some "closing connections" screen
+
+        # send closing signal to all tabs
         for index in range(self.tabs.count()):
-            if not self.tabs.widget(index).checkClosable():
-                event.ignore()
-                return
+            self.tabs.widget(index).close()
 
         if self.isMaximized():
             dimensions = (-1, -1)

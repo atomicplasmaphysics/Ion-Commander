@@ -101,3 +101,7 @@ class ControlWindow(TabWidget):
         self.splitter.setStretchFactor(1, 30)
         self.splitter.setStretchFactor(2, 30)
         self.splitter.setStretchFactor(3, 10)
+
+    def closeEvent(self, event):
+        """Closes all connections"""
+        self.ebis_group_vbox.closeEvent()
