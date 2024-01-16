@@ -130,21 +130,35 @@ class LucidControlConnection:
 
         self.id = LucidControlId()
 
+        self.serial: Serial | None = None
+
     def __enter__(self):
         """Enter serial connection and clean possible outputs"""
+        return self.open()
+
+    def open(self):
+        """Opens the connection"""
         self.serial = Serial(self.comport, baudrate=self.baudrate, timeout=self.timeout)
         self.identify()
         return self
 
     def __exit__(self, exception_type, exception_value, exception_traceback):
+        """Closes the connection"""
+        self.close()
+
+    def close(self):
         """Clean possible outputs and close connection"""
-        self.serial.close()
+        if self.serial is not None:
+            self.serial.close()
 
     def read(self) -> bytearray:
         """
         Reads output and returns bytearray. Returned bytearray will be empty if the response was a simple OK.
         If errors occur a ConnectionError will be raised.
         """
+
+        if self.serial is None:
+            raise ConnectionError('Connection has not been established')
 
         header_data = bytearray(2)
         header_length = self.serial.readinto(header_data)
@@ -180,6 +194,9 @@ class LucidControlConnection:
         :param p1a: (optional) parameter 1a
         :param data: (optional) additional data to send
         """
+
+        if self.serial is None:
+            raise ConnectionError('Connection has not been established')
 
         if data is None:
             data = bytearray()

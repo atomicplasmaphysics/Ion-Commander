@@ -269,12 +269,20 @@ class MonacoConnection(TelnetConnection):
 
     def __exit__(self, exception_type, exception_value, exception_traceback):
         """Close Monaco connection"""
-        self.write('EXIT')
+        self.close()
         super().__exit__(exception_type, exception_value, exception_traceback)
+
+    def close(self):
+        """Closes Monaco connection"""
+        self.write('EXIT')
 
     def __enter__(self):
         """Enters Monaco connection"""
-        super().__enter__()
+        return self.open()
+
+    def open(self):
+        """Enters Monaco connection"""
+        super().open()
         self.readInit()
         return self
 

@@ -603,8 +603,12 @@ class ComboBox(QComboBox):
 
         current_index = self.currentIndex()
         if text:
+            if current_index == -1:
+                return '-1'
             return self.entries[current_index]
         if save and self.entries_save is not None:
+            if current_index == -1:
+                return '-1'
             return self.entries_save[current_index]
         return current_index
 
@@ -682,7 +686,7 @@ class IndicatorLed(QWidget):
 
         return self.state
 
-    def setValue(self, state):
+    def setValue(self, state: bool):
         """
         Sets its state
         :param state: new state

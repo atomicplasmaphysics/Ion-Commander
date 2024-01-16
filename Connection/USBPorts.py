@@ -61,13 +61,7 @@ class COMConnection:
 
     def __enter__(self):
         """Enter serial connection and clean possible outputs"""
-        if self.comport != 'virtual':
-            self.serial = Serial(self.comport, baudrate=self.baudrate, timeout=self.timeout)
-        else:
-            self.serial = VirtualSerial()
-
-        self.clean()
-        return self
+        return self.open()
 
     def open(self):
         """Opens the connection"""
@@ -86,19 +80,31 @@ class COMConnection:
     def close(self):
         """Closes the connection"""
         self.clean()
-        self.serial.close()
+        if self.serial is not None:
+            self.serial.close()
 
     def clean(self):
         """Clean connection"""
         if not self.cleaning:
             return
 
+        if self.serial is None:
+            raise ConnectionError('Connection has not been established')
+
         while True:
             if not self.serial.readline():
                 break
 
     def write(self, cmd: str):
-        """Write command string to connection"""
+        """
+        Write command string to connection
+
+        :param cmd: instruction command
+        """
+
+        if self.serial is None:
+            raise ConnectionError('Connection has not been established')
+
         if not cmd.endswith('\r\n'):
             cmd += '\r\n'
         self.serial.write(cmd.encode(self.encoding))
@@ -109,16 +115,28 @@ class COMConnection:
             return
 
         # if echo is on
-        echocmd = self.readline()
-        if echocmd != cmd:
-            raise ConnectionError(f'Sent command does not match echo command: "{cmd}" was sent and "{echocmd}" was received')
+        echo_cmd = self.readline()
+        if echo_cmd != cmd:
+            raise ConnectionError(f'Sent command does not match echo command: "{cmd}" was sent and "{echo_cmd}" was received')
 
     def readline(self) -> str:
         """Reads output line"""
+
+        if self.serial is None:
+            raise ConnectionError('Connection has not been established')
+
         return self.serial.readline().decode(self.encoding)
 
     def read(self, count: int = 1024) -> str:
-        """Read defined length of output bytes"""
+        """
+        Read defined length of output bytes
+
+        :param count: bytes to read
+        """
+
+        if self.serial is None:
+            raise ConnectionError('Connection has not been established')
+
         return self.serial.read(count).decode(self.encoding)
 
 

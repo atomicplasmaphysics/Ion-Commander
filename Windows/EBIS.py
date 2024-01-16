@@ -209,5 +209,3 @@ class EBISVBoxLayout(QVBoxLayout):
     def closeEvent(self):
         """Must be called when application is closed"""
         pass
-
-

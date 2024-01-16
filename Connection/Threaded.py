@@ -70,13 +70,6 @@ class ConnectionWorker(QRunnable):
     def run(self):
         """Called when worker is started"""
 
-        try:
-            self.connection.open()
-            self.running = True
-        except ConnectionError as error:
-            self.signal.error.emit(error)
-            return
-
         while True:
             if not self.work:
                 sleep(0.1)

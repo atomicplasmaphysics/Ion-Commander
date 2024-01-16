@@ -200,3 +200,7 @@ class LaserVBoxLayout(QVBoxLayout):
             QLabel('Pulse Width'),
             self.spinbox_settings_pulsewidth
         )
+
+    def closeEvent(self):
+        """Must be called when application is closed"""
+        pass

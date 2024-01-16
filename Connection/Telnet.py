@@ -27,7 +27,13 @@ class TelnetConnection:
         self.timeout = timeout
         self.encoding = encoding
 
+        self.socket: socket.socket | None = None
+
     def __enter__(self):
+        """Enter telnet socket connection"""
+        return self.open()
+
+    def open(self):
         """Enter telnet socket connection"""
         if self.host != 'virtual':
             self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -39,17 +45,38 @@ class TelnetConnection:
 
     def __exit__(self, exception_type, exception_value, exception_traceback):
         """Close telnet connection"""
+        self.close()
+
+    def close(self):
+        """Closes telnet connection"""
+
+        if self.socket is None:
+            raise ConnectionError('Connection has not been established')
+
         self.socket.close()
 
     def write(self, cmd: str):
-        """Write command string to connection"""
+        """
+        Write command string to connection
+
+        :param cmd: instruction command
+        """
+
+        if self.socket is None:
+            raise ConnectionError('Connection has not been established')
+
         if not cmd.endswith('\r\n'):
             cmd += '\r\n'
+
         self.socket.send(cmd.encode(self.encoding))
         logging.info(f'Command {cmd} was written to {self.host}:{self.port}')
 
     def readline(self) -> str:
         """Reads until linebreak"""
+
+        if self.socket is None:
+            raise ConnectionError('Connection has not been established')
+
         line = ''
         while True:
             new_char = self.socket.recv(1).decode(self.encoding)
@@ -60,7 +87,15 @@ class TelnetConnection:
         return line
 
     def read(self, count: int = 1024) -> str:
-        """Read defined length of output bytes"""
+        """
+        Read defined length of output bytes
+
+        :param count: bytes to read
+        """
+
+        if self.socket is None:
+            raise ConnectionError('Connection has not been established')
+
         return self.socket.recv(count).decode(self.encoding)
 
 

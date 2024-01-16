@@ -6,6 +6,10 @@ from Config.StylesConf import Colors
 
 from Utility.Layouts import InsertingGridLayout, IndicatorLed, DoubleSpinBox, DisplayLabel, PolarityButton, SpinBox, ComboBox
 
+from Connection.USBPorts import getComports
+from Connection.ISEG import ISEGConnection
+from Connection.Threaded import ThreadedISEGConnection
+
 
 class PSUVBoxLayout(QVBoxLayout):
     def __init__(self, *args, **kwargs):
@@ -13,6 +17,10 @@ class PSUVBoxLayout(QVBoxLayout):
 
         # TODO: make indicator sizes global somewhere
         indicator_size = QSize(20, 20)
+
+        self.comports = getComports()
+        self.comport_ports = [port for port, description, hardware_id in self.comports]
+        self.comport_description = [f'{port}: {description} [{hardware_id}]' for port, description, hardware_id in self.comports]
 
         # Connection Group Box
         self.connection_group_box = QGroupBox('Connection')
@@ -32,10 +40,14 @@ class PSUVBoxLayout(QVBoxLayout):
         self.label_connection = QLabel('Connection')
         self.indicator_connection = IndicatorLed(clickable=True, size=indicator_size, off_color=Colors.cooperate_error)
         self.status_connection = QLabel('Not connected')
+        self.combobox_connection = ComboBox(entries=self.comport_ports, tooltips=self.comport_description)
+        self.button_connection = QPushButton('Connect')
         self.connection_grid.addWidgets(
             self.label_connection,
             self.indicator_connection,
-            (self.status_connection, 2)
+            (self.status_connection, 2),
+            self.combobox_connection,
+            self.button_connection
         )
 
         # TODO: do we need high voltage?
@@ -166,7 +178,7 @@ class PSUVBoxLayout(QVBoxLayout):
         # TODO: adjust current limit spin-boxes
 
         # MCP
-        self.label_limit_1 = self.label_1
+        self.label_limit_1 = QLabel('MCP Front/Back')
         self.spinbox_limit_voltage_1 = DoubleSpinBox(step_size=0.1, input_range=(0, 10000), decimals=1, buttons=True)
         self.spinbox_limit_current_1 = DoubleSpinBox(step_size=0.001, input_range=(0, 1), decimals=3, buttons=True)
         self.indicator_limit_1 = IndicatorLed(clickable=True, size=indicator_size, on_color=Colors.cooperate_error)
@@ -178,7 +190,7 @@ class PSUVBoxLayout(QVBoxLayout):
         )
 
         # Anode
-        self.label_limit_2 = self.label_2
+        self.label_limit_2 = QLabel('Anode')
         self.spinbox_limit_voltage_2 = DoubleSpinBox(step_size=0.1, input_range=(0, 10000), decimals=1, buttons=True)
         self.spinbox_limit_current_2 = DoubleSpinBox(step_size=0.001, input_range=(0, 1), decimals=3, buttons=True)
         self.indicator_limit_2 = IndicatorLed(clickable=True, size=indicator_size, on_color=Colors.cooperate_error)
@@ -190,7 +202,7 @@ class PSUVBoxLayout(QVBoxLayout):
         )
 
         # Cathode LSD
-        self.label_limit_3 = self.label_3
+        self.label_limit_3 = QLabel('Cathode LSD')
         self.spinbox_limit_voltage_3 = DoubleSpinBox(step_size=0.1, input_range=(0, 10000), decimals=1, buttons=True)
         self.spinbox_limit_current_3 = DoubleSpinBox(step_size=0.001, input_range=(0, 1), decimals=3, buttons=True)
         self.indicator_limit_3 = IndicatorLed(clickable=True, size=indicator_size, on_color=Colors.cooperate_error)
@@ -202,7 +214,7 @@ class PSUVBoxLayout(QVBoxLayout):
         )
 
         # Focus LSD
-        self.label_limit_4 = self.label_4
+        self.label_limit_4 = QLabel('Focus LSD')
         self.spinbox_limit_voltage_4 = DoubleSpinBox(step_size=0.1, input_range=(0, 10000), decimals=1, buttons=True)
         self.spinbox_limit_current_4 = DoubleSpinBox(step_size=0.001, input_range=(0, 1), decimals=3, buttons=True)
         self.indicator_limit_4 = IndicatorLed(clickable=True, size=indicator_size, on_color=Colors.cooperate_error)
@@ -266,3 +278,7 @@ class PSUVBoxLayout(QVBoxLayout):
             self.status_ramp,
             self.status_remaining_ramp
         )
+
+    def closeEvent(self):
+        """Must be called when application is closed"""
+        pass
