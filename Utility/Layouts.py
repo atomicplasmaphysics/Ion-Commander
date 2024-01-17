@@ -544,6 +544,7 @@ class ComboBox(QComboBox):
     :param numbering: (optional) numbers entries (starting from this index)
     :param label_default: (optional) labels the default selected
     :param disabled_list: (optional) enable/disable choices
+    :param scroll: (optional) enable/disable scrolling
     """
 
     def __init__(
@@ -559,6 +560,61 @@ class ComboBox(QComboBox):
         **kwargs
     ):
         super().__init__(**kwargs)
+
+        self.default = default
+        self.entries_save = entries_save
+
+        if entries is None:
+            entries = []
+        self.entries = entries
+
+        if numbering is not None:
+            if default:
+                self.default -= numbering
+            entries = [f'{i + numbering}: {entry}' for i, entry in enumerate(entries)]
+
+        if label_default:
+            entries[self.default] = f'{entries[self.default]} (default)'
+
+        self.addItems(entries)
+        self.setCurrentIndex(self.default)
+
+        if tooltips is not None and len(tooltips) == len(entries):
+            for i, tip in enumerate(tooltips):
+                self.setItemData(i, tip, Qt.ItemDataRole.ToolTipRole)
+
+        if disabled_list is not None:
+            for i in disabled_list:
+                self.model().item(i, 0).setEnabled(False)
+
+        if not scroll:
+            self.wheelEvent = lambda event: None
+
+    def reinitialize(
+        self,
+        default: int = 0,
+        entries: list[str] = None,
+        tooltips: list[str] = None,
+        entries_save: list = None,
+        numbering: int = None,
+        label_default: bool = False,
+        disabled_list: list[int] = None,
+        scroll: bool = False
+    ):
+        """
+        Reinitializes itself
+
+        :param default: default selected element
+        :param entries: list of possible choices
+        :param tooltips: (optional) list of tooltips when hovered over one choice
+        :param entries_save: (optional) list of entries for saving
+        :param numbering: (optional) numbers entries (starting from this index)
+        :param label_default: (optional) labels the default selected
+        :param disabled_list: (optional) enable/disable choices
+        :param scroll: (optional) enable/disable scrolling
+        """
+
+        self.clear()
 
         self.default = default
         self.entries_save = entries_save
@@ -1066,6 +1122,8 @@ class PolarityButton(QWidget):
     :param connected_buttons: buttons are connected to color change
     """
 
+    pressed = pyqtSignal(bool)
+
     def __init__(
         self,
         color_positive: QColor | Qt.GlobalColor | str = Colors.cooperate_lime,
@@ -1095,8 +1153,11 @@ class PolarityButton(QWidget):
         self.main_layout.addWidget(self.negative_button)
 
         if connected_buttons:
-            self.positive_button.clicked.connect(lambda: self.polarityChange(True))
-            self.negative_button.clicked.connect(lambda: self.polarityChange(False))
+            self.positive_button.pressed.connect(lambda: self.polarityChange(True))
+            self.negative_button.pressed.connect(lambda: self.polarityChange(False))
+
+        self.positive_button.pressed.connect(lambda: self.pressed.emit(True))
+        self.negative_button.pressed.connect(lambda: self.pressed.emit(False))
 
         self._setButtonColors()
 
@@ -1107,11 +1168,13 @@ class PolarityButton(QWidget):
         :param polarity: polarity of button (True = positive; False = negative)
         """
 
-        if self.state == polarity:
-            self.state = None
-        else:
-            self.state = polarity
+        self.state = polarity
+        self._setButtonColors()
 
+    def reset(self):
+        """Resets both buttons"""
+
+        self.state = None
         self._setButtonColors()
 
     def _setButtonColors(self):

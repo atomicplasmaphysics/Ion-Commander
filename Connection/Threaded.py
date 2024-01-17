@@ -63,7 +63,7 @@ class ConnectionWorker(QRunnable):
         super().__init__()
         self.connection = connection
         self.signal = ConnectionWorkerSignals()
-        self.running = False
+        self.running = True
         self.work = []
 
     @pyqtSlot()
@@ -165,8 +165,9 @@ class ThreadedConnection:
     def close(self):
         """Closes the worker"""
 
-        self.worker.execute(self.callback_id(), 'close')
-        self.worker.running = False
+        if self.worker.running:
+            self.worker.execute(self.callback_id(), 'close')
+            self.worker.running = False
 
     def __getattr__(self, name):
         """

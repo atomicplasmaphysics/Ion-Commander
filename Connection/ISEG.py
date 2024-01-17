@@ -764,8 +764,13 @@ class ISEGConnection(COMConnection):
         self._queryAndReturnInt(':SYSTEM:USER:CONFIG SAVE')
 
 
-def openiseg(port: str | ISEGPort, timeout: float = 0.05, encoding: str = 'utf-8', echo: bool = True,
-             cleaning: bool = True) -> ISEGConnection:
+def openiseg(
+    port: str | ISEGPort,
+    timeout: float = 0.05,
+    encoding: str = 'utf-8',
+    echo: bool = True,
+    cleaning: bool = True
+) -> ISEGConnection:
     """
     Opens ISEGConnection context manager for Serial connection
 
@@ -855,8 +860,7 @@ def assertionTest():
 
 
 def main():
-    iseg_port = ISEGPort(port='COM4', echo=True)
-    with openiseg(iseg_port) as iseg:
+    with openiseg(ISEGPort(port='COM4', echo=True)) as iseg:
         print(iseg.identification())
 
 

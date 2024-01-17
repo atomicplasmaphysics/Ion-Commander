@@ -104,4 +104,7 @@ class ControlWindow(TabWidget):
 
     def closeEvent(self, event):
         """Closes all connections"""
+        self.psu_group_vbox.closeEvent()
         self.ebis_group_vbox.closeEvent()
+        self.laser_group_vbox.closeEvent()
+        self.pressure_group_vbox.closeEvent()
