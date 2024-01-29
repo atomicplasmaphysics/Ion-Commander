@@ -4,6 +4,7 @@
 /compile
 !compile/pyinstaller.py
 /Ion Commander*.exe
+/logs/*
 
 /data/
 /tests/

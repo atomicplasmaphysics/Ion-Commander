@@ -1,9 +1,8 @@
-import logging
-
-
 import serial.tools.list_ports as list_ports
 from serial import Serial
 
+
+from Config.GlobalConf import GlobalConf
 
 from Connection.VirtualDevice import VirtualSerial
 
@@ -108,7 +107,7 @@ class COMConnection:
         if not cmd.endswith('\r\n'):
             cmd += '\r\n'
         self.serial.write(cmd.encode(self.encoding))
-        logging.info(f'Command {cmd} was written to port {self.comport}')
+        GlobalConf.logger.debug(f'Command {cmd} was written to port {self.comport}')
 
         # if echo is not on
         if not self.echo:

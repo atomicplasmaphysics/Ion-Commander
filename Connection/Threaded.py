@@ -5,6 +5,8 @@ from time import sleep
 from PyQt6.QtCore import QObject, pyqtSignal, QRunnable, pyqtSlot, QThreadPool
 
 
+from Config.GlobalConf import GlobalConf
+
 from Connection.ISEG import ISEGConnection
 from Connection.Thyracont import ThyracontConnection
 from Connection.Monaco import MonacoConnection
@@ -124,14 +126,15 @@ class ThreadedConnection:
         self.callback_id = CallbackId()
         self.callbacks = {}
 
-    def error(self, error):
+    @staticmethod
+    def error(error):
         """
         Called when an exception in the worker thread occurs
 
         :param error: exception that occurred
         """
 
-        raise error
+        GlobalConf.logger.exception(error)
 
     def callback(self, function, callback_id):
         """

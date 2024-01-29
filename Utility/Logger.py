@@ -1,4 +1,12 @@
 import logging
+import logging.config
+import logging.handlers
+import json
+from pathlib import Path
+from os import mkdir
+
+
+from Config.GlobalConf import GlobalConf
 
 
 class CustomFormatter(logging.Formatter):
@@ -12,7 +20,7 @@ class CustomFormatter(logging.Formatter):
     red = '\x1b[31;20m'
     bold_red = '\x1b[31;1m'
     reset = '\x1b[0m'
-    format = '%(asctime)s - %(levelname)s - %(message)s (%(filename)s:%(lineno)d)'
+    format = '%(asctime)s - %(levelname)-8s - %(message)s (%(filename)s:%(lineno)d)'
 
     FORMATS = {
         logging.DEBUG: blue + format + reset,
@@ -23,19 +31,54 @@ class CustomFormatter(logging.Formatter):
     }
 
     def format(self, record):
+        """Returns formatted record"""
+
         log_fmt = self.FORMATS.get(record.levelno)
         formatter = logging.Formatter(log_fmt)
         return formatter.format(record)
 
 
-def setupLogging(level: int):
-    """Set up logging"""
+def setupLogging(level: int = logging.WARNING):
+    """
+    Set up logging
 
-    logger = logging.getLogger()
-    logger.setLevel(level)
+    :param level: logging level
+    """
 
-    handler = logging.StreamHandler()
-    handler.setLevel(logging.DEBUG)
-    handler.setFormatter(CustomFormatter())
+    root_path = Path(__file__).parents[1]
+    print(root_path)
 
-    logger.addHandler(handler)
+    try:
+        mkdir(root_path / 'logs')
+    except FileExistsError:
+        pass
+
+    with open(root_path / 'Utility' / 'log_config.json', 'r') as log_file:
+        config = json.load(log_file)
+    config['handlers']['console']['level'] = logging.getLevelName(level)
+    config['handlers']['file']['filename'] = str(root_path / 'logs' / f'{GlobalConf.title.replace(" ", "_")}.log')
+    logging.config.dictConfig(config)
+
+
+def main():
+    """
+    Simple routine to generate some generic log messages of different levels
+    """
+
+    setupLogging(logging.DEBUG)
+    logger = logging.getLogger(GlobalConf.title)
+
+    logger.debug('debug message')
+    logger.info('info message')
+    logger.warning('warning message')
+    logger.error('error message')
+    logger.critical('critical message')
+
+    try:
+        1/0
+    except ZeroDivisionError:
+        logger.exception('exception message')
+
+
+if __name__ == '__main__':
+    main()

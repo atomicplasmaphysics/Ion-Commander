@@ -24,7 +24,7 @@ def main():
     # TODO: adjust logo and splashscreen
 
     # set up logging level
-    setupLogging(logging.WARNING)
+    setupLogging(logging.DEBUG)
 
     # ctypes.windll only works in Windows
     if system() == 'Windows':
@@ -45,7 +45,7 @@ def main():
     splash_size = QSize(int(min(620, screen.width() * 0.5)), int(min(300, screen.height() * 0.5)))
 
     # show splashscreen on startup
-    pixmap = SplashPixmap('icons/splash.png', 'v0.0.9', QRect(0, 265, 605, 50))
+    pixmap = SplashPixmap('icons/splash.png', 'v0.0.10', QRect(0, 265, 605, 50))
     pixmap = pixmap.scaled(splash_size, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
     splash = QSplashScreen(pixmap)
     splash.show()

@@ -5,6 +5,7 @@ from PyQt6.QtCore import Qt, QSize, QTimer
 from PyQt6.QtWidgets import QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QGroupBox, QMessageBox
 
 
+from Config.GlobalConf import GlobalConf
 from Config.StylesConf import Colors
 
 from Utility.Layouts import InsertingGridLayout, IndicatorLed, DoubleSpinBox, DisplayLabel, ComboBox
@@ -467,6 +468,7 @@ class EBISVBoxLayout(QVBoxLayout):
                     f'<strong>Encountered Error:</strong><br>{error}',
                     expand_details=False
                 )
+            GlobalConf.logger.info(f'Connection error! Could not connect to EBIS power supply, because of: {error}')
 
     def reset(self):
         """Resets everything to default"""

@@ -1,6 +1,5 @@
 import logging
 
-
 from PyQt6.QtCore import QSettings
 
 
@@ -9,15 +8,18 @@ class LoggerSettings(QSettings):
     Class that extends the QSettings with logging messages
     """
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, logger: logging.Logger = None, **kwargs):
         super().__init__(*args, **kwargs)
+        if logger is None:
+            logger = logging
+        self.logger = logger
 
     def value(self, key, **kwargs):
         """Get value of key"""
         if key not in self.allKeys():
             default = kwargs.get('defaultValue')
             default_text = '' if default is None else f', using "{default}" as default value'
-            logging.info(f'"{key}" not found in Settings{default_text}')
+            self.logger.info(f'"{key}" not found in Settings{default_text}')
         return super().value(key, **kwargs)
 
 
@@ -29,8 +31,11 @@ class GlobalConf:
     # title
     title = 'Ion Commander'
 
+    # logger
+    logger = logging.getLogger(title)
+
     # settings object
-    settings = LoggerSettings(f'TU Wien {title}', title)
+    settings = LoggerSettings(f'TU Wien {title}', title, logger=logger)
 
     # window parameters
     window_width_name = 'window_width'

@@ -1,5 +1,7 @@
-from dataclasses import dataclass
+from enum import Enum, auto
 
+
+from Config.GlobalConf import GlobalConf
 
 from Connection.USBPorts import COMConnection
 
@@ -66,16 +68,6 @@ def convertToString(inp: float | int, precision: int = 6):
     return f'{float(inp):.{precision}E}'
 
 
-@dataclass
-class ISEGPort:
-    """ISEG Port configuration"""
-    port: str = ''
-    timeout: float = 0.05
-    encoding: str = 'utf-8'
-    echo: bool = True
-    cleaning: bool = True
-
-
 class ISEGConnection(COMConnection):
     """
     Context manager for ISEG Serial connection, built on top of the COMConnection context manager
@@ -85,23 +77,57 @@ class ISEGConnection(COMConnection):
     :param encoding: Encoding
     :param echo: If device has echo. Will be checked
     :param cleaning: If output cache should be cleared when entering and exiting
+    :param strict: If identification string should contain "iseg"
     """
+
+    class EchoMode(Enum):
+        ECHO_ENABLED = auto()
+        ECHO_DISABLED = auto()
+        ECHO_AUTO = auto()
 
     def __init__(
         self,
         comport: str,
         timeout: float = 0.05,
         encoding: str = 'utf-8',
-        echo: bool = True,
-        cleaning: bool = True
+        echo: EchoMode = EchoMode.ECHO_AUTO,
+        cleaning: bool = True,
+        strict: bool = False
     ):
+        self.echo_mode = echo
+        self.strict = strict
+
         super().__init__(
             comport,
             timeout=timeout,
             encoding=encoding,
-            echo=echo,
+            echo=True if echo == self.EchoMode.ECHO_ENABLED else False,
             cleaning=cleaning
         )
+
+    def open(self):
+        """Opens the connection"""
+        super().open()
+
+        # detect echo mode
+        if self.echo_mode == self.EchoMode.ECHO_AUTO:
+            cmd = '*IDN?'
+            self.write(cmd)
+
+            if self.readline().strip() == cmd:
+                self.echo = True
+
+            GlobalConf.logger.info(f'<ISEGConnection> auto-detected echo-mode on port "{self.comport}" to {self.echo}')
+            self.clean()
+
+        # detect if it is ISEG device
+        identification = self.identification()
+        if 'iseg' not in identification.lower():
+            GlobalConf.logger.warning(f'<ISEGConnection> on port "{self.comport}" does not identify with "iseg". Identification is "{identification}"')
+            if self.strict:
+                raise ConnectionError(f'Device identification "{identification}" does not contain "iseg"')
+
+        return self
 
     def _queryAndReturn(self, cmd: str) -> str:
         """Queries command and returns striped result"""
@@ -764,37 +790,13 @@ class ISEGConnection(COMConnection):
         self._queryAndReturnInt(':SYSTEM:USER:CONFIG SAVE')
 
 
-def openiseg(
-    port: str | ISEGPort,
-    timeout: float = 0.05,
-    encoding: str = 'utf-8',
-    echo: bool = True,
-    cleaning: bool = True
-) -> ISEGConnection:
-    """
-    Opens ISEGConnection context manager for Serial connection
-
-    :param port: COM Port OR ISEGPort dataclass
-    :param timeout: Timeout [in s]
-    :param encoding: Encoding
-    :param echo: If device has echo. Will be checked
-    :param cleaning: If output cache should be cleared when entering and exiting
-    """
-
-    # if port is ISEGPort dataclass
-    if isinstance(port, ISEGPort):
-        timeout = port.timeout
-        encoding = port.encoding
-        echo = port.echo
-        cleaning = port.cleaning
-        port = port.port
-
-    return ISEGConnection(port, timeout, encoding, echo, cleaning)
-
-
 def assertionTest():
-    # Assertion tests
+    """
+    Different assertion tests
+    """
+
     def testConvertInListUnit():
+        """Test if conversion in list format works"""
         assert convertInUnitList(['1', '2', '3']) == [1, 2, 3]
         assert convertInUnitList([' 1', '2', '3 ']) == [1, 2, 3]
         assert convertInUnitList(['1E4', '2E-5', '3']) == [1E4, 2E-5, 3]
@@ -804,6 +806,7 @@ def assertionTest():
         assert convertInUnitList(['1E4%', '2E-5%', '3%'], '%') == [1E4, 2E-5, 3]
 
     def testChannelInChannelString():
+        """Test if conversion in channel format works"""
         assert convertInChannelString(2) == ('2', 1)
         assert convertInChannelString([1, 4, 5]) == ('1,4,5', 3)
         assert convertInChannelString(['0', '3', '2 ']) == ('0,2,3', 3)
@@ -812,6 +815,7 @@ def assertionTest():
         assert convertInChannelString('0-2, 5 -7') == ('0,1,2,5,6,7', 6)
 
     def testToString():
+        """Test if conversion from numeric to string format works"""
         assert convertToString(1) == '1.000000E+00'
         assert convertToString(10) == '1.000000E+01'
         assert convertToString(100) == '1.000000E+02'
@@ -860,7 +864,7 @@ def assertionTest():
 
 
 def main():
-    with openiseg(ISEGPort(port='COM4', echo=True)) as iseg:
+    with ISEGConnection(comport='COM4') as iseg:
         print(iseg.identification())
 
 

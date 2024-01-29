@@ -5,6 +5,7 @@ from PyQt6.QtWidgets import QVBoxLayout, QGroupBox, QLabel, QPushButton, QHBoxLa
 from PyQt6.QtCore import Qt, QSize, QTimer
 
 
+from Config.GlobalConf import GlobalConf
 from Config.StylesConf import Colors
 
 from Utility.Layouts import PressureWidget, IndicatorLed, ComboBox
@@ -135,6 +136,7 @@ class PressureVBoxLayout(QVBoxLayout):
                     f'<strong>Encountered Error:</strong><br>{error}',
                     expand_details=False
                 )
+            GlobalConf.logger.info(f'Connection error! Could not connect to Lucid Control ADC, because of: {error}')
 
     def reset(self):
         """Resets everything to default"""

@@ -1,7 +1,9 @@
 from enum import Enum, IntEnum
 from serial import Serial
 import struct
-import logging
+
+
+from Config.GlobalConf import GlobalConf
 
 
 class LucidControlId:
@@ -208,7 +210,7 @@ class LucidControlConnection:
         data_write.append(len(data))
         data_write += data
 
-        logging.info(f'Data {data_write} was written to port {self.comport}')
+        GlobalConf.logger.debug(f'Data {data_write} was written to port {self.comport}')
         self.serial.write(data_write)
 
     def query(
@@ -445,7 +447,6 @@ class LucidControlConnection:
 
 
 def main():
-    logging.basicConfig(level=logging.INFO)
     with LucidControlConnection('COM3') as lc:
         print(lc.ioGet(0))
         print(lc.ioGet(1))

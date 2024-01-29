@@ -1,6 +1,7 @@
 import socket
-import logging
 
+
+from Config.GlobalConf import GlobalConf
 
 from Connection.VirtualDevice import VirtualSocket
 
@@ -69,7 +70,7 @@ class TelnetConnection:
             cmd += '\r\n'
 
         self.socket.send(cmd.encode(self.encoding))
-        logging.info(f'Command {cmd} was written to {self.host}:{self.port}')
+        GlobalConf.logger.debug(f'Command {cmd} was written to {self.host}:{self.port}')
 
     def readline(self) -> str:
         """Reads until linebreak"""
