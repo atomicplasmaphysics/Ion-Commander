@@ -46,7 +46,6 @@ def setupLogging(level: int = logging.WARNING):
     """
 
     root_path = Path(__file__).parents[1]
-    print(root_path)
 
     try:
         mkdir(root_path / 'logs')

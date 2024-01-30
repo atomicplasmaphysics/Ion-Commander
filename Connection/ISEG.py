@@ -77,7 +77,7 @@ class ISEGConnection(COMConnection):
     :param encoding: Encoding
     :param echo: If device has echo. Will be checked
     :param cleaning: If output cache should be cleared when entering and exiting
-    :param strict: If identification string should contain "iseg"
+    :param strict: If identification string should contain <strict>-string
     """
 
     class EchoMode(Enum):
@@ -92,7 +92,7 @@ class ISEGConnection(COMConnection):
         encoding: str = 'utf-8',
         echo: EchoMode = EchoMode.ECHO_AUTO,
         cleaning: bool = True,
-        strict: bool = False
+        strict: str = ''
     ):
         self.echo_mode = echo
         self.strict = strict
@@ -122,10 +122,9 @@ class ISEGConnection(COMConnection):
 
         # detect if it is ISEG device
         identification = self.identification()
-        if 'iseg' not in identification.lower():
-            GlobalConf.logger.warning(f'<ISEGConnection> on port "{self.comport}" does not identify with "iseg". Identification is "{identification}"')
-            if self.strict:
-                raise ConnectionError(f'Device identification "{identification}" does not contain "iseg"')
+        if self.strict and self.strict not in identification.lower():
+            GlobalConf.logger.warning(f'<ISEGConnection> on port "{self.comport}" does not identify with "{self.strict}". Identification is "{identification}"')
+            raise ConnectionError(f'Device identification "{identification}" does not contain "{self.strict}"')
 
         return self
 
@@ -789,6 +788,22 @@ class ISEGConnection(COMConnection):
         """SHR: Saves the changed output mode or polarity to icsConfig.xml"""
         self._queryAndReturnInt(':SYSTEM:USER:CONFIG SAVE')
 
+    def configureMiccGet(self) -> int:
+        """Query the current state of the user calibration confirmation"""
+        ret = self._queryAndReturn(':CONF:HVMICC?')
+        if ret == 'HV_OK':
+            return 1
+        elif ret == 'HV_NOT_OK':
+            return 0
+        return -1
+
+    def configureMiccSet(self, state: bool | int):
+        """Set the current state of the user calibration confirmation"""
+        state_str = 'HV_OK' if state else 'HV_NOT_OK'
+        self._queryAndReturn(f':CONF:HVMICC {state_str}')
+
+    # TODO: implement MICC user calibration commands
+
 
 def assertionTest():
     """
@@ -865,7 +880,9 @@ def assertionTest():
 
 def main():
     with ISEGConnection(comport='COM4') as iseg:
-        print(iseg.identification())
+        print(f'{iseg.echo = }')
+        print(f'{iseg.identification() = }')
+        print(f'{iseg.readVoltage(0) = }')
 
 
 if __name__ == '__main__':

@@ -69,8 +69,9 @@ class TelnetConnection:
         if not cmd.endswith('\r\n'):
             cmd += '\r\n'
 
-        self.socket.send(cmd.encode(self.encoding))
-        GlobalConf.logger.debug(f'Command {cmd} was written to {self.host}:{self.port}')
+        cmd_encode = cmd.encode(self.encoding)
+        self.socket.send(cmd_encode)
+        GlobalConf.logger.debug(f'Command {cmd_encode} was written to {self.host}:{self.port}')
 
     def readline(self) -> str:
         """Reads until linebreak"""

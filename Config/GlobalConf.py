@@ -68,5 +68,7 @@ class GlobalConf:
     @staticmethod
     def getWindowCenter():
         """Returns (x, y) of window center"""
+        # TODO: check if coordinates even exist on screen, if not, than return center of the screen
+        # TODO: should also be implemented in the BCA-GUIDE
         return (GlobalConf.settings.value(GlobalConf.window_center_x_name, defaultValue=0, type=int),
                 GlobalConf.settings.value(GlobalConf.window_center_y_name, defaultValue=0, type=int))

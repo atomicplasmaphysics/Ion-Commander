@@ -63,7 +63,7 @@ class ConnectionWorker(QRunnable):
 
     def __init__(self, connection):
         super().__init__()
-        self.connection = connection
+        self.connection: ISEGConnection | ThyracontConnection | MonacoConnection = connection
         self.signal = ConnectionWorkerSignals()
         self.running = True
         self.work = []
@@ -73,19 +73,20 @@ class ConnectionWorker(QRunnable):
         """Called when worker is started"""
 
         while True:
+            if not self.running:
+                break
+
             if not self.work:
                 sleep(0.1)
-                if not self.running:
-                    break
                 continue
 
             callback_id, name, args, kwargs = self.work.pop(0)
-            obj_func = getattr(self.connection, name)
 
             try:
+                obj_func = getattr(self.connection, name)
                 result = obj_func(*args, **kwargs)
                 self.signal.result.emit(callback_id, result)
-            except ConnectionError as error:
+            except (AttributeError, ConnectionError, NameError, TypeError) as error:
                 self.signal.error.emit(error)
 
     def execute(self, callback_id: int, name, *args, **kwargs):
@@ -115,16 +116,27 @@ class ThreadedConnection:
     :param connection: Connection class
     """
 
-    def __init__(self, connection):
+    def __init__(
+        self,
+        connection: ISEGConnection | ThyracontConnection | MonacoConnection | None
+    ):
+        self.connection = connection
+
         self.worker = ConnectionWorker(connection)
         self.worker.signal.error.connect(self.error)
         self.worker.signal.result.connect(self.executeCallback)
 
         self.threadpool = QThreadPool.globalInstance()
-        self.threadpool.start(self.worker)
+        if self.connection is not None:
+            self.threadpool.start(self.worker)
 
         self.callback_id = CallbackId()
         self.callbacks = {}
+
+    def isDummy(self) -> bool:
+        """Returns if it is a dummy <ThreadedConnection>"""
+
+        return self.connection is None
 
     @staticmethod
     def error(error):
@@ -144,6 +156,9 @@ class ThreadedConnection:
         :param callback_id: every call of this class will be passed to the worker and return a unique id, which should be passed here
         """
 
+        if self.connection is None:
+            raise NotImplementedError('There should not be a callback happening')
+
         if not isinstance(callback_id, int):
             raise ValueError(f'Callback id must be int, received {type(callback_id)}')
         elif callback_id < 0:
@@ -158,6 +173,9 @@ class ThreadedConnection:
         :param callback_id: unique id for which the callback will be performed on
         :param result: result from worker
         """
+
+        if self.connection is None:
+            raise NotImplementedError('There should not be a callback happening')
 
         function = self.callbacks.get(callback_id)
         if function is None:
@@ -216,3 +234,12 @@ class ThreadedMonacoConnection(ThreadedConnection, base_monaco):
 
     def __init__(self, connection: MonacoConnection):
         super().__init__(connection)
+
+
+class ThreadedDummyConnection(ThreadedConnection):
+    """
+    Threaded dummy connection
+    """
+
+    def __init__(self):
+        super().__init__(None)

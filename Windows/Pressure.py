@@ -13,7 +13,7 @@ from Utility.Dialogs import showMessageBox
 
 from Connection.USBPorts import getComports
 from Connection.Thyracont import ThyracontConnection
-from Connection.Threaded import ThreadedThyracontConnection
+from Connection.Threaded import ThreadedThyracontConnection, ThreadedDummyConnection
 
 
 class PressureVBoxLayout(QVBoxLayout):
@@ -30,7 +30,7 @@ class PressureVBoxLayout(QVBoxLayout):
         indicator_size = QSize(20, 20)
 
         self.connection: None | ThyracontConnection = None
-        self.threaded_connection: None | ThreadedThyracontConnection = None
+        self.threaded_connection: ThreadedDummyConnection | ThreadedThyracontConnection = ThreadedDummyConnection()
 
         # Connection
         self.connection_group_box = QGroupBox('Connection')
@@ -77,7 +77,7 @@ class PressureVBoxLayout(QVBoxLayout):
         self.addWidget(self.group_box_lsd)
 
         # TODO: remove this hardcoded value, but load it from settings and set comport on startup to last set comport
-        self.connect('COM3', False)
+        #self.connect('COM3', False)
 
         self.reset()
 
@@ -105,9 +105,8 @@ class PressureVBoxLayout(QVBoxLayout):
         else:
             comport = self.combobox_connection.getValue(text=True)
 
-        if self.threaded_connection is not None:
-            self.threaded_connection.close()
-            self.threaded_connection = None
+        self.threaded_connection.close()
+        self.threaded_connection = ThreadedDummyConnection()
         if self.connection is not None:
             self.connection.close()
             self.connection = None
@@ -127,6 +126,8 @@ class PressureVBoxLayout(QVBoxLayout):
             self.connection = None
             self.reset()
 
+            GlobalConf.logger.info(f'Connection error! Could not connect to Lucid Control ADC, because of: {error}')
+
             if messagebox:
                 showMessageBox(
                     None,
@@ -136,13 +137,11 @@ class PressureVBoxLayout(QVBoxLayout):
                     f'<strong>Encountered Error:</strong><br>{error}',
                     expand_details=False
                 )
-            GlobalConf.logger.info(f'Connection error! Could not connect to Lucid Control ADC, because of: {error}')
 
     def reset(self):
         """Resets everything to default"""
 
-        if self.threaded_connection is not None:
-            self.threaded_connection.close()
+        self.threaded_connection.close()
         if self.connection is not None:
             self.connection.close()
 
@@ -156,7 +155,7 @@ class PressureVBoxLayout(QVBoxLayout):
     def setComportsComboBox(self):
         """Sets available ports in the comports combobox"""
 
-        comports = getComports()
+        comports = getComports(not_available_entry=True)
         comport_ports = [port for port, description, hardware_id in comports]
         comport_description = [f'{port}: {description} [{hardware_id}]' for port, description, hardware_id in comports]
 
@@ -168,7 +167,6 @@ class PressureVBoxLayout(QVBoxLayout):
     def closeEvent(self):
         """Must be called when application is closed"""
 
-        if self.threaded_connection is not None:
-            self.threaded_connection.close()
+        self.threaded_connection.close()
         if self.connection is not None:
             self.connection.close()

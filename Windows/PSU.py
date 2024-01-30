@@ -13,7 +13,7 @@ from Utility.Dialogs import showMessageBox
 
 from Connection.USBPorts import getComports
 from Connection.ISEG import ISEGConnection
-from Connection.Threaded import ThreadedISEGConnection
+from Connection.Threaded import ThreadedISEGConnection, ThreadedDummyConnection
 
 
 class PSUVBoxLayout(QVBoxLayout):
@@ -30,7 +30,7 @@ class PSUVBoxLayout(QVBoxLayout):
         indicator_size = QSize(20, 20)
 
         self.connection: None | ISEGConnection = None
-        self.threaded_connection: None | ThreadedISEGConnection = None
+        self.threaded_connection: ThreadedDummyConnection | ThreadedISEGConnection = ThreadedDummyConnection()
 
         self.comports = getComports()
         self.comport_ports = [port for port, description, hardware_id in self.comports]
@@ -328,7 +328,7 @@ class PSUVBoxLayout(QVBoxLayout):
         )
 
         # TODO: remove this hardcoded value, but load it from settings and set comport on startup to last set comport
-        self.connect('COM1', False)
+        #self.connect('COM1', False)
 
         self.reset()
 
@@ -343,16 +343,17 @@ class PSUVBoxLayout(QVBoxLayout):
         self.indicator_limit_3.setValue(False)
         self.indicator_limit_4.setValue(False)
 
-        def highVoltage(state: bool):
-            if not isinstance(state, bool):
-                raise ValueError('State must be bool')
+        def highVoltage(state: int):
+            if not isinstance(state, int) or state == -1:
+                raise ValueError(f'State must be int and not -1, got <{type(state)}> with value {state}')
 
+            state = bool(state)
             self.indicator_high_voltage.setValue(state)
             self.status_high_voltage.setText('Enabled' if state else 'Disabled')
             self.button_high_voltage.setText('Disable' if state else 'Enable')
 
-        # TODO: what is query of general output state?
-        #self.threaded_connection.callback(highVoltage, self.threaded_connection...)
+        # TODO: does the micc even work here?
+        self.threaded_connection.callback(highVoltage, self.threaded_connection.configureMiccGet())
 
         def voltageOn(states: list[float]):
             indicators = [
@@ -370,7 +371,7 @@ class PSUVBoxLayout(QVBoxLayout):
             ]
 
             if len(states) != len(indicators) != len(buttons):
-                raise ValueError('High voltage indicators cannot be set, non matching length')
+                raise ValueError(f'High voltage indicators cannot be set, non matching length: expected len = {len(indicators)}, got len = {len(states)}')
 
             for indicator, state, button in zip(indicators, states, buttons):
                 state = bool(state)
@@ -400,7 +401,7 @@ class PSUVBoxLayout(QVBoxLayout):
             ]
 
             if len(voltages) != len(status_voltages) != len(indicator_limits) != len(voltage_limits):
-                raise ValueError('Measured voltages cannot be set, non matching length')
+                raise ValueError(f'Measured voltages cannot be set, non matching length: expected len = {len(status_voltages)}, got len = {len(voltages)}')
 
             for status_voltage, indicator_limit, voltage_limit, voltage in zip(status_voltages, indicator_limits, voltage_limits, voltages):
                 status_voltage.setValue(voltage)
@@ -430,7 +431,7 @@ class PSUVBoxLayout(QVBoxLayout):
             ]
 
             if len(currents) != len(status_currents) != len(indicator_limits) != len(current_limits):
-                raise ValueError('Measured currents cannot be set, non matching length')
+                raise ValueError(f'Measured currents cannot be set, non matching length: expected len = {len(status_currents)}, got len = {len(currents)}')
 
             for status_current, indicator_limit, current_limit, current in zip(status_currents, indicator_limits, current_limits, currents):
                 status_current.setValue(current)
@@ -448,13 +449,12 @@ class PSUVBoxLayout(QVBoxLayout):
             ]
 
             if len(polarities) != len(status_polarities):
-                raise ValueError('Measured polarities cannot be set, non matching length')
+                raise ValueError(f'Measured polarities cannot be set, non matching length: expected len = {len(status_polarities)}, got len = {len(polarities)}')
 
             for status_polarity, polarity in zip(status_polarities, polarities):
                 status_polarity.polarityChange(polarity)
 
         self.threaded_connection.callback(setPolarity, self.threaded_connection.configureOutputPolarityGet('0-3'))
-
 
     def updateAllValues(self):
         """Updates all values"""
@@ -473,7 +473,7 @@ class PSUVBoxLayout(QVBoxLayout):
             ]
 
             if len(voltages) != len(set_voltages):
-                raise ValueError('Set voltages cannot be set, non matching length')
+                raise ValueError(f'Set voltages cannot be set, non matching length: expected len = {len(set_voltages)}, got len = {len(voltages)}')
 
             for set_voltage, voltage in zip(set_voltages, voltages):
                 set_voltage.setValue(voltage)
@@ -489,7 +489,7 @@ class PSUVBoxLayout(QVBoxLayout):
             ]
 
             if len(voltages) != len(set_voltages):
-                raise ValueError('Set voltages cannot be set, non matching length')
+                raise ValueError(f'Set voltages cannot be set, non matching length: expected len = {len(set_voltages)}, got len = {len(voltages)}')
 
             for set_voltage, voltage in zip(set_voltages, voltages):
                 set_voltage.setValue(voltage)
@@ -505,7 +505,7 @@ class PSUVBoxLayout(QVBoxLayout):
             ]
 
             if len(currents) != len(set_currents):
-                raise ValueError('Set voltages cannot be set, non matching length')
+                raise ValueError(f'Set voltages cannot be set, non matching length: expected len = {len(set_currents)}, got len = {len(currents)}')
 
             for set_current, current in zip(set_currents, currents):
                 set_current.setValue(current)
@@ -630,8 +630,8 @@ class PSUVBoxLayout(QVBoxLayout):
         if not self.checkConnection():
             return
 
-        # TODO: what is query to set general output state?
-        #self.threaded_connection...
+        # TODO: does the micc exist here?
+        self.threaded_connection.configureMiccSet(state)
 
     def checkConnection(self, messagebox: bool = True) -> bool:
         """
@@ -668,9 +668,8 @@ class PSUVBoxLayout(QVBoxLayout):
         else:
             comport = self.combobox_connection.getValue(text=True)
 
-        if self.threaded_connection is not None:
-            self.threaded_connection.close()
-            self.threaded_connection = None
+        self.threaded_connection.close()
+        self.threaded_connection = ThreadedDummyConnection()
         if self.connection is not None:
             self.connection.close()
             self.connection = None
@@ -690,6 +689,8 @@ class PSUVBoxLayout(QVBoxLayout):
             self.connection = None
             self.reset()
 
+            GlobalConf.logger.info(f'Connection error! Could not connect to ISEG crate power supply, because of: {error}')
+
             if messagebox:
                 showMessageBox(
                     None,
@@ -699,13 +700,11 @@ class PSUVBoxLayout(QVBoxLayout):
                     f'<strong>Encountered Error:</strong><br>{error}',
                     expand_details=False
                 )
-            GlobalConf.logger.info(f'Connection error! Could not connect to ISEG crate power supply, because of: {error}')
 
     def reset(self):
         """Resets everything to default"""
 
-        if self.threaded_connection is not None:
-            self.threaded_connection.close()
+        self.threaded_connection.close()
         if self.connection is not None:
             self.connection.close()
 
@@ -773,7 +772,7 @@ class PSUVBoxLayout(QVBoxLayout):
     def setComportsComboBox(self):
         """Sets available ports in the comports combobox"""
 
-        comports = getComports()
+        comports = getComports(not_available_entry=True)
         comport_ports = [port for port, description, hardware_id in comports]
         comport_description = [f'{port}: {description} [{hardware_id}]' for port, description, hardware_id in comports]
 
@@ -785,7 +784,6 @@ class PSUVBoxLayout(QVBoxLayout):
     def closeEvent(self):
         """Must be called when application is closed"""
 
-        if self.threaded_connection is not None:
-            self.threaded_connection.close()
+        self.threaded_connection.close()
         if self.connection is not None:
             self.connection.close()

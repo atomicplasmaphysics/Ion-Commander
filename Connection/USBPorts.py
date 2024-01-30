@@ -7,10 +7,18 @@ from Config.GlobalConf import GlobalConf
 from Connection.VirtualDevice import VirtualSerial
 
 
-def getComports() -> list[tuple[str, str, str]]:
-    """Returns list of comports as tuple of (port, description, hardware id)"""
+def getComports(not_available_entry: bool = False) -> list[tuple[str, str, str]]:
+    """
+    Returns list of comports as tuple of (port, description, hardware id)
 
-    return [(port, description, hardware_id) for port, description, hardware_id in sorted(list_ports.comports())]
+    :parm not_available_entry: add a not-available entry if there are no comports available
+    """
+
+    comports = [(port, description, hardware_id) for port, description, hardware_id in sorted(list_ports.comports())]
+    if not comports and not_available_entry:
+        comports = [('None', 'There is no comport available', '')]
+
+    return comports
 
 
 def printComports():
@@ -106,8 +114,10 @@ class COMConnection:
 
         if not cmd.endswith('\r\n'):
             cmd += '\r\n'
-        self.serial.write(cmd.encode(self.encoding))
-        GlobalConf.logger.debug(f'Command {cmd} was written to port {self.comport}')
+
+        cmd_encode = cmd.encode(self.encoding)
+        self.serial.write(cmd_encode)
+        GlobalConf.logger.debug(f'Command {cmd_encode} was written to port {self.comport}')
 
         # if echo is not on
         if not self.echo:
