@@ -90,6 +90,10 @@ class AnalyseWindow(TabWidget):
         self.fitting_selector_widget.currentIndexChanged.connect(self.fittingSelectorChanged)
         self.column_fitting_selector.addWidget(self.fitting_selector_widget)
 
+        self.button_reset_sliders = QPushButton('Reset sliders')
+        self.button_reset_sliders.clicked.connect(self.resetSliders)
+        self.column_fitting_selector.addWidget(self.button_reset_sliders)
+
         self.row_fitting_parameters = QHBoxLayout()
         self.row_fitting_parameters.setAlignment(Qt.AlignmentFlag.AlignLeft)
         self.row_fitting.addLayout(self.row_fitting_parameters)
@@ -170,6 +174,16 @@ class AnalyseWindow(TabWidget):
         self.fit_function_class = self.fitting_functions[index](self)
         self.fitting_parameters_box_layout.addWidget(self.fit_function_class.widget)
         self.graph.updateFitClass(self.fit_function_class)
+
+    def resetSliders(self):
+        """
+        Resets the sliders in the currently visible area
+        """
+
+        selected_index = self.fitting_selector_widget.currentIndex()
+        if selected_index:
+            self.fitting_selector_widget.setCurrentIndex(0)
+            self.fitting_selector_widget.setCurrentIndex(selected_index)
 
     def loadData(self, row: int):
         """
