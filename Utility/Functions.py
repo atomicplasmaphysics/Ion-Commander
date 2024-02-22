@@ -82,13 +82,16 @@ def linearInterpolateColor(start: QColor, end: QColor, percentage: float) -> QCo
     )
 
 
-def getPrefix(number: float) -> tuple[float, str]:
+def getPrefix(number: float | int) -> tuple[float | int, str]:
     """
     Gets the prefix of a number and returns the converted number and the prefix
 
     :param number: input number
     :return: tuple of converted number and prefix
     """
+
+    if not isinstance(number, float) and not isinstance(number, int):
+        raise ValueError(f'Provided argument is of type {type(number)} not <float> or <int>')
 
     prefixes = ['Z', 'E', 'P', 'T', 'G', 'M', 'k', '', 'm', 'μ', 'n', 'p', 'f', 'a', 'z', 'y']
     # [21, 18, 15, 12, 9, 6, 3, 0, -3, -6, -9, -12, -15, -18, -21, -24]

@@ -1,5 +1,5 @@
 from PyQt6.QtCore import QFileInfo, Qt
-from PyQt6.QtWidgets import QDialog, QFileDialog, QVBoxLayout, QLabel, QPushButton, QMessageBox, QCheckBox
+from PyQt6.QtWidgets import QDialog, QFileDialog, QVBoxLayout, QLabel, QPushButton, QMessageBox, QCheckBox, QHBoxLayout, QWidget
 from PyQt6.QtGui import QFont
 
 
@@ -101,12 +101,16 @@ class TACDialog(QDialog):
     """
     Dialog for entering TAC settings
 
-    :param parent: parent widget
     :param filename: name of file
     """
 
-    def __init__(self, parent, filename: str):
-        super().__init__(parent)
+    def __init__(
+        self,
+        filename: str,
+        *args,
+        **kwargs
+    ):
+        super().__init__(*args, **kwargs)
 
         self.setWindowFlags(Qt.WindowType.Dialog | Qt.WindowType.WindowTitleHint)
         self.setWindowTitle('Specify TAC values')
@@ -147,3 +151,92 @@ class TACDialog(QDialog):
         self.ok_button.setToolTip('Update values')
         self.ok_button.clicked.connect(self.accept)
         self.main_layout.addWidget(self.ok_button)
+
+
+class IPDialog(QDialog):
+    """
+    Dialog for entering IP address and port number
+
+    :param ip: starting IP address
+    :param port: starting port number
+    :param title: title of the dialog
+    """
+
+    def __init__(
+        self,
+        *args,
+        ip: tuple[int, int, int, int] = (0, 0, 0, 0),
+        port: int = 0,
+        title: str = '',
+        info: str = '',
+        **kwargs
+    ):
+        super().__init__(*args, **kwargs)
+
+        self.setWindowFlags(Qt.WindowType.Dialog | Qt.WindowType.WindowTitleHint)
+        if not title:
+            title = 'Specify IP and port'
+        self.setWindowTitle(title)
+
+        self.main_layout = QVBoxLayout()
+        self.setLayout(self.main_layout)
+
+        if info:
+            info = f'for {info}'
+        self.info_label = QLabel(f'Provide IP address and port number{info}')
+        self.main_layout.addWidget(self.info_label)
+
+        # IP address field
+        ip_input_range = (0, 255)
+        self.ip_1 = SpinBox(default=ip[0], input_range=ip_input_range)
+        self.ip_2 = SpinBox(default=ip[1], input_range=ip_input_range)
+        self.ip_3 = SpinBox(default=ip[2], input_range=ip_input_range)
+        self.ip_4 = SpinBox(default=ip[3], input_range=ip_input_range)
+
+        self.hbox_ip = QHBoxLayout()
+        self.hbox_ip.addWidget(self.ip_1)
+        self.hbox_ip.addWidget(QLabel('.'))
+        self.hbox_ip.addWidget(self.ip_2)
+        self.hbox_ip.addWidget(QLabel('.'))
+        self.hbox_ip.addWidget(self.ip_3)
+        self.hbox_ip.addWidget(QLabel('.'))
+        self.hbox_ip.addWidget(self.ip_4)
+
+        self.ip_widget = QWidget()
+        self.ip_widget.setLayout(self.hbox_ip)
+
+        self.ip_layout = InputHBoxLayout(
+            'IP address:',
+            self.ip_widget,
+            tooltip='Select IP address',
+            split=0
+        )
+        self.main_layout.addLayout(self.ip_layout)
+
+        # port number field
+        self.port = SpinBox(default=port, input_range=SpinBoxRange.ZERO_INF)
+        self.port_layout = InputHBoxLayout(
+            'Port number:',
+            self.port,
+            tooltip='Select port number',
+            split=0
+        )
+        self.main_layout.addLayout(self.port_layout)
+
+        self.ok_button = QPushButton('Ok', self)
+        self.ok_button.setToolTip('Update values')
+        self.ok_button.clicked.connect(self.accept)
+        self.main_layout.addWidget(self.ok_button)
+
+    def getIP(self) -> tuple[int, int, int, int]:
+        """Get entered IP address"""
+        return (
+            self.ip_1.value(),
+            self.ip_2.value(),
+            self.ip_3.value(),
+            self.ip_4.value()
+        )
+
+    def getPort(self) -> int:
+        """Get entered port number"""
+        return self.port.value()

@@ -110,7 +110,7 @@ class AnalyseWindow(TabWidget):
         # DISPLAY
         #
 
-        self.graph = TOFCanvas(self, self.data, self.fit_function_class)
+        self.graph = TOFCanvas(parent=self, data=self.data, fit_class=self.fit_function_class)
         self.main_layout.addWidget(self.graph)
 
     def openFiles(self, files: list[str] = None):
@@ -145,7 +145,7 @@ class AnalyseWindow(TabWidget):
             # ask for tac and delay if '.dat' file
             del_item_kwargs = {}
             if file.endswith('.dat'):
-                tac_dialog = TACDialog(self, file)
+                tac_dialog = TACDialog(file, parent=self)
                 tac_dialog.exec()
                 del_item_kwargs = {
                     'tac': tac_dialog.tac_input.value(),

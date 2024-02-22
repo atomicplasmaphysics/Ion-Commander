@@ -17,10 +17,12 @@ from PyQt6.QtSvg import QSvgRenderer
 import pyqtgraph as pg
 
 
+from Config.GlobalConf import GlobalConf
 from Config.StylesConf import Colors, Styles, Forms
 
 from Utility.ModifyWidget import setWidgetBackground
 from Utility.Functions import hexToRgb, linearInterpolateColor, getPrefix, qColorToHex
+
 if TYPE_CHECKING:
     from Windows.Main import MainWindow
     from Utility.Fitting import FitMethod
@@ -43,11 +45,13 @@ class SplashPixmap(QPixmap):
         image: str,
         text: str,
         box: QRect,
+        *args,
         align: Qt.AlignmentFlag = Qt.AlignmentFlag.AlignRight,
         color: Qt.GlobalColor | QColor = Qt.GlobalColor.black,
-        font_size: int = 20
+        font_size: int = 20,
+        **kwargs
     ):
-        super().__init__(image)
+        super().__init__(image, *args, **kwargs)
 
         self.painter = QPainter(self)
         self.painter.setRenderHint(QPainter.RenderHint.Antialiasing)
@@ -66,8 +70,13 @@ class TabWidget(QWidget):
     :param parent: parent widget
     """
 
-    def __init__(self, parent: MainWindow):
-        super().__init__(parent=parent)
+    def __init__(
+        self,
+        parent: MainWindow,
+        *args,
+        **kwargs
+    ):
+        super().__init__(*args, parent=parent, **kwargs)
         self.main_window = parent
 
     def checkClosable(self) -> bool:
@@ -89,8 +98,8 @@ class VBoxTitleLayout(QVBoxLayout):
     """
     Class providing a QVBoxLayout with a title and style
 
-    :param parent: parent widget
     :param title: title of top line
+    :param parent: parent widget
     :param title_style: style of title line
     :param title_style_busy: style of title line in busy mode
     :param busy_symbol: symbol when busy
@@ -101,17 +110,15 @@ class VBoxTitleLayout(QVBoxLayout):
 
     def __init__(
         self,
-        parent,
         title: str,
+        parent=None,
         title_style: str = Styles.title_style_sheet,
         title_style_busy: str = Styles.title_style_sheet,
         busy_symbol: str = '⧖',
         spacing: int = 0,
-        add_stretch: bool | int = 0,
-        *args,
-        **kwargs
+        add_stretch: bool | int = 0
     ):
-        super().__init__(*args, **kwargs)
+        super().__init__(parent)
         self.parent = parent
         self.title_str = title
         self.title_style = title_style
@@ -157,7 +164,11 @@ class InsertingGridLayout(QGridLayout):
     Extends the QGridLayout such that a row of items can be inserted at once
     """
 
-    def __init__(self, *args, **kwargs):
+    def __init__(
+        self,
+        *args,
+        **kwargs
+    ):
         super().__init__(*args, **kwargs)
 
         self.lines: list[tuple[QFrame, int]] = []
@@ -243,6 +254,7 @@ class InputHBoxLayout(QHBoxLayout):
         self,
         label: str,
         widget: QWidget | None,
+        *args,
         tooltip: str = None,
         split: int = 50,
         disabled: bool = False,
@@ -251,7 +263,7 @@ class InputHBoxLayout(QHBoxLayout):
         checkbox_connected: bool = True,
         **kwargs
     ):
-        super().__init__(**kwargs)
+        super().__init__(*args, **kwargs)
 
         self.checkbox = None
         self.default_checkbox = checkbox
@@ -374,6 +386,7 @@ class SpinBox(QSpinBox):
 
     def __init__(
         self,
+        *args,
         default: float | int = 0,
         step_size: int = None,
         input_range: tuple[float, float] = None,
@@ -381,7 +394,7 @@ class SpinBox(QSpinBox):
         buttons: bool = False,
         **kwargs
     ):
-        super().__init__(**kwargs)
+        super().__init__(*args, **kwargs)
 
         self.setMinimumSize(50, 20)
 
@@ -422,6 +435,7 @@ class DoubleSpinBox(QDoubleSpinBox):
 
     def __init__(
         self,
+        *args,
         default: float = 0,
         step_size: float = None,
         input_range: tuple[float, float] = None,
@@ -432,7 +446,7 @@ class DoubleSpinBox(QDoubleSpinBox):
         click_copy: bool = False,
         **kwargs
     ):
-        super().__init__(**kwargs)
+        super().__init__(*args, **kwargs)
 
         self.setMinimumSize(50, 20)
 
@@ -497,6 +511,7 @@ class LineEdit(QLineEdit):
 
     def __init__(
         self,
+        *args,
         default: str = '',
         placeholder: str = None,
         max_length: int = None,
@@ -504,7 +519,7 @@ class LineEdit(QLineEdit):
         click_copy: bool = False,
         **kwargs
     ):
-        super().__init__(**kwargs)
+        super().__init__(*args, **kwargs)
 
         self.default = default
         self.setText(default)
@@ -549,6 +564,7 @@ class ComboBox(QComboBox):
 
     def __init__(
         self,
+        *args,
         default: int = 0,
         entries: list[str] = None,
         tooltips: list[str] = None,
@@ -559,7 +575,7 @@ class ComboBox(QComboBox):
         scroll: bool = False,
         **kwargs
     ):
-        super().__init__(**kwargs)
+        super().__init__(*args, **kwargs)
 
         self.default = default
         self.entries_save = entries_save
@@ -706,7 +722,7 @@ class ComboBox(QComboBox):
 class IndicatorLed(QWidget):
     """
     Indicating Led that extends the QWidget class
-    :param parent: parent widget
+
     :param state: initial state of indicator
     :param clickable: if indicator can be toggled via click
     :param on_color: color if indicator is on
@@ -718,7 +734,7 @@ class IndicatorLed(QWidget):
 
     def __init__(
         self,
-        parent=None,
+        *args,
         state: bool = False,
         clickable: bool = False,
         on_color: str = Colors.cooperate_lime,
@@ -726,7 +742,7 @@ class IndicatorLed(QWidget):
         size: QSize | None = None,
         **kwargs
     ):
-        super().__init__(parent, **kwargs)
+        super().__init__(*args, **kwargs)
 
         self.state = state
         self.clickable = clickable
@@ -818,8 +834,12 @@ class PressureWidget(QWidget):
     :param input_range: input range as tuple of (maximum exponent, minimum exponent)
     """
 
-    def __init__(self, input_range: tuple[float, float] = (-2, -10)):
-        super().__init__()
+    def __init__(
+        self,
+        input_range: tuple[float, float] = (-2, -10),
+        **kwargs
+    ):
+        super().__init__(**kwargs)
 
         self.input_range = input_range
 
@@ -889,6 +909,7 @@ class StackWidget(QLCDNumber):
 
     def __init__(
         self,
+        *args,
         layers: int = 8,
         antialiased: bool = True,
         size: QSize = QSize(100, 100),
@@ -898,9 +919,10 @@ class StackWidget(QLCDNumber):
         color_bottom: QColor | Qt.GlobalColor | str = Colors.cooperate_strawberry,
         color_grayed: QColor | Qt.GlobalColor | str = Colors.app_background_event,
         percentage_grey: float = 0,
-        enable_digits: bool = False
+        enable_digits: bool = False,
+        **kwargs
     ):
-        super().__init__(1)
+        super().__init__(*args, **kwargs)
 
         self.layers = layers
         self.antialiased = antialiased
@@ -998,9 +1020,10 @@ class DisplayLabel(QLabel):
 
     :param value: current value
     :param target_value: target value
+    :param target_value_sign: if sign of target_value matters
     :param deviation: deviation value
     :param unit: unit to be displayed
-    :param f_format: formatting part of f-string
+    :param decimals: decimals to be shown
     :param enable_prefix: enable prefixing
     :param alignment_flag: alignment flag
     :param antialiased: antialiasing enabled
@@ -1011,25 +1034,29 @@ class DisplayLabel(QLabel):
 
     def __init__(
         self,
+        *args,
         value: float | None = 0,
         target_value: float = 1,
+        target_value_sign: bool = False,
         deviation: float = 1,
         unit: str = '',
-        f_format: str = '.2f',
+        decimals: int = 2,
         enable_prefix: bool = False,
         alignment_flag: Qt.AlignmentFlag = Qt.AlignmentFlag.AlignRight,
         antialiased: bool = True,
         color_good: QColor | Qt.GlobalColor | str = Colors.cooperate_lime,
         color_bad: QColor | Qt.GlobalColor | str = Colors.cooperate_strawberry,
-        color_grayed: QColor | Qt.GlobalColor | str = Colors.app_background_event
+        color_grayed: QColor | Qt.GlobalColor | str = Colors.app_background_event,
+        **kwargs
     ):
-        super().__init__()
+        super().__init__(*args, **kwargs)
 
         self.value = value
         self.target_value = target_value
+        self.target_value_sign = target_value_sign
         self.deviation = deviation
         self.unit = unit
-        self.f_format = f_format
+        self.decimals = decimals
         self.enable_prefix = enable_prefix
         self.antialiased = antialiased
         self.color_good = QColor(color_good)
@@ -1047,11 +1074,11 @@ class DisplayLabel(QLabel):
         value = self.value
         addon = self.unit
 
-        if self.value is not None:
+        if value is not None and (isinstance(value, float) or isinstance(value, int)):
             if self.enable_prefix:
                 value, prefix = getPrefix(value)
                 addon = prefix + addon
-            text = f'{value:{self.f_format}}'
+            text = f'{value:.{self.decimals}f}'
         if addon:
             text += ' ' + addon
 
@@ -1064,6 +1091,10 @@ class DisplayLabel(QLabel):
         :param value: new value
         """
 
+        if not isinstance(value, float) and not isinstance(value, int):
+            GlobalConf.logger.warning(f'Error during setValue() in DisplayLabel. Argument must be of type <float> or <int>, got "{type(value)}"')
+            return
+
         self.value = value
         self._writeOwnText()
 
@@ -1075,6 +1106,16 @@ class DisplayLabel(QLabel):
         """
 
         self.target_value = target_value
+        self._writeOwnText()
+
+    def setTargetValueSign(self, target_value_sign: bool):
+        """
+        Set a new target value
+
+        :param target_value_sign: if target_value sign matters
+        """
+
+        self.target_value_sign = target_value_sign
         self._writeOwnText()
 
     def setDeviation(self, deviation: float):
@@ -1100,8 +1141,11 @@ class DisplayLabel(QLabel):
 
         brush = QBrush(self.color_grayed)
         if self.value is not None:
-            percentage = abs(self.value - self.target_value) / self.deviation
-            percentage = min(percentage, 1)
+            if self.target_value_sign:
+                difference = self.value - self.target_value
+            else:
+                difference = abs(self.value) - abs(self.target_value)
+            percentage = min(abs(difference) / self.deviation, 1)
             new_color = linearInterpolateColor(self.color_good, self.color_bad, percentage)
             new_color.setAlpha(90)
             brush.setColor(new_color)
@@ -1126,12 +1170,14 @@ class PolarityButton(QWidget):
 
     def __init__(
         self,
+        *args,
         color_positive: QColor | Qt.GlobalColor | str = Colors.cooperate_lime,
         color_negative: QColor | Qt.GlobalColor | str = Colors.cooperate_strawberry,
         color_grayed: QColor | Qt.GlobalColor | str = Colors.app_background_event,
-        connected_buttons: bool = True
+        connected_buttons: bool = True,
+        **kwargs
     ):
-        super().__init__()
+        super().__init__(*args, **kwargs)
 
         self.color_positive = qColorToHex(QColor(color_positive))
         self.color_negative = qColorToHex(QColor(color_negative))
@@ -1196,8 +1242,13 @@ class ErrorTable(QTableWidget):
     :param default_rows: number of rows to be displayed
     """
 
-    def __init__(self, default_rows: int = 3):
-        super().__init__()
+    def __init__(
+        self,
+        *args,
+        default_rows: int = 3,
+        **kwargs
+    ):
+        super().__init__(*args, **kwargs)
 
         self.actual_row = 0
         self.default_rows = default_rows
@@ -1249,12 +1300,14 @@ class ErrorTable(QTableWidget):
 class DeleteWidgetList(QListWidget):
     """
     Extends the QListWidget for deletable Items
-
-    :param parent: parent of Widget
     """
 
-    def __init__(self, parent):
-        super().__init__(parent)
+    def __init__(
+        self,
+        *args,
+        **kwargs
+    ):
+        super().__init__(*args, **kwargs)
 
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
@@ -1318,7 +1371,6 @@ class DeleteWidgetListItem(QWidget):
     """
     A Widget that acts as deletable ListWidgetItem for the list DeleteWidgetList
 
-    :param parent: parent of Widget
     :param path: title of Widget
     :param tac: tac time
     :param delay: delay time
@@ -1328,16 +1380,14 @@ class DeleteWidgetListItem(QWidget):
 
     def __init__(
         self,
-        parent,
         path: str,
         *args,
         tac: int = -1,
         delay: float = 0,
         **kwargs
     ):
-        super().__init__(parent, *args, **kwargs)
+        super().__init__(*args, **kwargs)
 
-        self.parent = parent
         self.main_layout = QHBoxLayout(self)
         self.main_layout.setAlignment(Qt.AlignmentFlag.AlignLeft)
         self.main_layout.setContentsMargins(0, 0, 0, 0)
@@ -1458,20 +1508,18 @@ class TOFCanvas(pg.PlotWidget):
     """
     Extends the PlotWidget of pyqtgraph
 
-    :param parent: parent widget
     :param data: data of plot
     :param fit_class: fitting method
     """
 
     def __init__(
         self,
-        parent,
         data: tuple[np.ndarray, np.ndarray],
         fit_class: FitMethod,
         *args,
         **kwargs
     ):
-        super().__init__(parent, *args, **kwargs)
+        super().__init__(*args, **kwargs)
 
         self.data = data
         self.fit_class = fit_class
@@ -1642,7 +1690,14 @@ class FittingBar(pg.InfiniteLine):
     :param label_position: position of label
     """
 
-    def __init__(self, name: str, pos: float, label_position: float = 0.9, **kwargs):
+    def __init__(
+        self,
+        name: str,
+        pos: float,
+        *args,
+        label_position: float = 0.9,
+        **kwargs
+    ):
         super_dict = {
             'pos': pos,
             'movable': True,
@@ -1653,7 +1708,7 @@ class FittingBar(pg.InfiniteLine):
         }
         super_dict.update(kwargs)
 
-        super().__init__(**super_dict)
+        super().__init__(*args, **super_dict)
 
 
 def createFittingBars(names: list[str]) -> list[FittingBar]:

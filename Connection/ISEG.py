@@ -18,49 +18,60 @@ def convertInUnitList(data: list, unit: str = '') -> list[str | float]:
         return return_data
 
 
-def convertInChannelString(channels: int | str | list) -> tuple[str, int]:
+def convertInChannelString(channels: int | str | list, sort: bool = False) -> tuple[str, int]:
     """
     Converts channel in channel input string. Returns input string and amount of channels.
+
+    :param channels: channels to be convertd, can be integer, list of integers or string
+    :param sort: if resulting string should be sorted in ascending channel order
+
     Possible notations:
         2 -> '2'
-        [1, 4, 5] -> '1,3,5'
-        ['0', '3', '2 '] -> '0,2,3'
-        '0, 3, 1' -> '0,1,3'
+        [1, 4, 5] -> '1,4,5'
+        ['0', '3', '2 '] -> '0,3,2'
+        '0, 3, 1' -> '0,3,1'
         '0-2' -> '0,1,2'
         '0-2, 5 -7' -> '0,1,2,5,6,7'
     """
+    channels_out = []
 
     # in int form
     if isinstance(channels, int):
-        channels_out = {channels}
+        channels_out.append(channels)
 
     # in list form
     elif isinstance(channels, list):
-        channels_out = {int(channel) for channel in channels}
+        for channel in channels:
+            channel = int(channel)
+            if channel not in channels_out:
+                channels_out.append(channel)
 
     # in string form
     else:
-        channels_out = set()
-
         for channel in [channel for channel in channels.split(',')]:
             # single channel
             if '-' not in channel:
-                channels_out.add(int(channel))
+                channel = int(channel)
+                if channel not in channels_out:
+                    channels_out.append(channel)
                 continue
 
             # channel range
             channel_parts = channel.split('-')
-            if len(channel_parts) > 2:
-                raise ValueError(f'Channel range is invalid: {channel}')
-            channels_out.update(set(range(int(channel_parts[0]), int(channel_parts[1]) + 1)))
-
-    channels_out = list(channels_out)
+            if len(channel_parts) != 2:
+                raise ValueError(f'Channel range is invalid: {channel}, expected format "begin-end"')
+            for channel_i in range(int(channel_parts[0]), int(channel_parts[1]) + 1):
+                if channel_i not in channels_out:
+                    channels_out.append(channel_i)
 
     # check if output string might be valid
     if not channels_out:
         raise ValueError('Conversion of channels in channel string failed. No channels selected')
 
-    return ','.join([str(channel_out) for channel_out in sorted(channels_out)]), len(channels_out)
+    if sort:
+        channels_out = sorted(channels_out)
+
+    return ','.join([str(channel_out) for channel_out in channels_out]), len(channels_out)
 
 
 def convertToString(inp: float | int, precision: int = 6):
@@ -122,9 +133,9 @@ class ISEGConnection(COMConnection):
 
         # detect if it is ISEG device
         identification = self.identification()
-        if self.strict and self.strict not in identification.lower():
-            GlobalConf.logger.warning(f'<ISEGConnection> on port "{self.comport}" does not identify with "{self.strict}". Identification is "{identification}"')
-            raise ConnectionError(f'Device identification "{identification}" does not contain "{self.strict}"')
+        if self.strict and self.strict not in identification:
+            GlobalConf.logger.warning(f'<ISEGConnection> on port "{self.comport}" does not identify with "{self.strict}". Identification is {identification!r}')
+            raise ConnectionError(f'Device identification {identification!r} does not contain {self.strict!r}')
 
         return self
 
@@ -136,7 +147,8 @@ class ISEGConnection(COMConnection):
     def _queryAndReturnFloat(self, cmd: str, unit: str = '') -> float:
         """Queries command and returns striped result as float without unit. If float conversion fails, -1 will be returned."""
         try:
-            return float(self._queryAndReturn(cmd).replace(unit, ''))
+            result = self._queryAndReturn(cmd).replace(unit, '')
+            return float(result)
         except ValueError:
             return -1
 
@@ -824,10 +836,21 @@ def assertionTest():
         """Test if conversion in channel format works"""
         assert convertInChannelString(2) == ('2', 1)
         assert convertInChannelString([1, 4, 5]) == ('1,4,5', 3)
-        assert convertInChannelString(['0', '3', '2 ']) == ('0,2,3', 3)
-        assert convertInChannelString('0, 3, 1') == ('0,1,3', 3)
+        assert convertInChannelString([7, 6, 5, 4]) == ('7,6,5,4', 4)
+        assert convertInChannelString([7, 6, 5, 4], sort=True) == ('4,5,6,7', 4)
+        assert convertInChannelString(['0', '3', '2 ']) == ('0,3,2', 3)
+        assert convertInChannelString(['0', '3', '2 '], sort=True) == ('0,2,3', 3)
+        assert convertInChannelString(['0 ', ' 1', ' 2 ', '3  ']) == ('0,1,2,3', 4)
+        assert convertInChannelString('0, 3, 1') == ('0,3,1', 3)
+        assert convertInChannelString('0, 3, 1', sort=True) == ('0,1,3', 3)
+        assert convertInChannelString('0,1') == ('0,1', 2)
         assert convertInChannelString('0-2') == ('0,1,2', 3)
         assert convertInChannelString('0-2, 5 -7') == ('0,1,2,5,6,7', 6)
+        assert convertInChannelString('5-7, 0-2') == ('5,6,7,0,1,2', 6)
+        assert convertInChannelString('5-7, 0-2', sort=True) == ('0,1,2,5,6,7', 6)
+        assert convertInChannelString('0-2, 1-3') == ('0,1,2,3', 4)
+        assert convertInChannelString('1-3, 0-2') == ('1,2,3,0', 4)
+        assert convertInChannelString('1-3, 0-2', sort=True) == ('0,1,2,3', 4)
 
     def testToString():
         """Test if conversion from numeric to string format works"""
@@ -879,10 +902,39 @@ def assertionTest():
 
 
 def main():
-    with ISEGConnection(comport='COM4') as iseg:
+    with ISEGConnection(
+        comport='COM4',
+        echo=ISEGConnection.EchoMode.ECHO_AUTO,
+        cleaning=True,
+        #strict='iseg Spezialelektronik GmbH,MICCETH,5200180,4.28'  # EBIS PSU
+        strict='iseg Spezialelektronik GmbH,NR040060r4050000200,8200005,1.74'  # 4er PSU
+    ) as iseg:
+        print('***** GENERAL VALUES *****')
         print(f'{iseg.echo = }')
         print(f'{iseg.identification() = }')
+        print('\n')
+
+        print('***** READING VALUES *****')
         print(f'{iseg.readVoltage(0) = }')
+        print(f'{iseg.readCurrent(0) = }')
+        print(f'{iseg.measureVoltage(0) = }')
+        print(f'{iseg.measureCurrent(0) = }')
+        print(f'{iseg.readVoltageBoundaries(0) = }')
+        print(f'{iseg.readCurrentBoundaries(0) = }')
+        print(f'{iseg.readVoltageLimit(0) = }')
+        print(f'{iseg.readCurrentLimit(0) = }')
+        print(f'{iseg.crateStatus() = }')
+        print(f'{iseg.readChannelControl(0) = }')
+        print(f'{iseg.readChannelStatus(0) = }')
+        print(f'{iseg.readChannelEventStatus(0) = }')
+        print(f'{iseg.readChannelEventMask(0) = }')
+        print(f'{iseg.configureRampVoltageGet() = }')
+        print('\n')
+
+        print('***** SETTING VALUES *****')
+        print(f'{iseg.voltageSet(0, 10) = }')
+        print(f'{iseg.currentSet(0, 5E-6) = }')
+        print('\n')
 
 
 if __name__ == '__main__':

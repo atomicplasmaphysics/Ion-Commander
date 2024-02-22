@@ -1,12 +1,12 @@
 from serial import SerialException
 
 
-from PyQt6.QtCore import Qt, QSize, QTimer
+from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtWidgets import QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QGroupBox, QMessageBox
 
 
 from Config.GlobalConf import GlobalConf
-from Config.StylesConf import Colors
+from Config.StylesConf import Colors, Styles
 
 from Utility.Layouts import InsertingGridLayout, IndicatorLed, DoubleSpinBox, DisplayLabel, ComboBox
 from Utility.Dialogs import showMessageBox
@@ -23,17 +23,17 @@ class EBISVBoxLayout(QVBoxLayout):
         # local variables
         self.update_timer = QTimer()
         self.update_timer.timeout.connect(self.updateLoop)
-        # TODO: do not use hardcoded interval time
-        self.update_timer.setInterval(1000)
+        self.update_timer.setInterval(GlobalConf.update_timer_time)
         self.update_timer.start()
 
-        # TODO: make indicator sizes global somewhere
-        indicator_size = QSize(20, 20)
+        self.active_message_box = False
 
         self.connection: None | ISEGConnection = None
         self.threaded_connection: ThreadedDummyConnection | ThreadedISEGConnection = ThreadedDummyConnection()
 
-        self.voltage_deviation = 1
+        # TODO: put them in the GlobalConfig
+        self.voltage_deviation = 5
+        self.voltage_maximum = 10000
         self.current_maximum = 1E-4
         self.current_deviation = 0.05
 
@@ -48,12 +48,9 @@ class EBISVBoxLayout(QVBoxLayout):
         self.connection_grid = InsertingGridLayout()
         self.connection_hbox.addLayout(self.connection_grid)
 
-        # TODO: remove clickable from all <IndicatorLed> instances
-        # TODO: change values of <DisplayLabel> instances to None
-
         # Connection
         self.label_connection = QLabel('Connection')
-        self.indicator_connection = IndicatorLed(size=indicator_size, off_color=Colors.cooperate_error)
+        self.indicator_connection = IndicatorLed(size=Styles.indicator_size, off_color=Colors.cooperate_error)
         self.status_connection = QLabel('Not connected')
         self.combobox_connection = ComboBox()
         self.button_connection = QPushButton('Connect')
@@ -68,7 +65,7 @@ class EBISVBoxLayout(QVBoxLayout):
 
         # High Voltage
         self.label_high_voltage = QLabel('High Voltage')
-        self.indicator_high_voltage = IndicatorLed(size=indicator_size)
+        self.indicator_high_voltage = IndicatorLed(size=Styles.indicator_size)
         self.status_high_voltage = QLabel('Disabled')
         self.button_high_voltage = QPushButton('Enable')
         self.button_high_voltage.pressed.connect(lambda: self.setGlobalOutput(not self.indicator_high_voltage.value()))
@@ -101,11 +98,11 @@ class EBISVBoxLayout(QVBoxLayout):
 
         # Cathode Potential
         self.label_1 = QLabel('Cathode')
-        self.spinbox_1 = DoubleSpinBox(default=0, step_size=0.1, input_range=(0, 10000), decimals=1, buttons=True)
-        self.spinbox_1.valueChanged.connect(lambda: self.setVoltage(0, self.spinbox_1.value()))
-        self.status_voltage_1 = DisplayLabel(0, unit='V', target_value=0, deviation=self.voltage_deviation)
-        self.status_current_1 = DisplayLabel(0, unit='A', target_value=0, deviation=self.current_maximum, enable_prefix=True)
-        self.indicator_1 = IndicatorLed(size=indicator_size)
+        self.spinbox_1 = DoubleSpinBox(default=0, step_size=0.1, input_range=(0, self.voltage_maximum), decimals=1, buttons=False)
+        self.spinbox_1.editingFinished.connect(lambda: self.setVoltage(0, self.spinbox_1.value()))
+        self.status_voltage_1 = DisplayLabel(value=0, unit='V', target_value=0, deviation=self.voltage_deviation)
+        self.status_current_1 = DisplayLabel(value=0, unit='A', target_value=0, deviation=self.current_maximum, enable_prefix=True)
+        self.indicator_1 = IndicatorLed(size=Styles.indicator_size)
         self.button_1 = QPushButton('Enable')
         self.button_1.pressed.connect(lambda: self.setOutput(0, not self.indicator_1.value()))
         self.potential_grid.addWidgets(
@@ -119,11 +116,11 @@ class EBISVBoxLayout(QVBoxLayout):
 
         # Drift Tube 1
         self.label_2 = QLabel('Drift Tube 1')
-        self.spinbox_2 = DoubleSpinBox(default=0, step_size=0.1, input_range=(0, 10000), decimals=1, buttons=True)
-        self.spinbox_2.valueChanged.connect(lambda: self.setVoltage(1, self.spinbox_2.value()))
-        self.status_voltage_2 = DisplayLabel(0, unit='V', target_value=0, deviation=self.voltage_deviation)
-        self.status_current_2 = DisplayLabel(0, unit='A', target_value=0, deviation=self.current_maximum, enable_prefix=True)
-        self.indicator_2 = IndicatorLed(size=indicator_size)
+        self.spinbox_2 = DoubleSpinBox(default=0, step_size=0.1, input_range=(0, self.voltage_maximum), decimals=1, buttons=False)
+        self.spinbox_2.editingFinished.connect(lambda: self.setVoltage(1, self.spinbox_2.value()))
+        self.status_voltage_2 = DisplayLabel(value=0, unit='V', target_value=0, deviation=self.voltage_deviation)
+        self.status_current_2 = DisplayLabel(value=0, unit='A', target_value=0, deviation=self.current_maximum, enable_prefix=True)
+        self.indicator_2 = IndicatorLed(size=Styles.indicator_size)
         self.button_2 = QPushButton('Enable')
         self.button_2.pressed.connect(lambda: self.setOutput(1, not self.indicator_2.value()))
         self.potential_grid.addWidgets(
@@ -137,11 +134,11 @@ class EBISVBoxLayout(QVBoxLayout):
 
         # Drift Tube 2
         self.label_3 = QLabel('Drift Tube 2')
-        self.spinbox_3 = DoubleSpinBox(default=0, step_size=0.1, input_range=(0, 10000), decimals=1, buttons=True)
-        self.spinbox_3.valueChanged.connect(lambda: self.setVoltage(2, self.spinbox_3.value()))
-        self.status_voltage_3 = DisplayLabel(0, unit='V', target_value=0, deviation=self.voltage_deviation)
-        self.status_current_3 = DisplayLabel(0, unit='A', target_value=0, deviation=self.current_maximum, enable_prefix=True)
-        self.indicator_3 = IndicatorLed(size=indicator_size)
+        self.spinbox_3 = DoubleSpinBox(default=0, step_size=0.1, input_range=(0, self.voltage_maximum), decimals=1, buttons=False)
+        self.spinbox_3.editingFinished.connect(lambda: self.setVoltage(2, self.spinbox_3.value()))
+        self.status_voltage_3 = DisplayLabel(value=0, unit='V', target_value=0, deviation=self.voltage_deviation)
+        self.status_current_3 = DisplayLabel(value=0, unit='A', target_value=0, deviation=self.current_maximum, enable_prefix=True)
+        self.indicator_3 = IndicatorLed(size=Styles.indicator_size)
         self.button_3 = QPushButton('Enable')
         self.button_3.pressed.connect(lambda: self.setOutput(2, not self.indicator_3.value()))
         self.potential_grid.addWidgets(
@@ -155,11 +152,11 @@ class EBISVBoxLayout(QVBoxLayout):
 
         # Drift Tube 3
         self.label_4 = QLabel('Drift Tube 3')
-        self.spinbox_4 = DoubleSpinBox(default=0, step_size=0.1, input_range=(0, 10000), decimals=1, buttons=True)
-        self.spinbox_4.valueChanged.connect(lambda: self.setVoltage(3, self.spinbox_4.value()))
-        self.status_voltage_4 = DisplayLabel(0, unit='V', target_value=0, deviation=self.voltage_deviation)
-        self.status_current_4 = DisplayLabel(0, unit='A', target_value=0, deviation=self.current_maximum, enable_prefix=True)
-        self.indicator_4 = IndicatorLed(size=indicator_size)
+        self.spinbox_4 = DoubleSpinBox(default=0, step_size=0.1, input_range=(0, self.voltage_maximum), decimals=1, buttons=False)
+        self.spinbox_4.editingFinished.connect(lambda: self.setVoltage(3, self.spinbox_4.value()))
+        self.status_voltage_4 = DisplayLabel(value=0, unit='V', target_value=0, deviation=self.voltage_deviation)
+        self.status_current_4 = DisplayLabel(value=0, unit='A', target_value=0, deviation=self.current_maximum, enable_prefix=True)
+        self.indicator_4 = IndicatorLed(size=Styles.indicator_size)
         self.button_4 = QPushButton('Enable')
         self.button_4.pressed.connect(lambda: self.setOutput(3, not self.indicator_4.value()))
         self.potential_grid.addWidgets(
@@ -173,11 +170,11 @@ class EBISVBoxLayout(QVBoxLayout):
 
         # Repeller
         self.label_5 = QLabel('Repeller')
-        self.spinbox_5 = DoubleSpinBox(default=0, step_size=0.1, input_range=(0, 10000), decimals=1, buttons=True)
-        self.spinbox_5.valueChanged.connect(lambda: self.setVoltage(4, self.spinbox_5.value()))
-        self.status_voltage_5 = DisplayLabel(0, unit='V', target_value=0, deviation=self.voltage_deviation)
-        self.status_current_5 = DisplayLabel(0, unit='A', target_value=0, deviation=self.current_maximum, enable_prefix=True)
-        self.indicator_5 = IndicatorLed(size=indicator_size)
+        self.spinbox_5 = DoubleSpinBox(default=0, step_size=0.1, input_range=(0, self.voltage_maximum), decimals=1, buttons=False)
+        self.spinbox_5.editingFinished.connect(lambda: self.setVoltage(4, self.spinbox_5.value()))
+        self.status_voltage_5 = DisplayLabel(value=0, unit='V', target_value=0, deviation=self.voltage_deviation)
+        self.status_current_5 = DisplayLabel(value=0, unit='A', target_value=0, deviation=self.current_maximum, enable_prefix=True)
+        self.indicator_5 = IndicatorLed(size=Styles.indicator_size)
         self.button_5 = QPushButton('Enable')
         self.button_5.pressed.connect(lambda: self.setOutput(4, not self.indicator_5.value()))
         self.potential_grid.addWidgets(
@@ -211,10 +208,10 @@ class EBISVBoxLayout(QVBoxLayout):
 
         # Cathode Heating Voltage
         self.label_voltage_6 = QLabel('Heating Voltage')
-        self.spinbox_voltage_6 = DoubleSpinBox(default=0, step_size=0.1, input_range=(0, 5), decimals=1, buttons=True)
-        self.spinbox_voltage_6.valueChanged.connect(lambda: self.setVoltage(5, self.spinbox_voltage_6.value()))
-        self.status_voltage_6 = DisplayLabel(0, unit='V', target_value=0, deviation=self.voltage_deviation)
-        self.indicator_6 = IndicatorLed(size=indicator_size)
+        self.spinbox_voltage_6 = DoubleSpinBox(default=0, step_size=0.1, input_range=(0, 5), decimals=1, buttons=False)
+        self.spinbox_voltage_6.editingFinished.connect(lambda: self.setVoltage(5, self.spinbox_voltage_6.value()))
+        self.status_voltage_6 = DisplayLabel(value=0, unit='V', target_value=0, deviation=self.voltage_deviation)
+        self.indicator_6 = IndicatorLed(size=Styles.indicator_size)
         self.button_6 = QPushButton('Enable')
         self.button_6.pressed.connect(lambda: self.setOutput(5, not self.indicator_6.value()))
         self.heating_grid.addWidgets(
@@ -228,17 +225,69 @@ class EBISVBoxLayout(QVBoxLayout):
 
         # Cathode Heating Current
         self.label_current_6 = QLabel('Heating Current')
-        self.spinbox_current_6 = DoubleSpinBox(default=0, step_size=0.05, input_range=(0, 5), decimals=2, buttons=True)
-        self.spinbox_current_6.valueChanged.connect(lambda: self.setCurrent(5, self.spinbox_current_6.value()))
-        self.status_current_6 = DisplayLabel(0, unit='A', target_value=0, deviation=self.current_deviation)
+        # TODO: enable button here, but it will be stuck on the editingFinished if the warning label overtakes!
+        self.spinbox_current_6 = DoubleSpinBox(default=0, step_size=0.05, input_range=(0, 5), decimals=2, buttons=False)
+        self.spinbox_current_6.editingFinished.connect(lambda: self.setCurrent(5, self.spinbox_current_6.value()))
+        self.status_current_6 = DisplayLabel(value=0, unit='A', target_value=0, deviation=self.current_deviation, decimals=4)
         self.heating_grid.addWidgets(
             self.label_current_6,
             self.spinbox_current_6,
             self.status_current_6,
         )
 
+        # grouped items
+        self.channel_dict = {
+            0: 0,
+            1: 2,
+            2: 3,
+            3: 4,
+            4: 1,
+            5: 10
+        }
+        self.all_channels_selector = [channel for _, channel in self.channel_dict.items()]
+        self.spinbox_voltages = [
+            self.spinbox_1,
+            self.spinbox_2,
+            self.spinbox_3,
+            self.spinbox_4,
+            self.spinbox_5,
+            self.spinbox_voltage_6
+        ]
+        self.status_voltages = [
+            self.status_voltage_1,
+            self.status_voltage_2,
+            self.status_voltage_3,
+            self.status_voltage_4,
+            self.status_voltage_5,
+            self.status_voltage_6
+        ]
+        self.status_currents = [
+            self.status_current_1,
+            self.status_current_2,
+            self.status_current_3,
+            self.status_current_4,
+            self.status_current_5,
+            self.status_current_6
+        ]
+        self.indicators = [
+            self.indicator_1,
+            self.indicator_2,
+            self.indicator_3,
+            self.indicator_4,
+            self.indicator_5,
+            self.indicator_6
+        ]
+        self.buttons = [
+            self.button_1,
+            self.button_2,
+            self.button_3,
+            self.button_4,
+            self.button_5,
+            self.button_6
+        ]
+
         # TODO: remove this hardcoded value, but load it from settings and set comport on startup to last set comport
-        #self.connect('COM4', False)
+        # self.connect('COM4', False)
 
         self.reset()
 
@@ -248,81 +297,52 @@ class EBISVBoxLayout(QVBoxLayout):
         if not self.checkConnection(False):
             return
 
-        def highVoltage(state: int):
+        def checkHighVoltageOn(state: int):
             if not isinstance(state, int) or state == -1:
-                raise ValueError(f'State must be int and not -1, got <{type(state)}> with value {state}')
+                GlobalConf.logger.error(f'State must be int and not -1, got <{type(state)}> with value {state}')
+                return
 
             state = bool(state)
             self.indicator_high_voltage.setValue(state)
             self.status_high_voltage.setText('Enabled' if state else 'Disabled')
             self.button_high_voltage.setText('Disable' if state else 'Enable')
 
-        self.threaded_connection.callback(highVoltage, self.threaded_connection.configureMiccGet())
+        self.threaded_connection.callback(checkHighVoltageOn, self.threaded_connection.configureMiccGet())
 
-        def voltageOn(states: list[float]):
-            indicators = [
-                self.indicator_1,
-                self.indicator_2,
-                self.indicator_3,
-                self.indicator_4,
-                self.indicator_5,
-                self.indicator_6
-            ]
+        def checkVoltageOn(states: list[float]):
+            if len(states) != len(self.indicators) != len(self.buttons) != len(self.status_voltages):
+                GlobalConf.logger.error(f'High voltage indicators cannot be set, non matching length: expected len = {len(self.indicators)}, got len = {len(states)}')
+                return
 
-            buttons = [
-                self.button_1,
-                self.button_2,
-                self.button_3,
-                self.button_4,
-                self.button_5,
-                self.button_6
-            ]
-
-            if len(states) != len(indicators) != len(buttons):
-                raise ValueError(f'High voltage indicators cannot be set, non matching length: expected len = {len(indicators)}, got len = {len(states)}')
-
-            for indicator, state, button in zip(indicators, states, buttons):
+            for indicator, status_voltage, state, button in zip(self.indicators, self.status_voltages, states, self.buttons):
                 state = bool(state)
                 indicator.setValue(state)
                 button.setText('Disable' if state else 'Enable')
 
-        self.threaded_connection.callback(voltageOn, self.threaded_connection.readVoltageOn('0-5'))
+                if not state:
+                    status_voltage.setTargetValue(0)
 
-        def setVoltage(voltages: list[float]):
-            status_voltages = [
-                self.status_voltage_1,
-                self.status_voltage_2,
-                self.status_voltage_3,
-                self.status_voltage_4,
-                self.status_voltage_5,
-                self.status_voltage_6
-            ]
+        self.threaded_connection.callback(checkVoltageOn, self.threaded_connection.readVoltageOn(self.all_channels_selector))
 
-            if len(voltages) != len(status_voltages):
-                raise ValueError(f'Measured voltages cannot be set, non matching length: expected len = {len(status_voltages)}, got len = {len(voltages)}')
+        def measureVoltage(voltages: list[float]):
+            if len(voltages) != len(self.status_voltages):
+                GlobalConf.logger.error(f'Measured voltages cannot be set, non matching length: expected len = {len(self.status_voltages)}, got len = {len(voltages)}')
+                return
 
-            for status_voltage, voltage in zip(status_voltages, voltages):
+            for status_voltage, voltage in zip(self.status_voltages, voltages):
                 status_voltage.setValue(voltage)
 
-        self.threaded_connection.callback(setVoltage, self.threaded_connection.measureVoltage('0-5'))
+        self.threaded_connection.callback(measureVoltage, self.threaded_connection.measureVoltage(self.all_channels_selector))
 
-        def setCurrent(currents: list[float]):
-            status_currents = [
-                self.status_current_1,
-                self.status_current_2,
-                self.status_current_3,
-                self.status_current_4,
-                self.status_current_5,
-                self.status_current_6
-            ]
+        def measureCurrent(currents: list[float]):
+            if len(currents) != len(self.status_currents):
+                GlobalConf.logger.error(f'Measured currents cannot be set, non matching length: expected len = {len(self.status_currents)}, got len = {len(currents)}')
+                return
 
-            if len(currents) != len(status_currents):
-                raise ValueError(f'Measured currents cannot be set, non matching length: expected len = {len(status_currents)}, got len = {len(currents)}')
-
-            for status_current, current in zip(status_currents, currents):
+            for status_current, current in zip(self.status_currents, currents):
                 status_current.setValue(current)
 
-        self.threaded_connection.callback(setCurrent, self.threaded_connection.measureCurrent('0-5'))
+        self.threaded_connection.callback(measureCurrent, self.threaded_connection.measureCurrent(self.all_channels_selector))
 
     def updateAllValues(self):
         """Updates all values"""
@@ -332,41 +352,26 @@ class EBISVBoxLayout(QVBoxLayout):
 
         self.updateLoop()
 
-        def setVoltage(voltages: list[float]):
-            set_voltages = [
-                self.spinbox_1,
-                self.spinbox_2,
-                self.spinbox_3,
-                self.spinbox_4,
-                self.spinbox_5,
-                self.spinbox_voltage_6
-            ]
-            check_voltages = [
-                self.status_voltage_1,
-                self.status_voltage_2,
-                self.status_voltage_3,
-                self.status_voltage_4,
-                self.status_voltage_5,
-                self.status_voltage_6
-            ]
+        def readVoltage(voltages: list[float]):
+            if len(voltages) != len(self.spinbox_voltages) != len(self.status_voltages):
+                GlobalConf.logger.error(f'Set voltages cannot be set, non matching length: expected len = {len(self.spinbox_voltages)}, got len = {len(voltages)}')
+                return
 
-            if len(voltages) != len(set_voltages) != len(check_voltages):
-                raise ValueError(f'Set voltages cannot be set, non matching length: expected len = {len(set_voltages)}, got len = {len(voltages)}')
+            for spinbox_voltage, status_voltage, voltage in zip(self.spinbox_voltages, self.status_voltages, voltages):
+                spinbox_voltage.setValue(voltage)
+                status_voltage.setTargetValue(voltage)
 
-            for set_voltage, check_voltage, voltage in zip(set_voltages, check_voltages, voltages):
-                set_voltage.setValue(voltage)
-                check_voltage.setTargetValue(voltage)
+        self.threaded_connection.callback(readVoltage, self.threaded_connection.readVoltage(self.all_channels_selector))
 
-        self.threaded_connection.callback(setVoltage, self.threaded_connection.readVoltage('0-5'))
-
-        def setCurrent(current: float):
+        def readCurrent(current: float):
             if not isinstance(current, float):
-                raise ValueError(f'Set current cannot be set: expected <float> type, got {type(current)}')
+                GlobalConf.logger.error(f'Set current cannot be set: expected <float> type, got {type(current)}')
+                return
 
             self.spinbox_current_6.setValue(current)
             self.status_current_6.setTargetValue(current)
 
-        self.threaded_connection.callback(setCurrent, self.threaded_connection.readCurrent(5))
+        self.threaded_connection.callback(readCurrent, self.threaded_connection.readCurrent(10))
 
     def setVoltage(self, channel: int, voltage: float):
         """
@@ -379,7 +384,9 @@ class EBISVBoxLayout(QVBoxLayout):
         if not self.checkConnection():
             return
 
-        self.threaded_connection.voltageSet(channel, voltage)
+        self.status_voltages[channel].setTargetValue(voltage)
+        phys_channel = self.channel_dict[channel]
+        self.threaded_connection.voltageSet(phys_channel, voltage)
 
     def setCurrent(self, channel: int, current: float):
         """
@@ -392,7 +399,9 @@ class EBISVBoxLayout(QVBoxLayout):
         if not self.checkConnection():
             return
 
-        self.threaded_connection.currentSet(channel, current)
+        self.status_currents[channel].setTargetValue(current)
+        phys_channel = self.channel_dict[channel]
+        self.threaded_connection.currentSet(phys_channel, current)
 
     def setOutput(self, channel: int, state: bool):
         """
@@ -405,10 +414,23 @@ class EBISVBoxLayout(QVBoxLayout):
         if not self.checkConnection():
             return
 
+        if channel != 5 and not self.indicator_high_voltage.state and not self.active_message_box:
+            self.active_message_box = True
+            _, result = showMessageBox(
+                None,
+                QMessageBox.Icon.Information,
+                'Enable high voltage warning!',
+                'General high voltage of EBIS power supply is not enabled, please enable it first!'
+            )
+            if result:
+                self.active_message_box = False
+
+        phys_channel = self.channel_dict[channel]
+
         if state:
-            self.threaded_connection.voltageOn(channel)
+            self.threaded_connection.voltageOn(phys_channel)
         else:
-            self.threaded_connection.voltageOff(channel)
+            self.threaded_connection.voltageOff(phys_channel)
 
     def setGlobalOutput(self, state: bool):
         """
@@ -432,13 +454,16 @@ class EBISVBoxLayout(QVBoxLayout):
         if self.indicator_connection.value():
             return True
 
-        if messagebox:
-            showMessageBox(
+        if messagebox and not self.active_message_box:
+            self.active_message_box = True
+            _, result = showMessageBox(
                 None,
                 QMessageBox.Icon.Warning,
                 'Connection warning!',
                 'EBIS power supply is not connected, please connect first!'
             )
+            if result:
+                self.active_message_box = False
 
         return False
 
@@ -450,12 +475,57 @@ class EBISVBoxLayout(QVBoxLayout):
         :param messagebox: show messagebox if failed
         """
 
-        if comport:
-            entries = {port.lower(): i for i, port in enumerate(self.combobox_connection.entries)}
-            if comport in entries.keys():
-                self.combobox_connection.setCurrentIndex(entries[comport])
-        else:
+        # TODO: sometimes it crashes or ConnectionError-Popup when disconnecting
+
+        if not comport:
             comport = self.combobox_connection.getValue(text=True)
+
+        connect = self.threaded_connection.isDummy()
+
+        self.unconnect()
+
+        if connect:
+            self.connection = ISEGConnection(
+                comport,
+                echo=ISEGConnection.EchoMode.ECHO_AUTO,
+                cleaning=True,
+                strict='iseg Spezialelektronik GmbH,MICCETH,5200180,4.28'
+            )
+            try:
+                self.connection.open()
+                self.threaded_connection = ThreadedISEGConnection(self.connection)
+                self.indicator_connection.setValue(True)
+                self.status_connection.setText('Connected')
+                self.combobox_connection.setEnabled(False)
+                self.button_connection.setText('Disconnect')
+
+            except (SerialException, ConnectionError) as error:
+                try:
+                    self.connection.close()
+                except ConnectionError:
+                    pass
+                self.connection = None
+                self.reset()
+
+                GlobalConf.logger.info(f'Connection error! Could not connect to EBIS power supply on port "{comport}", because of: {error}')
+
+                if messagebox:
+                    showMessageBox(
+                        None,
+                        QMessageBox.Icon.Critical,
+                        'Connection error!',
+                        f'Could not connect to EBIS power supply on port "{comport}"!',
+                        f'<strong>Encountered Error:</strong><br>{error}',
+                        expand_details=False
+                    )
+        else:
+            self.combobox_connection.setEnabled(True)
+            self.button_connection.setText('Connect')
+
+        self.updateAllValues()
+
+    def unconnect(self):
+        """Disconnect from any port"""
 
         self.threaded_connection.close()
         self.threaded_connection = ThreadedDummyConnection()
@@ -463,37 +533,22 @@ class EBISVBoxLayout(QVBoxLayout):
             self.connection.close()
             self.connection = None
 
-        self.connection = ISEGConnection(
-            comport,
-            echo=ISEGConnection.EchoMode.ECHO_ENABLED,
-            cleaning=True,
-            strict='iseg Spezialelektronik GmbH,MICCETH,5200180,4.28'
-        )
-        try:
-            self.connection.open()
-            self.threaded_connection = ThreadedISEGConnection(self.connection)
-            self.indicator_connection.setValue(True)
-            self.status_connection.setText('Connected')
+        comport = self.combobox_connection.getValue(text=True)
+        self.reset()
+        self.setComport(comport)
 
-        except (SerialException, ConnectionError) as error:
-            try:
-                self.connection.close()
-            except ConnectionError:
-                pass
-            self.connection = None
-            self.reset()
+    def setComport(self, comport: str):
+        """
+        Selects the comport in the list of comports
 
-            GlobalConf.logger.info(f'Connection error! Could not connect to EBIS power supply, because of: {error}')
+        :param comport: comport to be selected
+        """
 
-            if messagebox:
-                showMessageBox(
-                    None,
-                    QMessageBox.Icon.Critical,
-                    'Connection error!',
-                    'Could not connect to EBIS power supply!',
-                    f'<strong>Encountered Error:</strong><br>{error}',
-                    expand_details=False
-                )
+        comport = comport.lower()
+
+        entries = {port.lower(): i for i, port in enumerate(self.combobox_connection.entries)}
+        if comport in entries.keys():
+            self.combobox_connection.setCurrentIndex(entries[comport])
 
     def reset(self):
         """Resets everything to default"""
@@ -504,48 +559,32 @@ class EBISVBoxLayout(QVBoxLayout):
 
         self.indicator_connection.setValue(False)
         self.status_connection.setText('Not connected')
+        self.button_connection.setText('Connect')
 
         self.indicator_high_voltage.setValue(False)
         self.label_high_voltage.setText('Disabled')
         self.button_high_voltage.setText('Enable')
 
-        self.indicator_1.setValue(False)
-        self.button_1.setText('Enable')
-        self.spinbox_1.reset()
-        self.status_voltage_1.setValue(0)
-        self.status_current_1.setValue(0)
+        for indicator in self.indicators:
+            indicator.setValue(False)
 
-        self.indicator_2.setValue(False)
-        self.button_2.setText('Enable')
-        self.spinbox_2.reset()
-        self.status_voltage_2.setValue(0)
-        self.status_current_2.setValue(0)
+        for button in self.buttons:
+            button.setText('Enable')
 
-        self.indicator_3.setValue(False)
-        self.button_3.setText('Enable')
-        self.spinbox_3.reset()
-        self.status_voltage_3.setValue(0)
-        self.status_current_3.setValue(0)
+        for spinbox_voltage in self.spinbox_voltages:
+            spinbox_voltage.reset()
 
-        self.indicator_4.setValue(False)
-        self.button_4.setText('Enable')
-        self.spinbox_4.reset()
-        self.status_voltage_4.setValue(0)
-        self.status_current_4.setValue(0)
+        for status_voltage in self.status_voltages:
+            status_voltage.setValue(0)
+            status_voltage.setTargetValue(0)
 
-        self.indicator_5.setValue(False)
-        self.button_5.setText('Enable')
-        self.spinbox_5.reset()
-        self.status_voltage_5.setValue(0)
-        self.status_current_5.setValue(0)
+        for status_current in self.status_currents:
+            status_current.setValue(0)
+            status_current.setTargetValue(0)
 
-        self.indicator_6.setValue(False)
-        self.button_6.setText('Enable')
-        self.spinbox_voltage_6.reset()
         self.spinbox_current_6.reset()
-        self.status_voltage_6.setValue(0)
-        self.status_current_6.setValue(0)
-        
+
+        self.combobox_connection.setEnabled(True)
         self.setComportsComboBox()
 
     def setComportsComboBox(self):

@@ -1,12 +1,15 @@
+from datetime import datetime
+
+
 from serial import SerialException
 
 
-from PyQt6.QtCore import Qt, QSize, QTimer
+from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtWidgets import QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QGroupBox, QMessageBox
 
 
 from Config.GlobalConf import GlobalConf
-from Config.StylesConf import Colors
+from Config.StylesConf import Colors, Styles
 
 from Utility.Layouts import InsertingGridLayout, IndicatorLed, DoubleSpinBox, DisplayLabel, PolarityButton, SpinBox, ComboBox
 from Utility.Dialogs import showMessageBox
@@ -22,15 +25,26 @@ class PSUVBoxLayout(QVBoxLayout):
 
         self.update_timer = QTimer()
         self.update_timer.timeout.connect(self.updateLoop)
-        # TODO: do not use hardcoded interval time
-        self.update_timer.setInterval(1000)
+        self.update_timer.setInterval(GlobalConf.update_timer_time)
         self.update_timer.start()
 
-        # TODO: make indicator sizes global somewhere
-        indicator_size = QSize(20, 20)
+        self.ramp_timer = QTimer()
+        self.ramp_timer.timeout.connect(self.updateRamp)
+        self.ramp_timer.setInterval(GlobalConf.ramp_timer_time)
+        self.ramp_start_time = datetime.now()
+        self.ramp_channel = 0
+        self.ramp_start_voltage = 0
+
+        self.active_message_box = False
 
         self.connection: None | ISEGConnection = None
         self.threaded_connection: ThreadedDummyConnection | ThreadedISEGConnection = ThreadedDummyConnection()
+
+        # TODO: put them in the GlobalConfig
+        self.voltage_deviation = 5
+        self.voltage_maximum = 6000
+        self.current_maximum = 1E-4
+        self.time_ramp_default = 15
 
         self.comports = getComports()
         self.comport_ports = [port for port, description, hardware_id in self.comports]
@@ -47,12 +61,9 @@ class PSUVBoxLayout(QVBoxLayout):
         self.connection_grid = InsertingGridLayout()
         self.connection_hbox.addLayout(self.connection_grid)
 
-        # TODO: remove clickable from all <IndicatorLed> instances
-        # TODO: change values of <DisplayLabel> instances to None
-
         # Connection
         self.label_connection = QLabel('Connection')
-        self.indicator_connection = IndicatorLed(size=indicator_size, off_color=Colors.cooperate_error)
+        self.indicator_connection = IndicatorLed(size=Styles.indicator_size, off_color=Colors.cooperate_error)
         self.status_connection = QLabel('Not connected')
         self.combobox_connection = ComboBox(entries=self.comport_ports, tooltips=self.comport_description)
         self.button_connection = QPushButton('Connect')
@@ -63,20 +74,6 @@ class PSUVBoxLayout(QVBoxLayout):
             (self.status_connection, 2),
             self.combobox_connection,
             self.button_connection
-        )
-
-        # TODO: do we need high voltage?
-        # High Voltage
-        self.label_high_voltage = QLabel('High Voltage')
-        self.indicator_high_voltage = IndicatorLed(size=indicator_size)
-        self.status_high_voltage = QLabel('Disabled')
-        self.button_high_voltage = QPushButton('Enable')
-        self.button_high_voltage.pressed.connect(lambda: self.setGlobalOutput(not self.indicator_high_voltage.value()))
-        self.connection_grid.addWidgets(
-            self.label_high_voltage,
-            self.indicator_high_voltage,
-            self.status_high_voltage,
-            self.button_high_voltage
         )
 
         # Control Group Box
@@ -104,11 +101,11 @@ class PSUVBoxLayout(QVBoxLayout):
         self.label_1 = QLabel('MCP Front/Back')
         self.button_polarity_1 = PolarityButton(connected_buttons=False)
         self.button_polarity_1.pressed.connect(lambda state: self.setPolarity(0, state))
-        self.spinbox_1 = DoubleSpinBox(default=0, step_size=0.1, input_range=(0, 10000), decimals=1, buttons=True)
-        self.spinbox_1.valueChanged.connect(lambda: self.setVoltage(0, self.spinbox_1.value()))
-        self.status_voltage_1 = DisplayLabel(0, unit='V')
-        self.status_current_1 = DisplayLabel(0, unit='A', enable_prefix=True)
-        self.indicator_1 = IndicatorLed(size=indicator_size)
+        self.spinbox_1 = DoubleSpinBox(default=0, step_size=0.1, input_range=(0, self.voltage_maximum), decimals=1, buttons=False)
+        self.spinbox_1.editingFinished.connect(lambda: self.setVoltage(0, self.spinbox_1.value()))
+        self.status_voltage_1 = DisplayLabel(value=0, unit='V', target_value=0, deviation=self.voltage_deviation)
+        self.status_current_1 = DisplayLabel(value=0, unit='A', target_value=0, deviation=self.current_maximum, enable_prefix=True)
+        self.indicator_1 = IndicatorLed(size=Styles.indicator_size)
         self.button_enable_1 = QPushButton('Enable')
         self.button_enable_1.pressed.connect(lambda: self.setOutput(0, not self.indicator_1.value()))
         self.control_grid.addWidgets(
@@ -125,11 +122,11 @@ class PSUVBoxLayout(QVBoxLayout):
         self.label_2 = QLabel('Anode')
         self.button_polarity_2 = PolarityButton(connected_buttons=False)
         self.button_polarity_2.pressed.connect(lambda state: self.setPolarity(1, state))
-        self.spinbox_2 = DoubleSpinBox(default=0, step_size=0.1, input_range=(0, 10000), decimals=1, buttons=True)
-        self.spinbox_2.valueChanged.connect(lambda: self.setVoltage(1, self.spinbox_2.value()))
-        self.status_voltage_2 = DisplayLabel(0, unit='V')
-        self.status_current_2 = DisplayLabel(0, unit='A', enable_prefix=True)
-        self.indicator_2 = IndicatorLed(size=indicator_size)
+        self.spinbox_2 = DoubleSpinBox(default=0, step_size=0.1, input_range=(0, self.voltage_maximum), decimals=1, buttons=False)
+        self.spinbox_2.editingFinished.connect(lambda: self.setVoltage(1, self.spinbox_2.value()))
+        self.status_voltage_2 = DisplayLabel(value=0, unit='V', target_value=0, deviation=self.voltage_deviation)
+        self.status_current_2 = DisplayLabel(value=0, unit='A', target_value=0, deviation=self.current_maximum, enable_prefix=True)
+        self.indicator_2 = IndicatorLed(size=Styles.indicator_size)
         self.button_enable_2 = QPushButton('Enable')
         self.button_enable_2.pressed.connect(lambda: self.setOutput(1, not self.indicator_2.value()))
         self.control_grid.addWidgets(
@@ -146,11 +143,11 @@ class PSUVBoxLayout(QVBoxLayout):
         self.label_3 = QLabel('Cathode LSD')
         self.button_polarity_3 = PolarityButton(connected_buttons=False)
         self.button_polarity_3.pressed.connect(lambda state: self.setPolarity(2, state))
-        self.spinbox_3 = DoubleSpinBox(default=0, step_size=0.1, input_range=(0, 10000), decimals=1, buttons=True)
-        self.spinbox_3.valueChanged.connect(lambda: self.setVoltage(2, self.spinbox_3.value()))
-        self.status_voltage_3 = DisplayLabel(0, unit='V')
-        self.status_current_3 = DisplayLabel(0, unit='A', enable_prefix=True)
-        self.indicator_3 = IndicatorLed(size=indicator_size)
+        self.spinbox_3 = DoubleSpinBox(default=0, step_size=0.1, input_range=(0, self.voltage_maximum), decimals=1, buttons=False)
+        self.spinbox_3.editingFinished.connect(lambda: self.setVoltage(2, self.spinbox_3.value()))
+        self.status_voltage_3 = DisplayLabel(value=0, unit='V', target_value=0, deviation=self.voltage_deviation)
+        self.status_current_3 = DisplayLabel(value=0, unit='A', target_value=0, deviation=self.current_maximum, enable_prefix=True)
+        self.indicator_3 = IndicatorLed(size=Styles.indicator_size)
         self.button_enable_3 = QPushButton('Enable')
         self.button_enable_3.pressed.connect(lambda: self.setOutput(2, not self.indicator_3.value()))
         self.control_grid.addWidgets(
@@ -167,11 +164,11 @@ class PSUVBoxLayout(QVBoxLayout):
         self.label_4 = QLabel('Focus LSD')
         self.button_polarity_4 = PolarityButton(connected_buttons=False)
         self.button_polarity_4.pressed.connect(lambda state: self.setPolarity(3, state))
-        self.spinbox_4 = DoubleSpinBox(default=0, step_size=0.1, input_range=(0, 10000), decimals=1, buttons=True)
-        self.spinbox_4.valueChanged.connect(lambda: self.setVoltage(3, self.spinbox_4.value()))
-        self.status_voltage_4 = DisplayLabel(0, unit='V')
-        self.status_current_4 = DisplayLabel(0, unit='A', enable_prefix=True)
-        self.indicator_4 = IndicatorLed(size=indicator_size)
+        self.spinbox_4 = DoubleSpinBox(default=0, step_size=0.1, input_range=(0, self.voltage_maximum), decimals=1, buttons=False)
+        self.spinbox_4.editingFinished.connect(lambda: self.setVoltage(3, self.spinbox_4.value()))
+        self.status_voltage_4 = DisplayLabel(value=0, unit='V', target_value=0, deviation=self.voltage_deviation)
+        self.status_current_4 = DisplayLabel(value=0, unit='A', target_value=0, deviation=self.current_maximum, enable_prefix=True)
+        self.indicator_4 = IndicatorLed(size=Styles.indicator_size)
         self.button_enable_4 = QPushButton('Enable')
         self.button_enable_4.pressed.connect(lambda: self.setOutput(3, not self.indicator_4.value()))
         self.control_grid.addWidgets(
@@ -198,7 +195,6 @@ class PSUVBoxLayout(QVBoxLayout):
         # Labels
         self.limits_grid.addWidgets(
             None,
-            QLabel('Voltage [V]'),
             QLabel('Current [mA]'),
             QLabel('Reached')
         )
@@ -207,56 +203,44 @@ class PSUVBoxLayout(QVBoxLayout):
 
         # MCP
         self.label_limit_1 = QLabel('MCP Front/Back')
-        self.spinbox_limit_voltage_1 = DoubleSpinBox(default=0, step_size=0.1, input_range=(0, 10000), decimals=1, buttons=True)
-        self.spinbox_limit_voltage_1.valueChanged.connect(lambda: self.setVoltageLimit(0, self.spinbox_limit_voltage_1.value()))
-        self.spinbox_limit_current_1 = DoubleSpinBox(default=0, step_size=0.001, input_range=(0, 1), decimals=3, buttons=True)
-        self.spinbox_limit_current_1.valueChanged.connect(lambda: self.setCurrentLimit(0, self.spinbox_limit_current_1.value()))
-        self.indicator_limit_1 = IndicatorLed(size=indicator_size, on_color=Colors.cooperate_error)
+        self.spinbox_limit_current_1 = DoubleSpinBox(default=0.002, step_size=0.001, input_range=(0.002, 4), decimals=3, buttons=False)
+        self.spinbox_limit_current_1.editingFinished.connect(lambda: self.setCurrentLimit(0, self.spinbox_limit_current_1.value()))
+        self.indicator_limit_1 = IndicatorLed(size=Styles.indicator_size, on_color=Colors.cooperate_error)
         self.limits_grid.addWidgets(
             self.label_limit_1,
-            self.spinbox_limit_voltage_1,
             self.spinbox_limit_current_1,
             self.indicator_limit_1
         )
 
         # Anode
         self.label_limit_2 = QLabel('Anode')
-        self.spinbox_limit_voltage_2 = DoubleSpinBox(default=0, step_size=0.1, input_range=(0, 10000), decimals=1, buttons=True)
-        self.spinbox_limit_voltage_2.valueChanged.connect(lambda: self.setVoltageLimit(1, self.spinbox_limit_voltage_2.value()))
-        self.spinbox_limit_current_2 = DoubleSpinBox(default=0, step_size=0.001, input_range=(0, 1), decimals=3, buttons=True)
-        self.spinbox_limit_current_2.valueChanged.connect(lambda: self.setCurrentLimit(1, self.spinbox_limit_current_2.value()))
-        self.indicator_limit_2 = IndicatorLed(size=indicator_size, on_color=Colors.cooperate_error)
+        self.spinbox_limit_current_2 = DoubleSpinBox(default=0.002, step_size=0.001, input_range=(0.002, 1), decimals=3, buttons=False)
+        self.spinbox_limit_current_2.editingFinished.connect(lambda: self.setCurrentLimit(1, self.spinbox_limit_current_2.value()))
+        self.indicator_limit_2 = IndicatorLed(size=Styles.indicator_size, on_color=Colors.cooperate_error)
         self.limits_grid.addWidgets(
             self.label_limit_2,
-            self.spinbox_limit_voltage_2,
             self.spinbox_limit_current_2,
             self.indicator_limit_2
         )
 
         # Cathode LSD
         self.label_limit_3 = QLabel('Cathode LSD')
-        self.spinbox_limit_voltage_3 = DoubleSpinBox(default=0, step_size=0.1, input_range=(0, 10000), decimals=1, buttons=True)
-        self.spinbox_limit_voltage_3.valueChanged.connect(lambda: self.setVoltageLimit(2, self.spinbox_limit_voltage_3.value()))
-        self.spinbox_limit_current_3 = DoubleSpinBox(default=0, step_size=0.001, input_range=(0, 1), decimals=3, buttons=True)
-        self.spinbox_limit_current_3.valueChanged.connect(lambda: self.setCurrentLimit(2, self.spinbox_limit_current_3.value()))
-        self.indicator_limit_3 = IndicatorLed(size=indicator_size, on_color=Colors.cooperate_error)
+        self.spinbox_limit_current_3 = DoubleSpinBox(default=0.002, step_size=0.001, input_range=(0.002, 1), decimals=3, buttons=False)
+        self.spinbox_limit_current_3.editingFinished.connect(lambda: self.setCurrentLimit(2, self.spinbox_limit_current_3.value()))
+        self.indicator_limit_3 = IndicatorLed(size=Styles.indicator_size, on_color=Colors.cooperate_error)
         self.limits_grid.addWidgets(
             self.label_limit_3,
-            self.spinbox_limit_voltage_3,
             self.spinbox_limit_current_3,
             self.indicator_limit_3
         )
 
         # Focus LSD
         self.label_limit_4 = QLabel('Focus LSD')
-        self.spinbox_limit_voltage_4 = DoubleSpinBox(default=0, step_size=0.1, input_range=(0, 10000), decimals=1, buttons=True)
-        self.spinbox_limit_voltage_4.valueChanged.connect(lambda: self.setVoltageLimit(3, self.spinbox_limit_voltage_4.value()))
-        self.spinbox_limit_current_4 = DoubleSpinBox(default=0, step_size=0.001, input_range=(0, 1), decimals=3, buttons=True)
-        self.spinbox_limit_current_4.valueChanged.connect(lambda: self.setCurrentLimit(3, self.spinbox_limit_current_4.value()))
-        self.indicator_limit_4 = IndicatorLed(size=indicator_size, on_color=Colors.cooperate_error)
+        self.spinbox_limit_current_4 = DoubleSpinBox(default=0.002, step_size=0.001, input_range=(0.002, 1), decimals=3, buttons=False)
+        self.spinbox_limit_current_4.editingFinished.connect(lambda: self.setCurrentLimit(3, self.spinbox_limit_current_4.value()))
+        self.indicator_limit_4 = IndicatorLed(size=Styles.indicator_size, on_color=Colors.cooperate_error)
         self.limits_grid.addWidgets(
             self.label_limit_4,
-            self.spinbox_limit_voltage_4,
             self.spinbox_limit_current_4,
             self.indicator_limit_4
         )
@@ -275,8 +259,8 @@ class PSUVBoxLayout(QVBoxLayout):
         # Speed
         # TODO: get limits, unit and number of decimals right
         self.label_advanced_settings_ramp = QLabel('Ramp speed [%/s]')
-        self.spinbox_advanced_settings_ramp = DoubleSpinBox(default=0, step_size=0.001, input_range=(0, 100), decimals=3, buttons=True)
-        self.spinbox_advanced_settings_ramp.valueChanged.connect(lambda: self.setRampSpeed(self.spinbox_advanced_settings_ramp.value()))
+        self.spinbox_advanced_settings_ramp = DoubleSpinBox(default=0, step_size=0.01, input_range=(0, 20), decimals=2, buttons=False)
+        self.spinbox_advanced_settings_ramp.editingFinished.connect(lambda: self.setRampSpeed(self.spinbox_advanced_settings_ramp.value()))
         self.advanced_settings_grid.addWidgets(
             self.label_advanced_settings_ramp,
             self.spinbox_advanced_settings_ramp
@@ -295,15 +279,15 @@ class PSUVBoxLayout(QVBoxLayout):
 
         # Time
         self.label_ramp_time = QLabel('Time [min]')
-        self.spinbox_ramp_time = SpinBox(default=15, step_size=1, input_range=(0, 600), buttons=True)
+        self.spinbox_ramp_time = SpinBox(default=self.time_ramp_default, step_size=1, input_range=(0, 600), buttons=False)
         self.ramp_grid.addWidgets(
             self.label_ramp_time,
             self.spinbox_ramp_time
         )
 
         # Final Value
-        self.label_ramp_final = QLabel('Voltage [V]')
-        self.spinbox_ramp_voltage = DoubleSpinBox(default=0, step_size=0.1, input_range=(0, 10000), decimals=1, buttons=True)
+        self.label_ramp_final = QLabel('Target Voltage [V]')
+        self.spinbox_ramp_voltage = DoubleSpinBox(default=0, step_size=0.1, input_range=(0, self.voltage_maximum), decimals=1, buttons=False)
         self.ramp_grid.addWidgets(
             self.label_ramp_final,
             self.spinbox_ramp_voltage
@@ -318,14 +302,70 @@ class PSUVBoxLayout(QVBoxLayout):
         )
 
         # Start
-        self.button_ramp = QPushButton('Start')
+
         self.status_ramp = QLabel('Remaining time:')
-        self.status_remaining_ramp = DisplayLabel(value=0, target_value=15, deviation=1, unit='min')
+        # TODO: self.status_remaining_ramp is always red
+        self.status_remaining_ramp = DisplayLabel(value=0, target_value=0, deviation=1, unit='min')
+        self.indicator_ramp = IndicatorLed(size=Styles.indicator_size)
+        self.button_ramp = QPushButton('Start ramp')
+        self.button_ramp.clicked.connect(self.startRampVoltage)
         self.ramp_grid.addWidgets(
             self.status_ramp,
             self.status_remaining_ramp,
+            self.indicator_ramp,
             self.button_ramp
         )
+
+        # grouped items
+        self.all_channels_selector = '0-3'
+        self.indicators = [
+            self.indicator_1,
+            self.indicator_2,
+            self.indicator_3,
+            self.indicator_4
+        ]
+        self.buttons = [
+            self.button_enable_1,
+            self.button_enable_2,
+            self.button_enable_3,
+            self.button_enable_4
+        ]
+        self.status_voltages = [
+            self.status_voltage_1,
+            self.status_voltage_2,
+            self.status_voltage_3,
+            self.status_voltage_4
+        ]
+        self.indicator_limits = [
+            self.indicator_limit_1,
+            self.indicator_limit_2,
+            self.indicator_limit_3,
+            self.indicator_limit_4
+        ]
+        self.status_currents = [
+            self.status_current_1,
+            self.status_current_2,
+            self.status_current_3,
+            self.status_current_4
+        ]
+        self.spinbox_limit_currents = [
+            self.spinbox_limit_current_1,
+            self.spinbox_limit_current_2,
+            self.spinbox_limit_current_3,
+            self.spinbox_limit_current_4
+        ]
+        self.button_polarities = [
+            self.button_polarity_1,
+            self.button_polarity_2,
+            self.button_polarity_3,
+            self.button_polarity_4
+        ]
+        self.spinbox_voltages = [
+            self.spinbox_1,
+            self.spinbox_2,
+            self.spinbox_3,
+            self.spinbox_4
+        ]
 
         # TODO: remove this hardcoded value, but load it from settings and set comport on startup to last set comport
         #self.connect('COM1', False)
@@ -338,123 +378,51 @@ class PSUVBoxLayout(QVBoxLayout):
         if not self.checkConnection(False):
             return
 
-        self.indicator_limit_1.setValue(False)
-        self.indicator_limit_2.setValue(False)
-        self.indicator_limit_3.setValue(False)
-        self.indicator_limit_4.setValue(False)
+        def checkVoltageOn(states: list[float]):
+            if len(states) != len(self.indicators) != len(self.buttons) != len(self.status_voltages):
+                GlobalConf.logger.error(f'High voltage indicators cannot be set, non matching length: expected len = {len(self.indicators)}, got len = {len(states)}')
+                return
 
-        def highVoltage(state: int):
-            if not isinstance(state, int) or state == -1:
-                raise ValueError(f'State must be int and not -1, got <{type(state)}> with value {state}')
-
-            state = bool(state)
-            self.indicator_high_voltage.setValue(state)
-            self.status_high_voltage.setText('Enabled' if state else 'Disabled')
-            self.button_high_voltage.setText('Disable' if state else 'Enable')
-
-        # TODO: does the micc even work here?
-        self.threaded_connection.callback(highVoltage, self.threaded_connection.configureMiccGet())
-
-        def voltageOn(states: list[float]):
-            indicators = [
-                self.indicator_1,
-                self.indicator_2,
-                self.indicator_3,
-                self.indicator_4
-            ]
-
-            buttons = [
-                self.button_enable_1,
-                self.button_enable_2,
-                self.button_enable_3,
-                self.button_enable_4
-            ]
-
-            if len(states) != len(indicators) != len(buttons):
-                raise ValueError(f'High voltage indicators cannot be set, non matching length: expected len = {len(indicators)}, got len = {len(states)}')
-
-            for indicator, state, button in zip(indicators, states, buttons):
+            for indicator, status_voltage, state, button in zip(self.indicators, self.status_voltages, states, self.buttons):
                 state = bool(state)
                 indicator.setValue(state)
                 button.setText('Disable' if state else 'Enable')
 
-        self.threaded_connection.callback(voltageOn, self.threaded_connection.readVoltageOn('0-3'))
+                if not state:
+                    status_voltage.setTargetValue(0)
 
-        def setVoltage(voltages: list[float]):
-            status_voltages = [
-                self.status_voltage_1,
-                self.status_voltage_2,
-                self.status_voltage_3,
-                self.status_voltage_4
-            ]
-            indicator_limits = [
-                self.indicator_limit_1,
-                self.indicator_limit_2,
-                self.indicator_limit_3,
-                self.indicator_limit_4
-            ]
-            voltage_limits = [
-                self.spinbox_limit_voltage_1,
-                self.spinbox_limit_voltage_2,
-                self.spinbox_limit_voltage_3,
-                self.spinbox_limit_voltage_4
-            ]
+        self.threaded_connection.callback(checkVoltageOn, self.threaded_connection.readVoltageOn(self.all_channels_selector))
 
-            if len(voltages) != len(status_voltages) != len(indicator_limits) != len(voltage_limits):
-                raise ValueError(f'Measured voltages cannot be set, non matching length: expected len = {len(status_voltages)}, got len = {len(voltages)}')
+        def measureVoltage(voltages: list[float]):
+            if len(voltages) != len(self.status_voltages):
+                GlobalConf.logger.error(f'Measured voltages cannot be set, non matching length: expected len = {len(self.status_voltages)}, got len = {len(voltages)}')
+                return
 
-            for status_voltage, indicator_limit, voltage_limit, voltage in zip(status_voltages, indicator_limits, voltage_limits, voltages):
+            for status_voltage, voltage in zip(self.status_voltages, voltages):
                 status_voltage.setValue(voltage)
-                if voltage >= voltage_limit:
-                    indicator_limit.setValue(True)
 
-        self.threaded_connection.callback(setVoltage, self.threaded_connection.measureVoltage('0-3'))
+        self.threaded_connection.callback(measureVoltage, self.threaded_connection.measureVoltage(self.all_channels_selector))
 
-        def setCurrent(currents: list[float]):
-            status_currents = [
-                self.status_current_1,
-                self.status_current_2,
-                self.status_current_3,
-                self.status_current_4
-            ]
-            indicator_limits = [
-                self.indicator_limit_1,
-                self.indicator_limit_2,
-                self.indicator_limit_3,
-                self.indicator_limit_4
-            ]
-            current_limits = [
-                self.spinbox_limit_current_1,
-                self.spinbox_limit_current_2,
-                self.spinbox_limit_current_3,
-                self.spinbox_limit_current_4
-            ]
+        def measureCurrent(currents: list[float]):
+            if len(currents) != len(self.status_currents) != len(self.indicator_limits) != len(self.spinbox_limit_currents):
+                GlobalConf.logger.error(f'Measured currents cannot be set, non matching length: expected len = {len(self.status_currents)}, got len = {len(currents)}')
+                return
 
-            if len(currents) != len(status_currents) != len(indicator_limits) != len(current_limits):
-                raise ValueError(f'Measured currents cannot be set, non matching length: expected len = {len(status_currents)}, got len = {len(currents)}')
-
-            for status_current, indicator_limit, current_limit, current in zip(status_currents, indicator_limits, current_limits, currents):
+            for status_current, indicator_limit, spinbox_limit_current, current in zip(self.status_currents, self.indicator_limits, self.spinbox_limit_currents, currents):
                 status_current.setValue(current)
-                if current >= current_limit:
-                    indicator_limit.setValue(True)
+                indicator_limit.setValue(current >= spinbox_limit_current.value())
 
-        self.threaded_connection.callback(setCurrent, self.threaded_connection.measureCurrent('0-3'))
+        self.threaded_connection.callback(measureCurrent, self.threaded_connection.measureCurrent(self.all_channels_selector))
 
-        def setPolarity(polarities: list[bool]):
-            status_polarities = [
-                self.button_polarity_1,
-                self.button_polarity_2,
-                self.button_polarity_3,
-                self.button_polarity_4
-            ]
+        def checkPolarity(polarities: list[bool]):
+            if len(polarities) != len(self.button_polarities):
+                GlobalConf.logger.error(f'Measured polarities cannot be set, non matching length: expected len = {len(self.button_polarities)}, got len = {len(polarities)}')
+                return
 
-            if len(polarities) != len(status_polarities):
-                raise ValueError(f'Measured polarities cannot be set, non matching length: expected len = {len(status_polarities)}, got len = {len(polarities)}')
+            for button_polarity, polarity in zip(self.button_polarities, polarities):
+                button_polarity.polarityChange(polarity)
 
-            for status_polarity, polarity in zip(status_polarities, polarities):
-                status_polarity.polarityChange(polarity)
-
-        self.threaded_connection.callback(setPolarity, self.threaded_connection.configureOutputPolarityGet('0-3'))
+        self.threaded_connection.callback(checkPolarity, self.threaded_connection.configureOutputPolarityGet(self.all_channels_selector))
 
     def updateAllValues(self):
         """Updates all values"""
@@ -464,53 +432,27 @@ class PSUVBoxLayout(QVBoxLayout):
 
         self.updateLoop()
 
-        def setVoltage(voltages: list[float]):
-            set_voltages = [
-                self.spinbox_1,
-                self.spinbox_2,
-                self.spinbox_3,
-                self.spinbox_4
-            ]
+        def readVoltage(voltages: list[float]):
+            if len(voltages) != len(self.spinbox_voltages) != len(self.status_voltages):
+                GlobalConf.logger.error(f'Set voltages cannot be set, non matching length: expected len = {len(self.spinbox_voltages)}, got len = {len(voltages)}')
+                return
 
-            if len(voltages) != len(set_voltages):
-                raise ValueError(f'Set voltages cannot be set, non matching length: expected len = {len(set_voltages)}, got len = {len(voltages)}')
+            for spinbox_voltage, status_voltage, voltage in zip(self.spinbox_voltages, self.status_voltages, voltages):
+                voltage = abs(voltage)
+                spinbox_voltage.setValue(voltage)
+                status_voltage.setTargetValue(voltage)
 
-            for set_voltage, voltage in zip(set_voltages, voltages):
-                set_voltage.setValue(voltage)
+        self.threaded_connection.callback(readVoltage, self.threaded_connection.readVoltage(self.all_channels_selector))
 
-        self.threaded_connection.callback(setVoltage, self.threaded_connection.readVoltage('0-3'))
+        def readCurrentLimit(currents: list[float]):
+            if len(currents) != len(self.spinbox_limit_currents):
+                GlobalConf.logger.error(f'Set voltages cannot be set, non matching length: expected len = {len(self.spinbox_limit_currents)}, got len = {len(currents)}')
+                return
 
-        def setVoltageLimit(voltages: list[float]):
-            set_voltages = [
-                self.spinbox_limit_voltage_1,
-                self.spinbox_limit_voltage_2,
-                self.spinbox_limit_voltage_3,
-                self.spinbox_limit_voltage_4
-            ]
+            for (spinbox_limit_current, current) in zip(self.spinbox_limit_currents, currents):
+                spinbox_limit_current.setValue(current)
 
-            if len(voltages) != len(set_voltages):
-                raise ValueError(f'Set voltages cannot be set, non matching length: expected len = {len(set_voltages)}, got len = {len(voltages)}')
-
-            for set_voltage, voltage in zip(set_voltages, voltages):
-                set_voltage.setValue(voltage)
-
-        self.threaded_connection.callback(setVoltageLimit, self.threaded_connection.readVoltageBoundaries('0-3'))
-
-        def setCurrentLimit(currents: list[float]):
-            set_currents = [
-                self.spinbox_limit_current_1,
-                self.spinbox_limit_current_2,
-                self.spinbox_limit_current_3,
-                self.spinbox_limit_current_4
-            ]
-
-            if len(currents) != len(set_currents):
-                raise ValueError(f'Set voltages cannot be set, non matching length: expected len = {len(set_currents)}, got len = {len(currents)}')
-
-            for set_current, current in zip(set_currents, currents):
-                set_current.setValue(current)
-
-        self.threaded_connection.callback(setCurrentLimit, self.threaded_connection.readCurrentBoundaries('0-3'))
+        self.threaded_connection.callback(readCurrentLimit, self.threaded_connection.readCurrent(self.all_channels_selector))
 
         self.threaded_connection.callback(self.spinbox_advanced_settings_ramp.setValue, self.threaded_connection.configureRampVoltageGet())
 
@@ -525,20 +467,8 @@ class PSUVBoxLayout(QVBoxLayout):
         if not self.checkConnection():
             return
 
+        self.status_voltages[channel].setTargetValue(voltage)
         self.threaded_connection.voltageSet(channel, voltage)
-
-    def setVoltageLimit(self, channel: int, voltage: float):
-        """
-        Sets voltage limit to specified channel
-
-        :param channel: channel to be set
-        :param voltage: voltage to be set
-        """
-
-        if not self.checkConnection():
-            return
-
-        self.threaded_connection.voltageBoundarySet(channel, voltage)
 
     def setCurrentLimit(self, channel: int, current: float):
         """
@@ -551,7 +481,7 @@ class PSUVBoxLayout(QVBoxLayout):
         if not self.checkConnection():
             return
 
-        self.threaded_connection.currentBoundarySet(channel, current)
+        self.threaded_connection.currentSet(channel, current)
 
     def setOutput(self, channel: int, state: bool):
         """
@@ -592,46 +522,24 @@ class PSUVBoxLayout(QVBoxLayout):
         if not self.checkConnection():
             return
 
-        polarities = [
-            self.button_polarity_1,
-            self.button_polarity_2,
-            self.button_polarity_3,
-            self.button_polarity_4
-        ]
-        if polarities[channel].state == polarity:
+        if self.button_polarities[channel].state == polarity:
             return
 
-        high_voltages = [
-            self.indicator_1,
-            self.indicator_2,
-            self.indicator_3,
-            self.indicator_4
-        ]
-        if high_voltages[channel].value():
-            showMessageBox(
+        if self.indicators[channel].value() and not self.active_message_box:
+            self.active_message_box = True
+            _, result = showMessageBox(
                 None,
                 QMessageBox.Icon.Information,
                 'Polarity switch',
                 'Polarity can only be switched if high voltage of the same channel is turned off'
             )
+            if result:
+                self.active_message_box = False
             return
 
         self.threaded_connection.configureOutputPolaritySet(channel, polarity)
 
-        # TODO: set all other channels on again
-
-    def setGlobalOutput(self, state: bool):
-        """
-        Sets global output state
-
-        :param state: state of global output to be set
-        """
-
-        if not self.checkConnection():
-            return
-
-        # TODO: does the micc exist here?
-        self.threaded_connection.configureMiccSet(state)
+        # TODO: set all other channels on again - do we need to do this??
 
     def checkConnection(self, messagebox: bool = True) -> bool:
         """
@@ -643,13 +551,16 @@ class PSUVBoxLayout(QVBoxLayout):
         if self.indicator_connection.value():
             return True
 
-        if messagebox:
-            showMessageBox(
+        if messagebox and not self.active_message_box:
+            self.active_message_box = True
+            _, result = showMessageBox(
                 None,
                 QMessageBox.Icon.Warning,
                 'Connection warning!',
                 'ISEG crate power supply is not connected, please connect first!'
             )
+            if result:
+                self.active_message_box = False
 
         return False
 
@@ -661,12 +572,57 @@ class PSUVBoxLayout(QVBoxLayout):
         :param messagebox: show messagebox if failed
         """
 
-        if comport:
-            entries = {port.lower(): i for i, port in enumerate(self.combobox_connection.entries)}
-            if comport in entries.keys():
-                self.combobox_connection.setCurrentIndex(entries[comport])
-        else:
+        # TODO: sometimes it crashes or ConnectionError-Popup when disconnecting
+
+        if not comport:
             comport = self.combobox_connection.getValue(text=True)
+
+        connect = self.threaded_connection.isDummy()
+
+        self.unconnect()
+
+        if connect:
+            self.connection = ISEGConnection(
+                comport,
+                echo=ISEGConnection.EchoMode.ECHO_AUTO,
+                cleaning=True,
+                strict='iseg Spezialelektronik GmbH,NR040060r4050000200,8200005,1.74'
+            )
+            try:
+                self.connection.open()
+                self.threaded_connection = ThreadedISEGConnection(self.connection)
+                self.indicator_connection.setValue(True)
+                self.status_connection.setText('Connected')
+                self.combobox_connection.setEnabled(False)
+                self.button_connection.setText('Disconnect')
+
+            except (SerialException, ConnectionError) as error:
+                try:
+                    self.connection.close()
+                except ConnectionError:
+                    pass
+                self.connection = None
+                self.reset()
+
+                GlobalConf.logger.info(f'Connection error! Could not connect to ISEG crate power supply on port "{comport}", because of: {error}')
+
+                if messagebox:
+                    showMessageBox(
+                        None,
+                        QMessageBox.Icon.Critical,
+                        'Connection error!',
+                        f'Could not connect to ISEG crate power supply on port "{comport}"!',
+                        f'<strong>Encountered Error:</strong><br>{error}',
+                        expand_details=False
+                    )
+        else:
+            self.combobox_connection.setEnabled(True)
+            self.button_connection.setText('Connect')
+
+        self.updateAllValues()
+
+    def unconnect(self):
+        """Disconnect from any port"""
 
         self.threaded_connection.close()
         self.threaded_connection = ThreadedDummyConnection()
@@ -674,32 +630,81 @@ class PSUVBoxLayout(QVBoxLayout):
             self.connection.close()
             self.connection = None
 
-        self.connection = ISEGConnection(comport, echo=True, cleaning=True)
-        try:
-            self.connection.open()
-            self.threaded_connection = ThreadedISEGConnection(self.connection)
-            self.indicator_connection.setValue(True)
-            self.status_connection.setText('Connected')
+        comport = self.combobox_connection.getValue(text=True)
+        self.reset()
+        self.setComport(comport)
 
-        except (SerialException, ConnectionError) as error:
-            try:
-                self.connection.close()
-            except ConnectionError:
-                pass
-            self.connection = None
-            self.reset()
+    def setComport(self, comport: str):
+        """
+        Selects the comport in the list of comports
 
-            GlobalConf.logger.info(f'Connection error! Could not connect to ISEG crate power supply, because of: {error}')
+        :param comport: comport to be selected
+        """
 
-            if messagebox:
-                showMessageBox(
-                    None,
-                    QMessageBox.Icon.Critical,
-                    'Connection error!',
-                    'Could not connect to ISEG crate power supply!',
-                    f'<strong>Encountered Error:</strong><br>{error}',
-                    expand_details=False
-                )
+        comport = comport.lower()
+
+        entries = {port.lower(): i for i, port in enumerate(self.combobox_connection.entries)}
+        if comport in entries.keys():
+            self.combobox_connection.setCurrentIndex(entries[comport])
+
+    def startRampVoltage(self):
+        """Starts the voltage ramp with defined parameters"""
+
+        if self.ramp_timer.isActive():
+            self.stopRampVoltage()
+            return
+
+        self.ramp_timer.start()
+        self.ramp_start_time = datetime.now()
+        self.ramp_channel = self.combobox_ramp_channel.currentIndex()
+        self.ramp_start_voltage = abs(self.status_voltages[self.ramp_channel].value)
+
+        # disable input fields
+        self.spinbox_ramp_time.setEnabled(False)
+        self.spinbox_ramp_voltage.setEnabled(False)
+        self.combobox_ramp_channel.setEnabled(False)
+        self.indicator_ramp.setValue(True)
+        self.button_ramp.setText('Stop Ramp')
+        self.spinbox_voltages[self.ramp_channel].setEnabled(False)
+
+        self.status_remaining_ramp.setValue(self.spinbox_ramp_time.value())
+
+    def stopRampVoltage(self):
+        """Stops the voltage ramp"""
+
+        self.ramp_timer.stop()
+
+        # enable input fields
+        self.spinbox_ramp_time.setEnabled(True)
+        self.spinbox_ramp_voltage.setEnabled(True)
+        self.combobox_ramp_channel.setEnabled(True)
+        self.indicator_ramp.setValue(False)
+        self.button_ramp.setText('Start Ramp')
+        self.spinbox_voltages[self.ramp_channel].setEnabled(True)
+
+        # reset input values
+        self.spinbox_ramp_time.setValue(self.time_ramp_default)
+        self.spinbox_ramp_voltage.reset()
+        self.combobox_ramp_channel.setCurrentIndex(0)
+        self.status_remaining_ramp.setDeviation(1)
+        self.status_remaining_ramp.setValue(0)
+
+    def updateRamp(self):
+        """Called periodically to update the voltage ramp"""
+
+        time_available = self.spinbox_ramp_time.value() * 60
+        time_spent = (datetime.now() - self.ramp_start_time).total_seconds()
+        time_remaining = time_available - time_spent
+
+        if time_remaining > 0:
+            self.status_remaining_ramp.setValue(time_remaining / 60)
+            new_voltage = self.ramp_start_voltage - (self.ramp_start_voltage - self.spinbox_ramp_voltage.value()) * time_spent / time_available
+        else:
+            new_voltage = self.spinbox_ramp_voltage.value()
+            self.stopRampVoltage()
+
+        self.spinbox_voltages[self.ramp_channel].setValue(new_voltage)
+        self.setVoltage(self.ramp_channel, new_voltage)
 
     def reset(self):
         """Resets everything to default"""
@@ -710,63 +715,38 @@ class PSUVBoxLayout(QVBoxLayout):
 
         self.indicator_connection.setValue(False)
         self.status_connection.setText('Not connected')
+        self.button_connection.setText('Connect')
 
-        self.indicator_high_voltage.setValue(False)
-        self.label_high_voltage.setText('Disabled')
-        self.button_high_voltage.setText('Enable')
+        for indicator in self.indicators:
+            indicator.setValue(False)
 
-        self.button_polarity_1.reset()
-        self.spinbox_1.reset()
-        self.status_voltage_1.setValue(0)
-        self.status_current_1.setValue(0)
-        self.indicator_1.setValue(False)
-        self.button_enable_1.setText('Enable')
+        for button in self.buttons:
+            button.setText('Enable')
 
-        self.button_polarity_2.reset()
-        self.spinbox_2.reset()
-        self.status_voltage_2.setValue(0)
-        self.status_current_2.setValue(0)
-        self.indicator_2.setValue(False)
-        self.button_enable_2.setText('Enable')
+        for polarity in self.button_polarities:
+            polarity.reset()
 
-        self.button_polarity_3.reset()
-        self.spinbox_3.reset()
-        self.status_voltage_3.setValue(0)
-        self.status_current_3.setValue(0)
-        self.indicator_3.setValue(False)
-        self.button_enable_3.setText('Enable')
+        for spinbox_voltage in self.spinbox_voltages:
+            spinbox_voltage.reset()
 
-        self.button_polarity_4.reset()
-        self.spinbox_4.reset()
-        self.status_voltage_4.setValue(0)
-        self.status_current_4.setValue(0)
-        self.indicator_4.setValue(False)
-        self.button_enable_4.setText('Enable')
-        
-        self.spinbox_limit_voltage_1.reset()
-        self.spinbox_limit_current_1.reset()
-        self.indicator_limit_1.setValue(False)
+        for status_voltage in self.status_voltages:
+            status_voltage.setValue(0)
+            status_voltage.setTargetValue(0)
 
-        self.spinbox_limit_voltage_2.reset()
-        self.spinbox_limit_current_2.reset()
-        self.indicator_limit_2.setValue(False)
+        for status_current in self.status_currents:
+            status_current.setValue(0)
+            status_current.setTargetValue(0)
 
-        self.spinbox_limit_voltage_3.reset()
-        self.spinbox_limit_current_3.reset()
-        self.indicator_limit_3.setValue(False)
+        for spinbox_limit_current in self.spinbox_limit_currents:
+            spinbox_limit_current.reset()
 
-        self.spinbox_limit_voltage_4.reset()
-        self.spinbox_limit_current_4.reset()
-        self.indicator_limit_4.setValue(False)
+        for indicator_limit in self.indicator_limits:
+            indicator_limit.setValue(False)
 
         self.spinbox_advanced_settings_ramp.reset()
-        self.spinbox_ramp_time.setValue(15)
-        self.spinbox_ramp_voltage.reset()
-        self.combobox_ramp_channel.setCurrentIndex(0)
-        self.status_remaining_ramp.setValue(0)
-        self.status_remaining_ramp.setDeviation(1)
-        self.status_remaining_ramp.setTargetValue(15)
+        self.stopRampVoltage()
 
+        self.combobox_connection.setEnabled(True)
         self.setComportsComboBox()
 
     def setComportsComboBox(self):

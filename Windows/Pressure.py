@@ -2,11 +2,11 @@ from serial import SerialException
 
 
 from PyQt6.QtWidgets import QVBoxLayout, QGroupBox, QLabel, QPushButton, QHBoxLayout, QMessageBox
-from PyQt6.QtCore import Qt, QSize, QTimer
+from PyQt6.QtCore import Qt, QTimer
 
 
 from Config.GlobalConf import GlobalConf
-from Config.StylesConf import Colors
+from Config.StylesConf import Colors, Styles
 
 from Utility.Layouts import PressureWidget, IndicatorLed, ComboBox
 from Utility.Dialogs import showMessageBox
@@ -20,14 +20,11 @@ class PressureVBoxLayout(QVBoxLayout):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
+        # local variables
         self.update_timer = QTimer()
         self.update_timer.timeout.connect(self.updatePressure)
-        # TODO: do not use hardcoded interval time
-        self.update_timer.setInterval(1000)
+        self.update_timer.setInterval(GlobalConf.update_timer_time)
         self.update_timer.start()
-
-        # TODO: make indicator sizes global somewhere
-        indicator_size = QSize(20, 20)
 
         self.connection: None | ThyracontConnection = None
         self.threaded_connection: ThreadedDummyConnection | ThreadedThyracontConnection = ThreadedDummyConnection()
@@ -45,7 +42,7 @@ class PressureVBoxLayout(QVBoxLayout):
 
         self.label_connection = QLabel('Connection')
         self.connection_hbox.addWidget(self.label_connection)
-        self.indicator_connection = IndicatorLed(size=indicator_size, off_color=Colors.cooperate_error)
+        self.indicator_connection = IndicatorLed(size=Styles.indicator_size, off_color=Colors.cooperate_error)
         self.connection_hbox.addWidget(self.indicator_connection)
         self.status_connection = QLabel('Not connected')
         self.connection_hbox.addWidget(self.status_connection)
@@ -84,7 +81,7 @@ class PressureVBoxLayout(QVBoxLayout):
     def updatePressure(self):
         """Updates the pressure variables"""
 
-        if not self.indicator_connection.value():
+        if self.threaded_connection.isDummy():
             return
 
         self.threaded_connection.callback(self.pressure_widget_pitbul.setPressure, self.threaded_connection.getTemperature(0))
@@ -98,12 +95,48 @@ class PressureVBoxLayout(QVBoxLayout):
         :param messagebox: show messagebox if failed
         """
 
-        if comport:
-            entries = {port.lower(): i for i, port in enumerate(self.combobox_connection.entries)}
-            if comport in entries.keys():
-                self.combobox_connection.setCurrentIndex(entries[comport])
-        else:
+        if not comport:
             comport = self.combobox_connection.getValue(text=True)
+
+        connect = self.threaded_connection.isDummy()
+
+        self.unconnect()
+
+        if connect:
+            self.connection = ThyracontConnection(comport)
+            try:
+                self.connection.open()
+                self.threaded_connection = ThreadedThyracontConnection(self.connection)
+                self.indicator_connection.setValue(True)
+                self.status_connection.setText('Connected')
+                self.combobox_connection.setEnabled(False)
+                self.button_connection.setText('Disconnect')
+
+            except (SerialException, ConnectionError) as error:
+                try:
+                    self.connection.close()
+                except ConnectionError:
+                    pass
+                self.connection = None
+                self.reset()
+
+                GlobalConf.logger.info(f'Connection error! Could not connect to Lucid Control ADC on port "{comport}", because of: {error}')
+
+                if messagebox:
+                    showMessageBox(
+                        None,
+                        QMessageBox.Icon.Critical,
+                        'Connection error!',
+                        f'Could not connect to Lucid Control ADC on port "{comport}"!',
+                        f'<strong>Encountered Error:</strong><br>{error}',
+                        expand_details=False
+                    )
+        else:
+            self.combobox_connection.setEnabled(True)
+            self.button_connection.setText('Connect')
+
+    def unconnect(self):
+        """Disconnect from any port"""
 
         self.threaded_connection.close()
         self.threaded_connection = ThreadedDummyConnection()
@@ -111,32 +144,22 @@ class PressureVBoxLayout(QVBoxLayout):
             self.connection.close()
             self.connection = None
 
-        self.connection = ThyracontConnection(comport)
-        try:
-            self.connection.open()
-            self.threaded_connection = ThreadedThyracontConnection(self.connection)
-            self.indicator_connection.setValue(True)
-            self.status_connection.setText('Connected')
+        comport = self.combobox_connection.getValue(text=True)
+        self.reset()
+        self.setComport(comport)
 
-        except (SerialException, ConnectionError) as error:
-            try:
-                self.connection.close()
-            except ConnectionError:
-                pass
-            self.connection = None
-            self.reset()
+    def setComport(self, comport: str):
+        """
+        Selects the comport in the list of comports
 
-            GlobalConf.logger.info(f'Connection error! Could not connect to Lucid Control ADC, because of: {error}')
+        :param comport: comport to be selected
+        """
 
-            if messagebox:
-                showMessageBox(
-                    None,
-                    QMessageBox.Icon.Critical,
-                    'Connection error!',
-                    'Could not connect to Lucid Control ADC!',
-                    f'<strong>Encountered Error:</strong><br>{error}',
-                    expand_details=False
-                )
+        comport = comport.lower()
+
+        entries = {port.lower(): i for i, port in enumerate(self.combobox_connection.entries)}
+        if comport in entries.keys():
+            self.combobox_connection.setCurrentIndex(entries[comport])
 
     def reset(self):
         """Resets everything to default"""
@@ -147,9 +170,12 @@ class PressureVBoxLayout(QVBoxLayout):
 
         self.indicator_connection.setValue(False)
         self.status_connection.setText('Not connected')
+        self.button_connection.setText('Connect')
+
         self.pressure_widget_pitbul.setPressure(0)
         self.pressure_widget_lsd.setPressure(0)
 
+        self.combobox_connection.setEnabled(True)
         self.setComportsComboBox()
 
     def setComportsComboBox(self):

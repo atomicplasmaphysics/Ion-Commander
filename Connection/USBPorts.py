@@ -126,7 +126,8 @@ class COMConnection:
         # if echo is on
         echo_cmd = self.readline()
         if echo_cmd != cmd:
-            raise ConnectionError(f'Sent command does not match echo command: "{cmd}" was sent and "{echo_cmd}" was received')
+            self.clean()
+            raise ConnectionError(f'Sent command does not match echo command: {cmd!r} was sent and {echo_cmd!r} was received')
 
     def readline(self) -> str:
         """Reads output line"""

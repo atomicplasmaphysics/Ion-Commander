@@ -1,3 +1,6 @@
+from PyQt6.QtCore import QSize
+
+
 class Colors:
     """
     Different colors
@@ -91,6 +94,8 @@ class Styles:
         margin: 0px;
         color: #000000;
     '''
+
+    indicator_size = QSize(20, 20)
 
 
 class Forms:

@@ -32,7 +32,7 @@ class ControlWindow(TabWidget):
         # TODO: Add tooltips to everything
 
         # PSU CONTROL
-        self.psu_vbox = VBoxTitleLayout(self, 'PSU', add_stretch=True)
+        self.psu_vbox = VBoxTitleLayout('PSU', parent=self, add_stretch=True)
         self.psu_group_vbox = PSUVBoxLayout()
 
         # Stretch to bottom
@@ -48,7 +48,7 @@ class ControlWindow(TabWidget):
         self.splitter.addWidget(self.psu_vbox_parent)
 
         # EBIS CONTROL
-        self.ebis_vbox = VBoxTitleLayout(self, 'EBIS', add_stretch=True)
+        self.ebis_vbox = VBoxTitleLayout('EBIS', parent=self, add_stretch=True)
         self.ebis_group_vbox = EBISVBoxLayout()
 
         # Stretch to bottom
@@ -64,7 +64,7 @@ class ControlWindow(TabWidget):
         self.splitter.addWidget(self.ebis_parent)
 
         # LASER CONTROL
-        self.laser_vbox = VBoxTitleLayout(self, 'LASER', add_stretch=True)
+        self.laser_vbox = VBoxTitleLayout('LASER', parent=self, add_stretch=True)
         self.laser_group_vbox = LaserVBoxLayout()
 
         # Stretch to bottom
@@ -80,7 +80,7 @@ class ControlWindow(TabWidget):
         self.splitter.addWidget(self.laser_parent)
 
         # PRESSURE CONTROL
-        self.pressure_vbox = VBoxTitleLayout(self, 'Pressure', add_stretch=True)
+        self.pressure_vbox = VBoxTitleLayout('Pressure', parent=self, add_stretch=True)
         self.pressure_group_vbox = PressureVBoxLayout()
 
         # Stretch to bottom

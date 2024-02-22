@@ -43,6 +43,10 @@ class GlobalConf:
     window_center_x_name = 'window_center_x'
     window_center_y_name = 'window_center_y'
 
+    # timer parameters
+    update_timer_time = 1000
+    ramp_timer_time = 10000
+
     @staticmethod
     def updateWindowSize(width, height):
         """Updates and saves settings object with window parameters"""

@@ -226,8 +226,8 @@ class MonacoConnection(TelnetConnection):
 
     def __init__(
         self,
-        host: str = '169.254.21.151',
-        port: int = 23,
+        host: str,
+        port: int,
         timeout: float = 5,
         encoding: str = 'utf-8'
     ):
@@ -249,9 +249,7 @@ class MonacoConnection(TelnetConnection):
         """Reads output and strips cursor for next input"""
         recv = self.read(count)
         if not recv.endswith(self.terminating_string):
-            raise ConnectionError(
-                f'Expected terminating {self.terminating_string.encode(self.encoding)} cursor, but received {recv.encode(self.encoding)}'
-            )
+            raise ConnectionError(f'Expected terminating {self.terminating_string.encode(self.encoding)} cursor, but received {recv.encode(self.encoding)}')
         return recv[:-len(self.terminating_string)]
 
     def _queryAndReturn(self, cmd: str) -> str:
@@ -1258,7 +1256,28 @@ class MonacoConnection(TelnetConnection):
 
 
 def main():
-    with MonacoConnection() as monaco:
+    with MonacoConnection(host='169.254.21.151', port=23) as monaco:
+        print('***** GENERAL VALUES *****')
+        print(f'{monaco.identification() = }')
+        print(f'\n')
+
+        print('***** READ VALUES *****')
+        print(f'keyswitch: {monaco.kGet() = }')
+        print(f'shutter: {monaco.sGet() = }')
+        print(f'pulsing: {monaco.pmGet() = }')
+        print(f'system status: {monaco.readyGet() = }')
+        print(f'chiller temperature: {monaco.chtGet() = }')
+        print(f'baseplate temperature: {monaco.btGet() = }')
+        print(f'chiller flow: {monaco.chfGet() = }')
+        print(f'faults: {monaco.fGet() = }')
+        print(f'fault list: {monaco.faultsGet() = }')
+        print(f'amplifier: {monaco.mrrGet() = }')
+        print(f'stats: {monaco.setGet() = }')
+        print('\n')
+
+
+def read_out_values():
+    with MonacoConnection(host='169.254.21.151', port=23) as monaco:
         for func in dir(monaco):
             if not func.endswith('Get'):
                 continue
