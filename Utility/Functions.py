@@ -103,3 +103,83 @@ def getPrefix(number: float | int) -> tuple[float | int, str]:
             return number / (10 ** prefix_exponent), prefix
 
     return number, ''
+
+
+def getSignificantDigits(number: float, digits: int = 3) -> float:
+    """
+    Rounds number to amount of significant digits
+
+    :param number: input number
+    :param digits: number of significant digits
+    :return: input number cut off at significant digits
+    """
+
+    return float(f'{number:.{digits}G}')
+
+
+def getIntIfInt(number: float) -> float | int:
+    """
+    Returns an integer if number can be converted into an integer without loss, otherwise the number will be returned
+
+    :param number: input number
+    :return: input number converted into integer or input number
+    """
+
+    if int(number) == number:
+        return int(number)
+    return number
+
+
+def assertionTests():
+    def getPrefixTest():
+        assert getPrefix(1E-24) == (1, 'y')
+        assert getPrefix(1E-21) == (1, 'z')
+        assert getPrefix(1E-18) == (1, 'a')
+        assert getPrefix(1E-15) == (1, 'f')
+        assert getPrefix(1E-12) == (1, 'p')
+        assert getPrefix(1E-9) == (1, 'n')
+        assert getPrefix(1E-6) == (1, 'μ')
+        assert getPrefix(1E-3) == (1, 'm')
+        assert getPrefix(1E0) == (1, '')
+        assert getPrefix(1E3) == (1, 'k')
+        assert getPrefix(1E6) == (1, 'M')
+        assert getPrefix(1E9) == (1, 'G')
+        assert getPrefix(1E12) == (1, 'T')
+        assert getPrefix(1E15) == (1, 'P')
+        assert getPrefix(1E18) == (1, 'E')
+        assert getPrefix(1E21) == (1, 'Z')
+        assert getPrefix(2200) == (2.2, 'k')
+        assert getPrefix(123456789) == (123.456789, 'M')
+
+    def getSignificantDigitsTest():
+        assert getSignificantDigits(10/9) == 1.11
+        assert getSignificantDigits(10/8) == 1.25
+        assert getSignificantDigits(10/7) == 1.43
+        assert getSignificantDigits(10/6) == 1.67
+        assert getSignificantDigits(10/5) == 2
+        assert getSignificantDigits(10/4) == 2.5
+        assert getSignificantDigits(10/3) == 3.33
+        assert getSignificantDigits(10/2) == 5
+
+        assert getSignificantDigits(10/9, digits=5) == 1.1111
+        assert getSignificantDigits(10/8, digits=5) == 1.25
+        assert getSignificantDigits(10/7, digits=5) == 1.4286
+        assert getSignificantDigits(10/6, digits=5) == 1.6667
+        assert getSignificantDigits(10/5, digits=5) == 2
+        assert getSignificantDigits(10/4, digits=5) == 2.5
+        assert getSignificantDigits(10/3, digits=5) == 3.3333
+        assert getSignificantDigits(10/2, digits=5) == 5
+
+    def getIntIfIntTest():
+        assert getIntIfInt(1.0) == 1
+        assert getIntIfInt(111.0) == 111
+        assert getIntIfInt(1.1) == 1.1
+        assert getIntIfInt(111.1) == 111.1
+
+    getPrefixTest()
+    getSignificantDigitsTest()
+    getIntIfIntTest()
+
+
+if __name__ == '__main__':
+    assertionTests()

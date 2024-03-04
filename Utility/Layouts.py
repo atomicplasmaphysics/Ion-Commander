@@ -739,7 +739,7 @@ class IndicatorLed(QWidget):
         clickable: bool = False,
         on_color: str = Colors.cooperate_lime,
         off_color: str = Colors.app_background,
-        size: QSize | None = None,
+        size: QSize | None = Styles.indicator_size,
         **kwargs
     ):
         super().__init__(*args, **kwargs)
@@ -872,6 +872,7 @@ class PressureWidget(QWidget):
         label_text = 'No pressure available'
         exponent = self.input_range[0] + 1
 
+        self.stack_widget.enableDigit(bool(pressure))
         if pressure:
             pressure_string_split = f'{self.pressure:E}'.split('E')
             exponent = int(pressure_string_split[1])
@@ -884,11 +885,7 @@ class PressureWidget(QWidget):
         self.pressure_label.setText(label_text)
         self.stack_widget.changePercentage(percentage)
 
-        if exponent > self.input_range[0]:
-            self.stack_widget.enableDigit(False)
-        else:
-            self.stack_widget.enableDigit(True)
-            self.stack_widget.setValue(-exponent)
+        self.stack_widget.setValue('OR' if percentage == 1 else -exponent)
 
 
 class StackWidget(QLCDNumber):
@@ -919,7 +916,7 @@ class StackWidget(QLCDNumber):
         color_bottom: QColor | Qt.GlobalColor | str = Colors.cooperate_strawberry,
         color_grayed: QColor | Qt.GlobalColor | str = Colors.app_background_event,
         percentage_grey: float = 0,
-        enable_digits: bool = False,
+        enable_digits: bool = True,
         **kwargs
     ):
         super().__init__(*args, **kwargs)
@@ -952,11 +949,11 @@ class StackWidget(QLCDNumber):
 
         return self.size
 
-    def setValue(self, value: int):
+    def setValue(self, value: int | str):
         """
         Sets its own value
 
-        :param value: integer to be displayed
+        :param value: value to be displayed
         """
 
         self.setDigitCount(len(str(value)))
@@ -1030,6 +1027,7 @@ class DisplayLabel(QLabel):
     :param color_good: top color
     :param color_bad: bottom color
     :param color_grayed: grayed out color
+    :param tooltip: set target value as tooltip
     """
 
     def __init__(
@@ -1047,6 +1045,7 @@ class DisplayLabel(QLabel):
         color_good: QColor | Qt.GlobalColor | str = Colors.cooperate_lime,
         color_bad: QColor | Qt.GlobalColor | str = Colors.cooperate_strawberry,
         color_grayed: QColor | Qt.GlobalColor | str = Colors.app_background_event,
+        tooltip: bool = True,
         **kwargs
     ):
         super().__init__(*args, **kwargs)
@@ -1062,6 +1061,7 @@ class DisplayLabel(QLabel):
         self.color_good = QColor(color_good)
         self.color_bad = QColor(color_bad)
         self.color_grayed = QColor(color_grayed)
+        self.tooltip = tooltip
 
         self.setAlignment(alignment_flag)
         self.setContentsMargins(5, 5, 5, 5)
@@ -1074,15 +1074,44 @@ class DisplayLabel(QLabel):
         value = self.value
         addon = self.unit
 
-        if value is not None and (isinstance(value, float) or isinstance(value, int)):
-            if self.enable_prefix:
-                value, prefix = getPrefix(value)
-                addon = prefix + addon
-            text = f'{value:.{self.decimals}f}'
-        if addon:
-            text += ' ' + addon
+        if addon.lower() == 'min' and not self.enable_prefix:
+            text = f'{int(value)}:{round((value * 60) % 60)}'
+
+        elif addon.lower() == 'h' and not self.enable_prefix:
+            text = f'{int(value)}:{int((value * 60) % 60)}:{round((value * 3600) % 60)}'
+
+        else:
+            if value is not None and (isinstance(value, float) or isinstance(value, int)):
+                if self.enable_prefix:
+                    value, prefix = getPrefix(value)
+                    addon = prefix + addon
+                text = f'{value:.{self.decimals}f}'
+            if addon:
+                text += ' ' + addon
 
         self.setText(text)
+
+        if self.tooltip:
+            tooltip = 'No tooltip available'
+            target_value = self.target_value
+            addon = self.unit
+
+            if addon.lower() == 'min' and not self.enable_prefix:
+                tooltip = f'{int(value)}:{round((value * 60) % 60)}'
+
+            elif addon.lower() == 'h' and not self.enable_prefix:
+                tooltip = f'{int(value)}:{int((value * 60) % 60)}:{round((value * 3600) % 60)}'
+
+            else:
+                if target_value is not None and (isinstance(target_value, float) or isinstance(target_value, int)):
+                    if self.enable_prefix:
+                        target_value, prefix = getPrefix(target_value)
+                        addon = prefix + addon
+                    tooltip = f'{target_value:.{self.decimals}f}'
+                if addon:
+                    tooltip += ' ' + addon
+
+            self.setToolTip(f'Target value: {tooltip}')
 
     def setValue(self, value: float):
         """
@@ -1145,7 +1174,9 @@ class DisplayLabel(QLabel):
                 difference = self.value - self.target_value
             else:
                 difference = abs(self.value) - abs(self.target_value)
-            percentage = min(abs(difference) / self.deviation, 1)
+            percentage = 0
+            if self.deviation != 0:
+                percentage = min(abs(difference) / self.deviation, 1)
             new_color = linearInterpolateColor(self.color_good, self.color_bad, percentage)
             new_color.setAlpha(90)
             brush.setColor(new_color)
@@ -1257,10 +1288,9 @@ class ErrorTable(QTableWidget):
         self.setRowCount(self.default_rows)
         self.verticalHeader().setVisible(False)
         self.setHorizontalHeaderLabels(['#', 'Type', 'Description'])
-        self.setColumnWidth(0, 40)
+        self.setColumnWidth(0, 50)
         self.setColumnWidth(1, 100)
-        self.setColumnWidth(2, 300)
-        self.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
+        self.horizontalHeader().setStretchLastSection(True)
         self.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
 
@@ -1280,20 +1310,33 @@ class ErrorTable(QTableWidget):
         self.setItem(self.actual_row, 2, QTableWidgetItem(error_description))
         self.actual_row += 1
 
+    def getErrorList(self) -> list[int]:
+        """Returns list of errors"""
+
+        errors = []
+        for row_id in range(self.rowCount()):
+            item = self.item(row_id, 0)
+            if item is not None:
+                errors.append(int(item.text()))
+        return errors
+
     def resetTable(self):
         """Resets the table"""
+
         self.setRowCount(0)
         self.setRowCount(self.default_rows)
         self.actual_row = 0
 
     def sizeHint(self) -> QSize:
         """Returns an optimal size for itself"""
+
         size = super().sizeHint()
         size.setHeight(self.horizontalHeader().height() + self.rowHeight(0) * 3)
         return size
 
     def minimumSizeHint(self) -> QSize:
         """Returns a minimum size for itself"""
+
         return self.sizeHint()
 
 
@@ -1348,17 +1391,20 @@ class DeleteWidgetList(QListWidget):
 
     def clearAll(self):
         """Clears all items in this list"""
+
         self.clear()
         self.addInfoItem()
 
     def addInfoItem(self):
         """Adds info item to the list"""
+
         item_info = QListWidgetItem(self.info_text, self)
         item_info.setFlags(Qt.ItemFlag.NoItemFlags)
         super().addItem(item_info)
 
     def containedItems(self) -> list[DeleteWidgetListItem]:
         """Returns a list of contained DeleteWidgetListItem"""
+
         delete_widgets = []
         for row in range(self.count()):
             widget = self.itemWidget(self.item(row))

@@ -6,7 +6,7 @@ from PyQt6.QtWidgets import QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QGrou
 
 
 from Config.GlobalConf import GlobalConf
-from Config.StylesConf import Colors, Styles
+from Config.StylesConf import Colors
 
 from Utility.Layouts import InsertingGridLayout, IndicatorLed, DoubleSpinBox, DisplayLabel, ComboBox
 from Utility.Dialogs import showMessageBox
@@ -50,7 +50,7 @@ class EBISVBoxLayout(QVBoxLayout):
 
         # Connection
         self.label_connection = QLabel('Connection')
-        self.indicator_connection = IndicatorLed(size=Styles.indicator_size, off_color=Colors.cooperate_error)
+        self.indicator_connection = IndicatorLed(off_color=Colors.cooperate_error)
         self.status_connection = QLabel('Not connected')
         self.combobox_connection = ComboBox()
         self.button_connection = QPushButton('Connect')
@@ -65,7 +65,7 @@ class EBISVBoxLayout(QVBoxLayout):
 
         # High Voltage
         self.label_high_voltage = QLabel('High Voltage')
-        self.indicator_high_voltage = IndicatorLed(size=Styles.indicator_size)
+        self.indicator_high_voltage = IndicatorLed()
         self.status_high_voltage = QLabel('Disabled')
         self.button_high_voltage = QPushButton('Enable')
         self.button_high_voltage.pressed.connect(lambda: self.setGlobalOutput(not self.indicator_high_voltage.value()))
@@ -102,7 +102,7 @@ class EBISVBoxLayout(QVBoxLayout):
         self.spinbox_1.editingFinished.connect(lambda: self.setVoltage(0, self.spinbox_1.value()))
         self.status_voltage_1 = DisplayLabel(value=0, unit='V', target_value=0, deviation=self.voltage_deviation)
         self.status_current_1 = DisplayLabel(value=0, unit='A', target_value=0, deviation=self.current_maximum, enable_prefix=True)
-        self.indicator_1 = IndicatorLed(size=Styles.indicator_size)
+        self.indicator_1 = IndicatorLed()
         self.button_1 = QPushButton('Enable')
         self.button_1.pressed.connect(lambda: self.setOutput(0, not self.indicator_1.value()))
         self.potential_grid.addWidgets(
@@ -120,7 +120,7 @@ class EBISVBoxLayout(QVBoxLayout):
         self.spinbox_2.editingFinished.connect(lambda: self.setVoltage(1, self.spinbox_2.value()))
         self.status_voltage_2 = DisplayLabel(value=0, unit='V', target_value=0, deviation=self.voltage_deviation)
         self.status_current_2 = DisplayLabel(value=0, unit='A', target_value=0, deviation=self.current_maximum, enable_prefix=True)
-        self.indicator_2 = IndicatorLed(size=Styles.indicator_size)
+        self.indicator_2 = IndicatorLed()
         self.button_2 = QPushButton('Enable')
         self.button_2.pressed.connect(lambda: self.setOutput(1, not self.indicator_2.value()))
         self.potential_grid.addWidgets(
@@ -138,7 +138,7 @@ class EBISVBoxLayout(QVBoxLayout):
         self.spinbox_3.editingFinished.connect(lambda: self.setVoltage(2, self.spinbox_3.value()))
         self.status_voltage_3 = DisplayLabel(value=0, unit='V', target_value=0, deviation=self.voltage_deviation)
         self.status_current_3 = DisplayLabel(value=0, unit='A', target_value=0, deviation=self.current_maximum, enable_prefix=True)
-        self.indicator_3 = IndicatorLed(size=Styles.indicator_size)
+        self.indicator_3 = IndicatorLed()
         self.button_3 = QPushButton('Enable')
         self.button_3.pressed.connect(lambda: self.setOutput(2, not self.indicator_3.value()))
         self.potential_grid.addWidgets(
@@ -156,7 +156,7 @@ class EBISVBoxLayout(QVBoxLayout):
         self.spinbox_4.editingFinished.connect(lambda: self.setVoltage(3, self.spinbox_4.value()))
         self.status_voltage_4 = DisplayLabel(value=0, unit='V', target_value=0, deviation=self.voltage_deviation)
         self.status_current_4 = DisplayLabel(value=0, unit='A', target_value=0, deviation=self.current_maximum, enable_prefix=True)
-        self.indicator_4 = IndicatorLed(size=Styles.indicator_size)
+        self.indicator_4 = IndicatorLed()
         self.button_4 = QPushButton('Enable')
         self.button_4.pressed.connect(lambda: self.setOutput(3, not self.indicator_4.value()))
         self.potential_grid.addWidgets(
@@ -174,7 +174,7 @@ class EBISVBoxLayout(QVBoxLayout):
         self.spinbox_5.editingFinished.connect(lambda: self.setVoltage(4, self.spinbox_5.value()))
         self.status_voltage_5 = DisplayLabel(value=0, unit='V', target_value=0, deviation=self.voltage_deviation)
         self.status_current_5 = DisplayLabel(value=0, unit='A', target_value=0, deviation=self.current_maximum, enable_prefix=True)
-        self.indicator_5 = IndicatorLed(size=Styles.indicator_size)
+        self.indicator_5 = IndicatorLed()
         self.button_5 = QPushButton('Enable')
         self.button_5.pressed.connect(lambda: self.setOutput(4, not self.indicator_5.value()))
         self.potential_grid.addWidgets(
@@ -211,7 +211,7 @@ class EBISVBoxLayout(QVBoxLayout):
         self.spinbox_voltage_6 = DoubleSpinBox(default=0, step_size=0.1, input_range=(0, 5), decimals=1, buttons=False)
         self.spinbox_voltage_6.editingFinished.connect(lambda: self.setVoltage(5, self.spinbox_voltage_6.value()))
         self.status_voltage_6 = DisplayLabel(value=0, unit='V', target_value=0, deviation=self.voltage_deviation)
-        self.indicator_6 = IndicatorLed(size=Styles.indicator_size)
+        self.indicator_6 = IndicatorLed()
         self.button_6 = QPushButton('Enable')
         self.button_6.pressed.connect(lambda: self.setOutput(5, not self.indicator_6.value()))
         self.heating_grid.addWidgets(
@@ -416,14 +416,13 @@ class EBISVBoxLayout(QVBoxLayout):
 
         if channel != 5 and not self.indicator_high_voltage.state and not self.active_message_box:
             self.active_message_box = True
-            _, result = showMessageBox(
+            showMessageBox(
                 None,
                 QMessageBox.Icon.Information,
                 'Enable high voltage warning!',
                 'General high voltage of EBIS power supply is not enabled, please enable it first!'
             )
-            if result:
-                self.active_message_box = False
+            self.active_message_box = False
 
         phys_channel = self.channel_dict[channel]
 
@@ -456,14 +455,13 @@ class EBISVBoxLayout(QVBoxLayout):
 
         if messagebox and not self.active_message_box:
             self.active_message_box = True
-            _, result = showMessageBox(
+            showMessageBox(
                 None,
                 QMessageBox.Icon.Warning,
                 'Connection warning!',
                 'EBIS power supply is not connected, please connect first!'
             )
-            if result:
-                self.active_message_box = False
+            self.active_message_box = False
 
         return False
 

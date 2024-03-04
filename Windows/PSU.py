@@ -9,7 +9,7 @@ from PyQt6.QtWidgets import QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QGrou
 
 
 from Config.GlobalConf import GlobalConf
-from Config.StylesConf import Colors, Styles
+from Config.StylesConf import Colors
 
 from Utility.Layouts import InsertingGridLayout, IndicatorLed, DoubleSpinBox, DisplayLabel, PolarityButton, SpinBox, ComboBox
 from Utility.Dialogs import showMessageBox
@@ -63,7 +63,7 @@ class PSUVBoxLayout(QVBoxLayout):
 
         # Connection
         self.label_connection = QLabel('Connection')
-        self.indicator_connection = IndicatorLed(size=Styles.indicator_size, off_color=Colors.cooperate_error)
+        self.indicator_connection = IndicatorLed(off_color=Colors.cooperate_error)
         self.status_connection = QLabel('Not connected')
         self.combobox_connection = ComboBox(entries=self.comport_ports, tooltips=self.comport_description)
         self.button_connection = QPushButton('Connect')
@@ -105,7 +105,7 @@ class PSUVBoxLayout(QVBoxLayout):
         self.spinbox_1.editingFinished.connect(lambda: self.setVoltage(0, self.spinbox_1.value()))
         self.status_voltage_1 = DisplayLabel(value=0, unit='V', target_value=0, deviation=self.voltage_deviation)
         self.status_current_1 = DisplayLabel(value=0, unit='A', target_value=0, deviation=self.current_maximum, enable_prefix=True)
-        self.indicator_1 = IndicatorLed(size=Styles.indicator_size)
+        self.indicator_1 = IndicatorLed()
         self.button_enable_1 = QPushButton('Enable')
         self.button_enable_1.pressed.connect(lambda: self.setOutput(0, not self.indicator_1.value()))
         self.control_grid.addWidgets(
@@ -126,7 +126,7 @@ class PSUVBoxLayout(QVBoxLayout):
         self.spinbox_2.editingFinished.connect(lambda: self.setVoltage(1, self.spinbox_2.value()))
         self.status_voltage_2 = DisplayLabel(value=0, unit='V', target_value=0, deviation=self.voltage_deviation)
         self.status_current_2 = DisplayLabel(value=0, unit='A', target_value=0, deviation=self.current_maximum, enable_prefix=True)
-        self.indicator_2 = IndicatorLed(size=Styles.indicator_size)
+        self.indicator_2 = IndicatorLed()
         self.button_enable_2 = QPushButton('Enable')
         self.button_enable_2.pressed.connect(lambda: self.setOutput(1, not self.indicator_2.value()))
         self.control_grid.addWidgets(
@@ -147,7 +147,7 @@ class PSUVBoxLayout(QVBoxLayout):
         self.spinbox_3.editingFinished.connect(lambda: self.setVoltage(2, self.spinbox_3.value()))
         self.status_voltage_3 = DisplayLabel(value=0, unit='V', target_value=0, deviation=self.voltage_deviation)
         self.status_current_3 = DisplayLabel(value=0, unit='A', target_value=0, deviation=self.current_maximum, enable_prefix=True)
-        self.indicator_3 = IndicatorLed(size=Styles.indicator_size)
+        self.indicator_3 = IndicatorLed()
         self.button_enable_3 = QPushButton('Enable')
         self.button_enable_3.pressed.connect(lambda: self.setOutput(2, not self.indicator_3.value()))
         self.control_grid.addWidgets(
@@ -168,7 +168,7 @@ class PSUVBoxLayout(QVBoxLayout):
         self.spinbox_4.editingFinished.connect(lambda: self.setVoltage(3, self.spinbox_4.value()))
         self.status_voltage_4 = DisplayLabel(value=0, unit='V', target_value=0, deviation=self.voltage_deviation)
         self.status_current_4 = DisplayLabel(value=0, unit='A', target_value=0, deviation=self.current_maximum, enable_prefix=True)
-        self.indicator_4 = IndicatorLed(size=Styles.indicator_size)
+        self.indicator_4 = IndicatorLed()
         self.button_enable_4 = QPushButton('Enable')
         self.button_enable_4.pressed.connect(lambda: self.setOutput(3, not self.indicator_4.value()))
         self.control_grid.addWidgets(
@@ -205,7 +205,7 @@ class PSUVBoxLayout(QVBoxLayout):
         self.label_limit_1 = QLabel('MCP Front/Back')
         self.spinbox_limit_current_1 = DoubleSpinBox(default=0.002, step_size=0.001, input_range=(0.002, 4), decimals=3, buttons=False)
         self.spinbox_limit_current_1.editingFinished.connect(lambda: self.setCurrentLimit(0, self.spinbox_limit_current_1.value()))
-        self.indicator_limit_1 = IndicatorLed(size=Styles.indicator_size, on_color=Colors.cooperate_error)
+        self.indicator_limit_1 = IndicatorLed(on_color=Colors.cooperate_error)
         self.limits_grid.addWidgets(
             self.label_limit_1,
             self.spinbox_limit_current_1,
@@ -216,7 +216,7 @@ class PSUVBoxLayout(QVBoxLayout):
         self.label_limit_2 = QLabel('Anode')
         self.spinbox_limit_current_2 = DoubleSpinBox(default=0.002, step_size=0.001, input_range=(0.002, 1), decimals=3, buttons=False)
         self.spinbox_limit_current_2.editingFinished.connect(lambda: self.setCurrentLimit(1, self.spinbox_limit_current_2.value()))
-        self.indicator_limit_2 = IndicatorLed(size=Styles.indicator_size, on_color=Colors.cooperate_error)
+        self.indicator_limit_2 = IndicatorLed(on_color=Colors.cooperate_error)
         self.limits_grid.addWidgets(
             self.label_limit_2,
             self.spinbox_limit_current_2,
@@ -227,7 +227,7 @@ class PSUVBoxLayout(QVBoxLayout):
         self.label_limit_3 = QLabel('Cathode LSD')
         self.spinbox_limit_current_3 = DoubleSpinBox(default=0.002, step_size=0.001, input_range=(0.002, 1), decimals=3, buttons=False)
         self.spinbox_limit_current_3.editingFinished.connect(lambda: self.setCurrentLimit(2, self.spinbox_limit_current_3.value()))
-        self.indicator_limit_3 = IndicatorLed(size=Styles.indicator_size, on_color=Colors.cooperate_error)
+        self.indicator_limit_3 = IndicatorLed(on_color=Colors.cooperate_error)
         self.limits_grid.addWidgets(
             self.label_limit_3,
             self.spinbox_limit_current_3,
@@ -238,7 +238,7 @@ class PSUVBoxLayout(QVBoxLayout):
         self.label_limit_4 = QLabel('Focus LSD')
         self.spinbox_limit_current_4 = DoubleSpinBox(default=0.002, step_size=0.001, input_range=(0.002, 1), decimals=3, buttons=False)
         self.spinbox_limit_current_4.editingFinished.connect(lambda: self.setCurrentLimit(3, self.spinbox_limit_current_4.value()))
-        self.indicator_limit_4 = IndicatorLed(size=Styles.indicator_size, on_color=Colors.cooperate_error)
+        self.indicator_limit_4 = IndicatorLed(on_color=Colors.cooperate_error)
         self.limits_grid.addWidgets(
             self.label_limit_4,
             self.spinbox_limit_current_4,
@@ -302,11 +302,9 @@ class PSUVBoxLayout(QVBoxLayout):
         )
 
         # Start
-
         self.status_ramp = QLabel('Remaining time:')
-        # TODO: self.status_remaining_ramp is always red
         self.status_remaining_ramp = DisplayLabel(value=0, target_value=0, deviation=1, unit='min')
-        self.indicator_ramp = IndicatorLed(size=Styles.indicator_size)
+        self.indicator_ramp = IndicatorLed()
         self.button_ramp = QPushButton('Start ramp')
         self.button_ramp.clicked.connect(self.startRampVoltage)
         self.ramp_grid.addWidgets(
@@ -527,14 +525,13 @@ class PSUVBoxLayout(QVBoxLayout):
 
         if self.indicators[channel].value() and not self.active_message_box:
             self.active_message_box = True
-            _, result = showMessageBox(
+            showMessageBox(
                 None,
                 QMessageBox.Icon.Information,
                 'Polarity switch',
                 'Polarity can only be switched if high voltage of the same channel is turned off'
             )
-            if result:
-                self.active_message_box = False
+            self.active_message_box = False
             return
 
         self.threaded_connection.configureOutputPolaritySet(channel, polarity)
@@ -553,14 +550,13 @@ class PSUVBoxLayout(QVBoxLayout):
 
         if messagebox and not self.active_message_box:
             self.active_message_box = True
-            _, result = showMessageBox(
+            showMessageBox(
                 None,
                 QMessageBox.Icon.Warning,
                 'Connection warning!',
                 'ISEG crate power supply is not connected, please connect first!'
             )
-            if result:
-                self.active_message_box = False
+            self.active_message_box = False
 
         return False
 

@@ -160,7 +160,7 @@ class ThreadedConnection:
             raise NotImplementedError('There should not be a callback happening')
 
         if not isinstance(callback_id, int):
-            raise ValueError(f'Callback id must be int, received {type(callback_id)}')
+            raise ValueError(f'Callback id must be <int>, received {type(callback_id)}')
         elif callback_id < 0:
             raise ValueError(f'Callback id is invalid')
 

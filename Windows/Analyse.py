@@ -155,7 +155,7 @@ class AnalyseWindow(TabWidget):
             if self.files_opened is False:
                 self.files_opened = file
 
-            del_item = DeleteWidgetListItem(self, file, **del_item_kwargs)
+            del_item = DeleteWidgetListItem(file, **del_item_kwargs)
             self.list_files.addItem(del_item)
 
     def clearFiles(self):

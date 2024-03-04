@@ -385,9 +385,9 @@ class MonacoConnection(TelnetConnection):
         """Get chiller service warning enable"""
         return self._queryAndReturnInt('?CHSERVEN')
 
-    def chservicedSet(self, service: str):
-        """Setting n=1 will clear the chiller service warning, and resets the service start time"""
-        self._queryAndReturn(f'?CHSERVICED={service}')
+    def chservicedSet(self):
+        """Will clear the chiller service warning, and resets the service start time"""
+        self._queryAndReturn(f'CHSERVICED=1')
 
     def chservicehrsremGet(self) -> float:
         """Displays the remaining hours before chiller service is required."""
@@ -428,6 +428,16 @@ class MonacoConnection(TelnetConnection):
     def cputGet(self) -> float:
         """Returns CPU chip temperature"""
         return self._queryAndReturnFloat('?CPUT')
+
+    def crrGet(self) -> float:
+        """Returns measured output repetition rate"""
+        rrd = self.rrdGet()
+        mmr = self.mrrGet()
+        if rrd == 0 or mmr == 0:
+            return 0
+        if rrd == -1 or mmr == -1:
+            return -1
+        return self.mrrGet() / self.rrdGet()
 
     # TODO: better errors
     def dafGet(self) -> str:
@@ -752,10 +762,44 @@ class MonacoConnection(TelnetConnection):
             0 = if the laser is in STANDBY, key-switch is off
             1 = a fault is active and the system has been shut down
             2 = if the laser is READY, key-switch is on but the diodes are off
+            3-"22" = starting: 3: 0%, 22: 100%; but 22 is not in range anymore
+            22 = waiting for baseplate temperature
             24 = if the laser is ON, all the diodes are on and the laser is ready to produce output pulses
+            27-30 = stopping
         """
         return self._queryAndReturnInt('?L')
 
+    def lGetInfo(self) -> tuple[str, bool, int]:
+        """
+        Returns laser state info
+
+        :return: tuple(
+            description: str,
+            state: bool,
+            laser state id: int
+        )
+        """
+
+        l_state = self.lGet()
+
+        l_states = {
+            0: ('Standby', False),
+            1: ('Error', False),
+            2: ('Ready', False),
+            22: ('Waiting for Baseplate Temperature', True),
+            24: ('On', True),
+        }
+
+        if 3 <= l_state < 22:
+            return f'Starting ({round((l_state - 3) / 19 * 100)}%)', True, l_state
+
+        if 26 <= l_state <= 30:
+            return f'Stopping ({(l_state - 26) * 20 + 10}%)', True, l_state
+
+        ret_state = l_states.get(l_state, ('Not defined', True))
+        return ret_state[0], ret_state[1], l_state
+
+    # TODO: return ip in tuple of 4 ints instead of string -> external function
     def lipGet(self) -> str:
         """Returns last used static IP address"""
         return self._queryAndReturn('?LIP')
@@ -999,12 +1043,12 @@ class MonacoConnection(TelnetConnection):
         self._queryAndReturn(f'S={int(mode)}')
 
     def sGet(self) -> int:
-        """Returns the shutter cycle counter value"""
-        return self._queryAndReturnInt('?SC')
+        """Returns the shutter state"""
+        return self._queryAndReturnInt('?S')
 
     def scGet(self) -> int:
-        """Returns inversion of shutter control input value"""
-        return self._queryAndReturnInt('?SCI')
+        """Returns the shutter cycle counter value"""
+        return self._queryAndReturnInt('?SC')
 
     def sciSet(self, mode: int | bool):
         """
@@ -1090,7 +1134,7 @@ class MonacoConnection(TelnetConnection):
         """
         Returns the current values for the laser parameters:
             MRR: amplifier repetition rate in kHz
-            PW: pulse width in femtoseconds,
+            PW: pulse width in femtoseconds
             RRD: repetition rate divisor
             SB: number of seeder bursts
         """
@@ -1232,10 +1276,30 @@ class MonacoConnection(TelnetConnection):
         """Returns the USB connection mode"""
         return self._queryAndReturn('?USB')
 
-    # TODO: better output
-    def wGet(self) -> str:
-        """Displays a list of warnings"""
-        return self._queryAndReturn('?W')
+    def wGet(self) -> list[int]:
+        """Displays a list of warning ids"""
+        res = self._queryAndReturn('?W')
+        ret = []
+        try:
+            ret = [int(s) for s in res.split(',')]
+        except ValueError:
+            pass
+        return ret
+
+    def wGetInfo(self) -> dict[int, tuple[str, str]]:
+        """Displays a list of warning ids and their type and description"""
+        ret = {}
+        for w in self.wGet():
+            res = []
+            try:
+                res = self.fnameGet(w).split(':')
+            except ConnectionError:
+                pass
+
+            if len(res) < 2:
+                res = ['', '']
+            ret[w] = (res[0].strip(), str(':'.join(res[1:]).strip()))
+        return ret
 
     # TODO: better output
     def whGet(self) -> str:
@@ -1252,7 +1316,7 @@ class MonacoConnection(TelnetConnection):
 
     def identification(self) -> str:
         """Get the laser identification"""
-        return f'Connected to {self.lmGet()} with S/N {self.hsnGet()}'
+        return f'{self.lmGet()} with S/N {self.hsnGet()}'
 
 
 def main():
@@ -1264,19 +1328,49 @@ def main():
         print('***** READ VALUES *****')
         print(f'keyswitch: {monaco.kGet() = }')
         print(f'shutter: {monaco.sGet() = }')
-        print(f'pulsing: {monaco.pmGet() = }')
+        print(f'pulse control: {monaco.pcGet() = }')
         print(f'system status: {monaco.readyGet() = }')
+        print(f'laser status: {monaco.lGet() = }')
         print(f'chiller temperature: {monaco.chtGet() = }')
+        print(f'chiller set point: {monaco.chstGet() = }')
         print(f'baseplate temperature: {monaco.btGet() = }')
         print(f'chiller flow: {monaco.chfGet() = }')
         print(f'faults: {monaco.fGet() = }')
-        print(f'fault list: {monaco.faultsGet() = }')
-        print(f'amplifier: {monaco.mrrGet() = }')
+        print(f'fault list: {monaco.dafGet() = }')
+        print(f'chiller faults: {monaco.chfaultGet() = }')
+        print(f'warnings: {monaco.wGet() = }')
+        for warning in monaco.wGet():
+            print(f'warning #{warning}: {monaco.fnameGet(warning)}')
+        print(f'warnings: {monaco.wGetInfo() = }')
+        print(f'warnings history: {monaco.whGet() = }')
+        print(f'Rep Rate: {monaco.mrrGet() = }')
         print(f'stats: {monaco.setGet() = }')
+        print(f'RF level: {monaco.rlGet() = }')
         print('\n')
 
+        monaco.sSet(0)
+        monaco.pcSet(0)
+        monaco.fackSet()
+        monaco.lSet(1)
 
-def read_out_values():
+
+def toggleLaserAndReadStatus():
+    from time import sleep
+
+    with MonacoConnection(host='169.254.21.151', port=23) as monaco:
+        _, state, _ = monaco.lGetInfo()
+        monaco.lSet(not state)
+
+        l_id_old = -1
+        while True:
+            desc, l_state, l_id = monaco.lGetInfo()
+            if l_id != l_id_old:
+                l_id_old = l_id
+                print(f'#{l_id}: {desc}, {l_state}')
+            sleep(0.1)
+
+
+def readOutValues():
     with MonacoConnection(host='169.254.21.151', port=23) as monaco:
         for func in dir(monaco):
             if not func.endswith('Get'):
@@ -1421,4 +1515,4 @@ def read_out_values():
 
 
 if __name__ == '__main__':
-    main()
+    toggleLaserAndReadStatus()

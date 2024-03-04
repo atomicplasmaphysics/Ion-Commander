@@ -13,7 +13,8 @@ class TelnetConnection:
     :param host: name of host
     :param port: port of host
     :param timeout: Timeout [in s]
-    :param encoding: Encoding
+    :param encoding: Encoding type
+    :param debug: If debug is enabled
     """
 
     def __init__(
@@ -21,12 +22,14 @@ class TelnetConnection:
         host: str,
         port: int = 23,
         timeout: float = 5,
-        encoding: str = 'utf-8'
+        encoding: str = 'utf-8',
+        debug: bool = False
     ):
         self.host = host
         self.port = port
         self.timeout = timeout
         self.encoding = encoding
+        self.debug = debug
 
         self.socket: socket.socket | None = None
 
@@ -36,12 +39,14 @@ class TelnetConnection:
 
     def open(self):
         """Enter telnet socket connection"""
-        if self.host != 'virtual':
-            self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            self.socket.settimeout(self.timeout)
-            self.socket.connect((self.host, self.port))
-        else:
-            self.socket = VirtualSocket()
+        if self.socket is None:
+            if self.host != 'virtual':
+                self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                self.socket.settimeout(self.timeout)
+                self.socket.connect((self.host, self.port))
+            else:
+                self.socket = VirtualSocket()
+
         return self
 
     def __exit__(self, exception_type, exception_value, exception_traceback):
@@ -55,6 +60,7 @@ class TelnetConnection:
             raise ConnectionError('Connection has not been established')
 
         self.socket.close()
+        self.socket = None
 
     def write(self, cmd: str):
         """
@@ -71,7 +77,8 @@ class TelnetConnection:
 
         cmd_encode = cmd.encode(self.encoding)
         self.socket.send(cmd_encode)
-        GlobalConf.logger.debug(f'Command {cmd_encode} was written to {self.host}:{self.port}')
+        if self.debug:
+            GlobalConf.logger.debug(f'Command {cmd_encode} was written to {self.host}:{self.port}')
 
     def readline(self) -> str:
         """Reads until linebreak"""

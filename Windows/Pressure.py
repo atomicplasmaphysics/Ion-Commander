@@ -6,7 +6,7 @@ from PyQt6.QtCore import Qt, QTimer
 
 
 from Config.GlobalConf import GlobalConf
-from Config.StylesConf import Colors, Styles
+from Config.StylesConf import Colors
 
 from Utility.Layouts import PressureWidget, IndicatorLed, ComboBox
 from Utility.Dialogs import showMessageBox
@@ -42,7 +42,7 @@ class PressureVBoxLayout(QVBoxLayout):
 
         self.label_connection = QLabel('Connection')
         self.connection_hbox.addWidget(self.label_connection)
-        self.indicator_connection = IndicatorLed(size=Styles.indicator_size, off_color=Colors.cooperate_error)
+        self.indicator_connection = IndicatorLed(off_color=Colors.cooperate_error)
         self.connection_hbox.addWidget(self.indicator_connection)
         self.status_connection = QLabel('Not connected')
         self.connection_hbox.addWidget(self.status_connection)

@@ -46,6 +46,7 @@ class COMConnection:
     :param baudrate: Baudrate
     :param echo: If device has echo. Will be checked
     :param cleaning: If output cache should be cleared when entering and exiting
+    :param debug: If debug is enabled
     """
 
     def __init__(
@@ -55,7 +56,8 @@ class COMConnection:
         encoding: str = 'utf-8',
         baudrate: int = 9600,
         echo: bool = True,
-        cleaning: bool = True
+        cleaning: bool = True,
+        debug: bool = False
     ):
         self.comport = comport
         self.timeout = timeout
@@ -63,6 +65,7 @@ class COMConnection:
         self.baudrate = baudrate
         self.echo = echo
         self.cleaning = cleaning
+        self.debug = debug
 
         self.serial: Serial | None = None
 
@@ -72,10 +75,11 @@ class COMConnection:
 
     def open(self):
         """Opens the connection"""
-        if self.comport != 'virtual':
-            self.serial = Serial(self.comport, baudrate=self.baudrate, timeout=self.timeout)
-        else:
-            self.serial = VirtualSerial()
+        if self.serial is None:
+            if self.comport != 'virtual':
+                self.serial = Serial(self.comport, baudrate=self.baudrate, timeout=self.timeout)
+            else:
+                self.serial = VirtualSerial()
 
         self.clean()
         return self
@@ -89,6 +93,7 @@ class COMConnection:
         self.clean()
         if self.serial is not None:
             self.serial.close()
+            self.serial = None
 
     def clean(self):
         """Clean connection"""
@@ -117,7 +122,8 @@ class COMConnection:
 
         cmd_encode = cmd.encode(self.encoding)
         self.serial.write(cmd_encode)
-        GlobalConf.logger.debug(f'Command {cmd_encode} was written to port {self.comport}')
+        if self.debug:
+            GlobalConf.logger.debug(f'Command {cmd_encode} was written to port "{self.comport}"')
 
         # if echo is not on
         if not self.echo:
@@ -127,7 +133,7 @@ class COMConnection:
         echo_cmd = self.readline()
         if echo_cmd != cmd:
             self.clean()
-            raise ConnectionError(f'Sent command does not match echo command: {cmd!r} was sent and {echo_cmd!r} was received')
+            raise ConnectionError(f'Sent command does not match echo command: {cmd!r} was sent and {echo_cmd!r} was received on port "{self.comport}"')
 
     def readline(self) -> str:
         """Reads output line"""
