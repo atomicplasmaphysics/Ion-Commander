@@ -182,7 +182,7 @@ class IPDialog(QDialog):
         self.setLayout(self.main_layout)
 
         if info:
-            info = f'for {info}'
+            info = f' for {info}'
         self.info_label = QLabel(f'Provide IP address and port number{info}')
         self.main_layout.addWidget(self.info_label)
 

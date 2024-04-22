@@ -30,6 +30,7 @@ class LaserVBoxLayout(QVBoxLayout):
 
         self.active_message_box = False
         self.combobox_message_box_warning = True
+        self.update_frequency_output = False
 
         self.connection: None | MonacoConnection = None
         self.threaded_connection: ThreadedDummyConnection | ThreadedMonacoConnection = ThreadedDummyConnection()
@@ -230,7 +231,7 @@ class LaserVBoxLayout(QVBoxLayout):
 
         # Output Settings
         self.combobox_settings_output = ComboBox()
-        self.combobox_settings_output.currentIndexChanged.connect(self.setOutputFreuquency)
+        self.combobox_settings_output.currentIndexChanged.connect(self.setOutputFrequency)
         self.status_settings_output = DisplayLabel(value=0, target_value=0, deviation=0, unit='Hz', enable_prefix=True, alignment_flag=Qt.AlignmentFlag.AlignLeft)
         self.settings_grid.addWidgets(
             QLabel('Output'),
@@ -254,10 +255,13 @@ class LaserVBoxLayout(QVBoxLayout):
             self.spinbox_settings_pulsewidth
         )
 
-        # TODO: remove this hardcoded value, but load it from settings and set comport on startup to last set comport
-        # self.connect(self.ip, self.port, False)
-
         self.reset()
+
+        last_connection = GlobalConf.getConnection('laser')
+        if all([True if elem > 0 else False for elem in last_connection]):
+            self.ip = tuple(last_connection[:4])
+            self.port = last_connection[4]
+            self.connect(self.ip, self.port, False)
 
     def updateLoop(self):
         """Called by timer; Updates actual voltages"""
@@ -555,8 +559,11 @@ class LaserVBoxLayout(QVBoxLayout):
 
         self.threaded_connection.setSet(mrr=item_data[0], pulses=item_data[1])
 
-    def setOutputFreuquency(self):
-        """Sets output freuqency"""
+    def setOutputFrequency(self):
+        """Sets output frequency"""
+
+        if not self.update_frequency_output:
+            return
 
         if not self.checkConnection(self.combobox_message_box_warning) or not self.checkKeySwitch(self.combobox_message_box_warning):
             return
@@ -667,6 +674,8 @@ class LaserVBoxLayout(QVBoxLayout):
         :param select: selects newly added item
         """
 
+        self.update_frequency_output = False
+
         frequency = mrr / rrd
 
         frequency_modified, frequency_prefix = getPrefix(frequency * 1000)
@@ -675,6 +684,8 @@ class LaserVBoxLayout(QVBoxLayout):
         text = f'{frequency_modified} {frequency_prefix}Hz'
 
         self.combobox_settings_output.addItem(text, userData=rrd)
+
+        self.update_frequency_output = True
 
         if select:
             self.combobox_settings_output.setCurrentIndex(self.combobox_settings_output.count() - 1)
@@ -701,7 +712,7 @@ class LaserVBoxLayout(QVBoxLayout):
             self.fillComboboxOutputItem(item_data[0], i)
 
         if 0 < rrd < rrds:
-            self.combobox_settings_output.setCurrentIndex(rrd)
+            self.combobox_settings_output.setCurrentIndex(rrd - 1)
 
         self.combobox_message_box_warning = True
 
@@ -908,5 +919,13 @@ class LaserVBoxLayout(QVBoxLayout):
         """Must be called when application is closed"""
 
         self.threaded_connection.close()
+        last_connection = [-1, -1, -1, -1, -1]
         if self.connection is not None:
+            last_connection[0] = self.ip[0]
+            last_connection[1] = self.ip[1]
+            last_connection[2] = self.ip[2]
+            last_connection[3] = self.ip[3]
+            last_connection[4] = self.port
             self.connection.close()
+
+        GlobalConf.updateConnections(laser=last_connection)

@@ -73,10 +73,11 @@ class PressureVBoxLayout(QVBoxLayout):
         self.group_box_lsd.setLayout(self.layout_lsd)
         self.addWidget(self.group_box_lsd)
 
-        # TODO: remove this hardcoded value, but load it from settings and set comport on startup to last set comport
-        #self.connect('COM3', False)
-
         self.reset()
+
+        last_connection = GlobalConf.getConnection('pressure')
+        if last_connection:
+            self.connect(last_connection, False)
 
     def updatePressure(self):
         """Updates the pressure variables"""
@@ -97,6 +98,7 @@ class PressureVBoxLayout(QVBoxLayout):
 
         if not comport:
             comport = self.combobox_connection.getValue(text=True)
+        self.setComport(comport)
 
         connect = self.threaded_connection.isDummy()
 
@@ -194,5 +196,9 @@ class PressureVBoxLayout(QVBoxLayout):
         """Must be called when application is closed"""
 
         self.threaded_connection.close()
+        last_connection = ''
         if self.connection is not None:
+            last_connection = self.combobox_connection.getValue(text=True)
             self.connection.close()
+
+        GlobalConf.updateConnections(pressure=last_connection)

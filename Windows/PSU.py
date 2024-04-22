@@ -365,10 +365,11 @@ class PSUVBoxLayout(QVBoxLayout):
             self.spinbox_4
         ]
 
-        # TODO: remove this hardcoded value, but load it from settings and set comport on startup to last set comport
-        #self.connect('COM1', False)
-
         self.reset()
+
+        last_connection = GlobalConf.getConnection('psu')
+        if last_connection:
+            self.connect(last_connection, False)
 
     def updateLoop(self):
         """Called by timer; Updates actual voltages"""
@@ -572,6 +573,7 @@ class PSUVBoxLayout(QVBoxLayout):
 
         if not comport:
             comport = self.combobox_connection.getValue(text=True)
+        self.setComport(comport)
 
         connect = self.threaded_connection.isDummy()
 
@@ -761,5 +763,10 @@ class PSUVBoxLayout(QVBoxLayout):
         """Must be called when application is closed"""
 
         self.threaded_connection.close()
+
+        last_connection = ''
         if self.connection is not None:
+            last_connection = self.combobox_connection.getValue(text=True)
             self.connection.close()
+
+        GlobalConf.updateConnections(psu=last_connection)

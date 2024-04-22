@@ -43,6 +43,16 @@ class GlobalConf:
     window_center_x_name = 'window_center_x'
     window_center_y_name = 'window_center_y'
 
+    # connection parameters
+    connection_psu_port_name = 'connection_psu_port'
+    connection_ebis_port_name = 'connection_ebis_port'
+    connection_pressure_port_name = 'connection_pressure_port'
+    connection_laser_ip1_name = 'connection_laser_ip1'
+    connection_laser_ip2_name = 'connection_laser_ip2'
+    connection_laser_ip3_name = 'connection_laser_ip3'
+    connection_laser_ip4_name = 'connection_laser_ip4'
+    connection_laser_port_name = 'connection_laser_port'
+
     # timer parameters
     update_timer_time = 1000
     ramp_timer_time = 10000
@@ -56,6 +66,12 @@ class GlobalConf:
         GlobalConf.settings.sync()
 
     @staticmethod
+    def getWindowSize():
+        """Returns (width, height) of window"""
+        return (GlobalConf.settings.value(GlobalConf.window_width_name, defaultValue=-1, type=int),
+                GlobalConf.settings.value(GlobalConf.window_height_name, defaultValue=-1, type=int))
+
+    @staticmethod
     def updateWindowCenter(x, y):
         """Updates and saves settings object with window center parameters"""
         GlobalConf.settings.setValue(GlobalConf.window_center_x_name, x)
@@ -64,15 +80,52 @@ class GlobalConf:
         GlobalConf.settings.sync()
 
     @staticmethod
-    def getWindowSize():
-        """Returns (width, height) of window"""
-        return (GlobalConf.settings.value(GlobalConf.window_width_name, defaultValue=-1, type=int),
-                GlobalConf.settings.value(GlobalConf.window_height_name, defaultValue=-1, type=int))
-
-    @staticmethod
     def getWindowCenter():
         """Returns (x, y) of window center"""
         # TODO: check if coordinates even exist on screen, if not, than return center of the screen
         # TODO: should also be implemented in the BCA-GUIDE
         return (GlobalConf.settings.value(GlobalConf.window_center_x_name, defaultValue=0, type=int),
                 GlobalConf.settings.value(GlobalConf.window_center_y_name, defaultValue=0, type=int))
+
+    @staticmethod
+    def updateConnections(psu=None, ebis=None, pressure=None, laser=None):
+        """
+        Updates and saves settings object with connection parameters
+
+        :param psu: port of PSU
+        :param ebis: port of EBIS
+        :param pressure: port of pressure ADC
+        :param laser: tuple of (laser_ip1, laser_ip2, laser_ip3, laser_ip4, laser_port)
+        """
+
+        if psu is not None:
+            GlobalConf.settings.setValue(GlobalConf.connection_psu_port_name, psu)
+        if ebis is not None:
+            GlobalConf.settings.setValue(GlobalConf.connection_ebis_port_name, ebis)
+        if pressure is not None:
+            GlobalConf.settings.setValue(GlobalConf.connection_pressure_port_name, pressure)
+        if laser is not None:
+            GlobalConf.settings.setValue(GlobalConf.connection_laser_ip1_name, laser[0])
+            GlobalConf.settings.setValue(GlobalConf.connection_laser_ip2_name, laser[1])
+            GlobalConf.settings.setValue(GlobalConf.connection_laser_ip3_name, laser[2])
+            GlobalConf.settings.setValue(GlobalConf.connection_laser_ip4_name, laser[3])
+            GlobalConf.settings.setValue(GlobalConf.connection_laser_port_name, laser[4])
+
+        GlobalConf.settings.sync()
+
+    @staticmethod
+    def getConnection(connection_type: str):
+        """Returns connection for connection_type"""
+        connection_type = connection_type.lower()
+        if connection_type == 'psu':
+            return GlobalConf.settings.value(GlobalConf.connection_psu_port_name, defaultValue='', type=str)
+        if connection_type == 'ebis':
+            return GlobalConf.settings.value(GlobalConf.connection_ebis_port_name, defaultValue='', type=str)
+        if connection_type == 'pressure':
+            return GlobalConf.settings.value(GlobalConf.connection_pressure_port_name, defaultValue='', type=str)
+        if connection_type == 'laser':
+            return (GlobalConf.settings.value(GlobalConf.connection_laser_ip1_name, defaultValue=-1, type=int),
+                    GlobalConf.settings.value(GlobalConf.connection_laser_ip2_name, defaultValue=-1, type=int),
+                    GlobalConf.settings.value(GlobalConf.connection_laser_ip3_name, defaultValue=-1, type=int),
+                    GlobalConf.settings.value(GlobalConf.connection_laser_ip4_name, defaultValue=-1, type=int),
+                    GlobalConf.settings.value(GlobalConf.connection_laser_port_name, defaultValue=-1, type=int))
