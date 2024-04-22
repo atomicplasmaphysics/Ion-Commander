@@ -13,7 +13,8 @@ from Config.StylesConf import Styles
 from Windows.Main import MainWindow
 
 from Utility.Layouts import SplashPixmap
-from Utility.Logger import setupLogging
+
+from Log.Logger import setupLogging
 
 
 def main():

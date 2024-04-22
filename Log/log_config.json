@@ -6,7 +6,7 @@
       "format": "\n%(asctime)s - %(levelname)-8s - %(message)s (%(filename)s:%(lineno)d)"
     },
     "custom": {
-      "()": "Utility.Logger.CustomFormatter"
+      "()": "Log.Logger.CustomFormatter"
     }
   },
   "handlers": {
@@ -20,7 +20,7 @@
       "class": "logging.handlers.RotatingFileHandler",
       "level": "INFO",
       "formatter": "simple",
-      "filename": "../logs/Ion_Commander.log",
+      "filename": "Log/logs/Ion_Commander.log",
       "encoding": "utf8",
       "maxBytes": 10000000,
       "backupCount": 3

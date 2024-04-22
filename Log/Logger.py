@@ -48,14 +48,14 @@ def setupLogging(level: int = logging.WARNING):
     root_path = Path(__file__).parents[1]
 
     try:
-        mkdir(root_path / 'logs')
+        mkdir(root_path / 'Log' / 'logs')
     except FileExistsError:
         pass
 
-    with open(root_path / 'Utility' / 'log_config.json', 'r') as log_file:
+    with open(root_path / 'Log' / 'log_config.json', 'r') as log_file:
         config = json.load(log_file)
     config['handlers']['console']['level'] = logging.getLevelName(level)
-    config['handlers']['file']['filename'] = str(root_path / 'logs' / f'{GlobalConf.title.replace(" ", "_")}.log')
+    config['handlers']['file']['filename'] = str(root_path / 'Log' / 'logs' / f'{GlobalConf.title.replace(" ", "_")}.log')
     logging.config.dictConfig(config)
 
 
