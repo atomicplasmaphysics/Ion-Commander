@@ -6,5 +6,6 @@
 /Ion Commander*.exe
 Log/logs/*
 
+/guis/
 /data/
 /tests/
