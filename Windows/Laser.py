@@ -6,7 +6,7 @@ from PyQt6.QtWidgets import QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QGrou
 from Config.GlobalConf import GlobalConf
 from Config.StylesConf import Colors
 
-from Utility.Layouts import InsertingGridLayout, IndicatorLed, ErrorTable, DoubleSpinBox, ComboBox, DisplayLabel
+from Utility.Layouts import InsertingGridLayout, IndicatorLed, ErrorTable, DoubleSpinBox, SpinBox, ComboBox, DisplayLabel
 from Utility.Dialogs import IPDialog, showMessageBox
 from Utility.Functions import getPrefix, getSignificantDigits, getIntIfInt
 
@@ -35,6 +35,7 @@ class LaserVBoxLayout(QVBoxLayout):
         self.connection: None | MonacoConnection = None
         self.threaded_connection: ThreadedDummyConnection | ThreadedMonacoConnection = ThreadedDummyConnection()
 
+        # TODO: transfer these variables into GlobalConfig
         self.chiller_temperature_low = 12
         self.chiller_temperature_high = 33
         self.chiller_flow_low = 4.7
@@ -232,6 +233,7 @@ class LaserVBoxLayout(QVBoxLayout):
         # Output Settings
         self.combobox_settings_output = ComboBox()
         self.combobox_settings_output.currentIndexChanged.connect(self.setOutputFrequency)
+        # TODO: deviation and target value to this on update
         self.status_settings_output = DisplayLabel(value=0, target_value=0, deviation=0, unit='Hz', enable_prefix=True, alignment_flag=Qt.AlignmentFlag.AlignLeft)
         self.settings_grid.addWidgets(
             QLabel('Output'),
@@ -240,26 +242,35 @@ class LaserVBoxLayout(QVBoxLayout):
         )
 
         # RF Level Settings
-        self.spinbox_settings_rflvel = DoubleSpinBox(default=0, step_size=0.1, input_range=(0, 100), decimals=1, buttons=False)
-        self.spinbox_settings_rflvel.editingFinished.connect(self.setRFLevel)
+        self.spinbox_settings_rflevel = DoubleSpinBox(default=0, step_size=0.1, input_range=(0, 100), decimals=1, buttons=False)
+        self.spinbox_settings_rflevel.editingFinished.connect(self.setRFLevel)
+        self.status_settings_rflevel = DisplayLabel(value=0, target_value=0, deviation=0.1, decimals=1, unit='%', enable_prefix=False, alignment_flag=Qt.AlignmentFlag.AlignLeft)
         self.settings_grid.addWidgets(
             QLabel('RF Level [%]'),
-            self.spinbox_settings_rflvel
+            self.spinbox_settings_rflevel,
+            self.status_settings_rflevel
         )
 
         # Pulse Width Settings
-        self.spinbox_settings_pulsewidth = DoubleSpinBox(default=276, step_size=0.1, input_range=(276, 10000), decimals=1, buttons=False)
+        self.spinbox_settings_pulsewidth = SpinBox(default=276, step_size=1, input_range=(276, 10000), buttons=False)
         self.spinbox_settings_pulsewidth.editingFinished.connect(self.setPulseLength)
+        self.status_settings_pulsewidth = DisplayLabel(value=0, target_value=0, deviation=1, decimals=0, unit='fs', enable_prefix=False, alignment_flag=Qt.AlignmentFlag.AlignLeft)
         self.settings_grid.addWidgets(
             QLabel('Pulse Width [fs]'),
-            self.spinbox_settings_pulsewidth
+            self.spinbox_settings_pulsewidth,
+            self.status_settings_pulsewidth
         )
 
         self.reset()
 
         last_connection = GlobalConf.getConnection('laser')
         if all([True if elem > 0 else False for elem in last_connection]):
-            self.ip = tuple(last_connection[:4])
+            self.ip = (
+                last_connection[0],
+                last_connection[1],
+                last_connection[2],
+                last_connection[3]
+            )
             self.port = last_connection[4]
             self.connect(self.ip, self.port, False)
 
@@ -379,7 +390,7 @@ class LaserVBoxLayout(QVBoxLayout):
 
         self.threaded_connection.callback(faultsTable, self.threaded_connection.wGetInfo())
 
-        def settings(params: tuple[float, float, int, int]):
+        def settings(params: tuple[float, int, int, int]):
             # params:
             #   MRR: amplifier repetition rate in kHz
             #   PW: pulse width in femtoseconds
@@ -396,7 +407,7 @@ class LaserVBoxLayout(QVBoxLayout):
                 self.fillComboboxOutput(params[2])
             else:
                 self.setComboboxOutput(params[2])
-            self.spinbox_settings_pulsewidth.setValue(params[1])
+            self.status_settings_pulsewidth.setValue(int(params[1]))
 
         self.threaded_connection.callback(settings, self.threaded_connection.setGet())
 
@@ -414,7 +425,7 @@ class LaserVBoxLayout(QVBoxLayout):
                 GlobalConf.logger.error(f'RF Level must be <float> and not -1, got {type(level)} with value "{level}"')
                 return
 
-            self.spinbox_settings_rflvel.setValue(level)
+            self.status_settings_rflevel.setValue(level)
 
         self.threaded_connection.callback(rfLevel, self.threaded_connection.rlGet())
 
@@ -459,6 +470,40 @@ class LaserVBoxLayout(QVBoxLayout):
             self.chiller_flow_high = flow
 
         self.threaded_connection.callback(setChillerFlowHigh, self.threaded_connection.chfhGet())
+
+        def rfLevel(level: float):
+            if (not isinstance(level, float) and not isinstance(level, int)) or level == -1:
+                GlobalConf.logger.error(f'RF Level must be <float> and not -1, got {type(level)} with value "{level}"')
+                return
+
+            self.status_settings_rflevel.setValue(level)
+            self.status_settings_rflevel.setTargetValue(level)
+            self.spinbox_settings_rflevel.setValue(level)
+
+        self.threaded_connection.callback(rfLevel, self.threaded_connection.rlGet())
+
+        def settings(params: tuple[float, int, int, int]):
+            # params:
+            #   MRR: amplifier repetition rate in kHz
+            #   PW: pulse width in femtoseconds
+            #   RRD: repetition rate divisor
+            #   SB: number of seeder bursts
+
+            if not isinstance(params, tuple) or len(params) != 4:
+                GlobalConf.logger.error(f'Settings parameter must be <tuple> with length 4, got {type(params)} with value "{params}"')
+                return
+
+            self.setComboboxAmplifier(params[0], params[3])
+            if params[0] != self.amplifier_repetition_rate:
+                self.amplifier_repetition_rate = params[0]
+                self.fillComboboxOutput(params[2])
+            else:
+                self.setComboboxOutput(params[2])
+            self.status_settings_pulsewidth.setValue(int(params[1]))
+            self.status_settings_pulsewidth.setTargetValue(int(params[1]))
+            self.spinbox_settings_pulsewidth.setValue(int(params[1]))
+
+        self.threaded_connection.callback(settings, self.threaded_connection.setGet())
 
         self.updateLoop()
 
@@ -580,7 +625,8 @@ class LaserVBoxLayout(QVBoxLayout):
         if not self.checkConnection() or not self.checkKeySwitch():
             return
 
-        self.threaded_connection.rlSet(self.spinbox_settings_rflvel.value())
+        self.threaded_connection.rlSet(self.spinbox_settings_rflevel.value())
+        self.status_settings_rflevel.setTargetValue(self.spinbox_settings_rflevel.value())
 
     def setPulseLength(self):
         """Sets pulse length"""
@@ -589,6 +635,7 @@ class LaserVBoxLayout(QVBoxLayout):
             return
 
         self.threaded_connection.setSet(pw=self.spinbox_settings_pulsewidth.value())
+        self.status_settings_pulsewidth.setTargetValue(self.spinbox_settings_pulsewidth.value())
 
     def fillComboboxAmplifierItem(self, mrr: float, sb: int, energy: float = 0, select: bool = False):
         """
@@ -912,8 +959,14 @@ class LaserVBoxLayout(QVBoxLayout):
         self.status_settings_output.setValue(0)
         self.status_settings_output.setTargetValue(0)
         self.status_settings_output.setDeviation(0)
-        self.spinbox_settings_rflvel.reset()
+        self.spinbox_settings_rflevel.reset()
+        self.status_settings_rflevel.setValue(0)
+        self.status_settings_rflevel.setTargetValue(0)
+        self.status_settings_rflevel.setDeviation(0.1)
         self.spinbox_settings_pulsewidth.reset()
+        self.status_settings_pulsewidth.setValue(0)
+        self.status_settings_pulsewidth.setTargetValue(0)
+        self.status_settings_pulsewidth.setDeviation(1)
 
     def closeEvent(self):
         """Must be called when application is closed"""

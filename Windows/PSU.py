@@ -5,6 +5,7 @@ from serial import SerialException
 
 
 from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QGroupBox, QMessageBox
 
 
@@ -23,6 +24,7 @@ class PSUVBoxLayout(QVBoxLayout):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
+        # local variables
         self.update_timer = QTimer()
         self.update_timer.timeout.connect(self.updateLoop)
         self.update_timer.setInterval(GlobalConf.update_timer_time)
@@ -46,10 +48,6 @@ class PSUVBoxLayout(QVBoxLayout):
         self.current_maximum = 1E-4
         self.time_ramp_default = 15
 
-        self.comports = getComports()
-        self.comport_ports = [port for port, description, hardware_id in self.comports]
-        self.comport_description = [f'{port}: {description} [{hardware_id}]' for port, description, hardware_id in self.comports]
-
         # Connection Group Box
         self.connection_group_box = QGroupBox('Connection')
         self.addWidget(self.connection_group_box)
@@ -65,15 +63,20 @@ class PSUVBoxLayout(QVBoxLayout):
         self.label_connection = QLabel('Connection')
         self.indicator_connection = IndicatorLed(off_color=Colors.cooperate_error)
         self.status_connection = QLabel('Not connected')
-        self.combobox_connection = ComboBox(entries=self.comport_ports, tooltips=self.comport_description)
+        self.combobox_connection = ComboBox()
         self.button_connection = QPushButton('Connect')
         self.button_connection.pressed.connect(self.connect)
+        self.button_connection_refresh = QPushButton()
+        self.button_connection_refresh.setToolTip('Refresh connections list')
+        self.button_connection_refresh.setIcon(QIcon('icons/refresh.png'))
+        self.button_connection_refresh.pressed.connect(self.setComportsComboBox)
         self.connection_grid.addWidgets(
             self.label_connection,
             self.indicator_connection,
             (self.status_connection, 2),
             self.combobox_connection,
-            self.button_connection
+            self.button_connection,
+            self.button_connection_refresh
         )
 
         # Control Group Box
@@ -199,11 +202,9 @@ class PSUVBoxLayout(QVBoxLayout):
             QLabel('Reached')
         )
 
-        # TODO: adjust current limit spin-boxes
-
         # MCP
         self.label_limit_1 = QLabel('MCP Front/Back')
-        self.spinbox_limit_current_1 = DoubleSpinBox(default=0.002, step_size=0.001, input_range=(0.002, 4), decimals=3, buttons=False)
+        self.spinbox_limit_current_1 = DoubleSpinBox(default=0.002, step_size=0.001, input_range=(0.002, 2), decimals=5, buttons=False)
         self.spinbox_limit_current_1.editingFinished.connect(lambda: self.setCurrentLimit(0, self.spinbox_limit_current_1.value()))
         self.indicator_limit_1 = IndicatorLed(on_color=Colors.cooperate_error)
         self.limits_grid.addWidgets(
@@ -214,7 +215,7 @@ class PSUVBoxLayout(QVBoxLayout):
 
         # Anode
         self.label_limit_2 = QLabel('Anode')
-        self.spinbox_limit_current_2 = DoubleSpinBox(default=0.002, step_size=0.001, input_range=(0.002, 1), decimals=3, buttons=False)
+        self.spinbox_limit_current_2 = DoubleSpinBox(default=0.002, step_size=0.001, input_range=(0.002, 2), decimals=5, buttons=False)
         self.spinbox_limit_current_2.editingFinished.connect(lambda: self.setCurrentLimit(1, self.spinbox_limit_current_2.value()))
         self.indicator_limit_2 = IndicatorLed(on_color=Colors.cooperate_error)
         self.limits_grid.addWidgets(
@@ -225,7 +226,7 @@ class PSUVBoxLayout(QVBoxLayout):
 
         # Cathode LSD
         self.label_limit_3 = QLabel('Cathode LSD')
-        self.spinbox_limit_current_3 = DoubleSpinBox(default=0.002, step_size=0.001, input_range=(0.002, 1), decimals=3, buttons=False)
+        self.spinbox_limit_current_3 = DoubleSpinBox(default=0.002, step_size=0.001, input_range=(0.002, 2), decimals=5, buttons=False)
         self.spinbox_limit_current_3.editingFinished.connect(lambda: self.setCurrentLimit(2, self.spinbox_limit_current_3.value()))
         self.indicator_limit_3 = IndicatorLed(on_color=Colors.cooperate_error)
         self.limits_grid.addWidgets(
@@ -236,7 +237,7 @@ class PSUVBoxLayout(QVBoxLayout):
 
         # Focus LSD
         self.label_limit_4 = QLabel('Focus LSD')
-        self.spinbox_limit_current_4 = DoubleSpinBox(default=0.002, step_size=0.001, input_range=(0.002, 1), decimals=3, buttons=False)
+        self.spinbox_limit_current_4 = DoubleSpinBox(default=0.002, step_size=0.001, input_range=(0.002, 2), decimals=5, buttons=False)
         self.spinbox_limit_current_4.editingFinished.connect(lambda: self.setCurrentLimit(3, self.spinbox_limit_current_4.value()))
         self.indicator_limit_4 = IndicatorLed(on_color=Colors.cooperate_error)
         self.limits_grid.addWidgets(
@@ -409,7 +410,7 @@ class PSUVBoxLayout(QVBoxLayout):
 
             for status_current, indicator_limit, spinbox_limit_current, current in zip(self.status_currents, self.indicator_limits, self.spinbox_limit_currents, currents):
                 status_current.setValue(current)
-                indicator_limit.setValue(current >= spinbox_limit_current.value())
+                indicator_limit.setValue(current >= spinbox_limit_current.value() / 1000)
 
         self.threaded_connection.callback(measureCurrent, self.threaded_connection.measureCurrent(self.all_channels_selector))
 
@@ -449,7 +450,7 @@ class PSUVBoxLayout(QVBoxLayout):
                 return
 
             for (spinbox_limit_current, current) in zip(self.spinbox_limit_currents, currents):
-                spinbox_limit_current.setValue(current)
+                spinbox_limit_current.setValue(current * 1000)
 
         self.threaded_connection.callback(readCurrentLimit, self.threaded_connection.readCurrent(self.all_channels_selector))
 
@@ -480,7 +481,7 @@ class PSUVBoxLayout(QVBoxLayout):
         if not self.checkConnection():
             return
 
-        self.threaded_connection.currentSet(channel, current)
+        self.threaded_connection.currentSet(channel, current / 1000)
 
     def setOutput(self, channel: int, state: bool):
         """
@@ -592,6 +593,7 @@ class PSUVBoxLayout(QVBoxLayout):
                 self.indicator_connection.setValue(True)
                 self.status_connection.setText('Connected')
                 self.combobox_connection.setEnabled(False)
+                self.button_connection_refresh.setEnabled(False)
                 self.button_connection.setText('Disconnect')
 
             except (SerialException, ConnectionError) as error:
@@ -615,6 +617,7 @@ class PSUVBoxLayout(QVBoxLayout):
                     )
         else:
             self.combobox_connection.setEnabled(True)
+            self.button_connection_refresh.setEnabled(True)
             self.button_connection.setText('Connect')
 
         self.updateAllValues()
@@ -745,6 +748,7 @@ class PSUVBoxLayout(QVBoxLayout):
         self.stopRampVoltage()
 
         self.combobox_connection.setEnabled(True)
+        self.button_connection_refresh.setEnabled(True)
         self.setComportsComboBox()
 
     def setComportsComboBox(self):

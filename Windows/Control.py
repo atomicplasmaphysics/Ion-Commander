@@ -13,7 +13,7 @@ from Windows.Pressure import PressureVBoxLayout
 
 class ControlWindow(TabWidget):
     """
-    Widget for Analysis
+    Widget for controlling hardware
 
     :param parent: parent widget
     """

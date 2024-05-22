@@ -10,16 +10,19 @@ from Config.GlobalConf import GlobalConf
 from Connection.ISEG import ISEGConnection
 from Connection.Thyracont import ThyracontConnection
 from Connection.Monaco import MonacoConnection
+from Connection.TLPMx import TLPMxConnection
 
 
 if TYPE_CHECKING:
     base_iseg = ISEGConnection
     base_thyracont = ThyracontConnection
     base_monaco = MonacoConnection
+    base_tlpmx = TLPMxConnection
 else:
     base_iseg = object
     base_thyracont = object
     base_monaco = object
+    base_tlpmx = object
 
 
 class CallbackId:
@@ -63,7 +66,7 @@ class ConnectionWorker(QRunnable):
 
     def __init__(self, connection):
         super().__init__()
-        self.connection: ISEGConnection | ThyracontConnection | MonacoConnection = connection
+        self.connection: ISEGConnection | ThyracontConnection | MonacoConnection | TLPMxConnection = connection
         self.signal = ConnectionWorkerSignals()
         self.running = True
         self.work = []
@@ -118,7 +121,7 @@ class ThreadedConnection:
 
     def __init__(
         self,
-        connection: ISEGConnection | ThyracontConnection | MonacoConnection | None
+        connection: ISEGConnection | ThyracontConnection | MonacoConnection | TLPMxConnection | None
     ):
         self.connection = connection
 
@@ -233,6 +236,17 @@ class ThreadedMonacoConnection(ThreadedConnection, base_monaco):
     """
 
     def __init__(self, connection: MonacoConnection):
+        super().__init__(connection)
+
+
+class ThreadedTLPMxConnection(ThreadedConnection, base_tlpmx):
+    """
+    Threaded connection for <TLPMxConnection>
+
+    :param connection: TLPMxConnection
+    """
+
+    def __init__(self, connection: TLPMxConnection):
         super().__init__(connection)
 
 

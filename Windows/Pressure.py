@@ -2,6 +2,7 @@ from serial import SerialException
 
 
 from PyQt6.QtWidgets import QVBoxLayout, QGroupBox, QLabel, QPushButton, QHBoxLayout, QMessageBox
+from PyQt6.QtGui import QIcon
 from PyQt6.QtCore import Qt, QTimer
 
 
@@ -56,6 +57,12 @@ class PressureVBoxLayout(QVBoxLayout):
         self.button_connection = QPushButton('Connect')
         self.button_connection.pressed.connect(self.connect)
         self.connection_hbox_selection.addWidget(self.button_connection)
+
+        self.button_connection_refresh = QPushButton()
+        self.button_connection_refresh.setToolTip('Refresh connections list')
+        self.button_connection_refresh.setIcon(QIcon('icons/refresh.png'))
+        self.button_connection_refresh.pressed.connect(self.setComportsComboBox)
+        self.connection_hbox_selection.addWidget(self.button_connection_refresh)
 
         # PITBUL
         self.group_box_pitbul = QGroupBox('PITBUL')
@@ -112,6 +119,7 @@ class PressureVBoxLayout(QVBoxLayout):
                 self.indicator_connection.setValue(True)
                 self.status_connection.setText('Connected')
                 self.combobox_connection.setEnabled(False)
+                self.button_connection_refresh.setEnabled(False)
                 self.button_connection.setText('Disconnect')
 
             except (SerialException, ConnectionError) as error:
@@ -135,6 +143,7 @@ class PressureVBoxLayout(QVBoxLayout):
                     )
         else:
             self.combobox_connection.setEnabled(True)
+            self.button_connection_refresh.setEnabled(True)
             self.button_connection.setText('Connect')
 
     def unconnect(self):
@@ -178,6 +187,8 @@ class PressureVBoxLayout(QVBoxLayout):
         self.pressure_widget_lsd.setPressure(0)
 
         self.combobox_connection.setEnabled(True)
+        self.button_connection_refresh.setEnabled(True)
+
         self.setComportsComboBox()
 
     def setComportsComboBox(self):

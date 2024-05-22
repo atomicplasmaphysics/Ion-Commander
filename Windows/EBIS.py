@@ -2,6 +2,7 @@ from serial import SerialException
 
 
 from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QGroupBox, QMessageBox
 
 
@@ -55,13 +56,30 @@ class EBISVBoxLayout(QVBoxLayout):
         self.combobox_connection = ComboBox()
         self.button_connection = QPushButton('Connect')
         self.button_connection.pressed.connect(self.connect)
+        self.button_connection_refresh = QPushButton()
+        self.button_connection_refresh.setToolTip('Refresh connections list')
+        self.button_connection_refresh.setIcon(QIcon('icons/refresh.png'))
+        self.button_connection_refresh.pressed.connect(self.setComportsComboBox)
         self.connection_grid.addWidgets(
             self.label_connection,
             self.indicator_connection,
             (self.status_connection, 2),
             self.combobox_connection,
-            self.button_connection
+            self.button_connection,
+            self.button_connection_refresh
         )
+
+        # Potentials Group Box
+        self.potential_group_box = QGroupBox('Potentials')
+        self.addWidget(self.potential_group_box)
+
+        self.potential_vbox = QVBoxLayout()
+        self.potential_vbox.setAlignment(Qt.AlignmentFlag.AlignTop)
+        self.potential_group_box.setLayout(self.potential_vbox)
+
+        self.highvoltage_hbox = QHBoxLayout()
+        self.highvoltage_hbox.setAlignment(Qt.AlignmentFlag.AlignLeft)
+        self.potential_vbox.addLayout(self.highvoltage_hbox)
 
         # High Voltage
         self.label_high_voltage = QLabel('High Voltage')
@@ -69,20 +87,14 @@ class EBISVBoxLayout(QVBoxLayout):
         self.status_high_voltage = QLabel('Disabled')
         self.button_high_voltage = QPushButton('Enable')
         self.button_high_voltage.pressed.connect(lambda: self.setGlobalOutput(not self.indicator_high_voltage.value()))
-        self.connection_grid.addWidgets(
-            self.label_high_voltage,
-            self.indicator_high_voltage,
-            self.status_high_voltage,
-            self.button_high_voltage
-        )
-
-        # Potentials Group Box
-        self.potential_group_box = QGroupBox('Potentials')
-        self.addWidget(self.potential_group_box)
+        self.highvoltage_hbox.addWidget(self.label_high_voltage)
+        self.highvoltage_hbox.addWidget(self.indicator_high_voltage)
+        self.highvoltage_hbox.addWidget(self.status_high_voltage)
+        self.highvoltage_hbox.addWidget(self.button_high_voltage)
 
         self.potential_hbox = QHBoxLayout()
         self.potential_hbox.setAlignment(Qt.AlignmentFlag.AlignLeft)
-        self.potential_group_box.setLayout(self.potential_hbox)
+        self.potential_vbox.addLayout(self.potential_hbox)
 
         self.potential_grid = InsertingGridLayout()
         self.potential_hbox.addLayout(self.potential_grid)
@@ -497,6 +509,7 @@ class EBISVBoxLayout(QVBoxLayout):
                 self.indicator_connection.setValue(True)
                 self.status_connection.setText('Connected')
                 self.combobox_connection.setEnabled(False)
+                self.button_connection_refresh.setEnabled(False)
                 self.button_connection.setText('Disconnect')
 
             except (SerialException, ConnectionError) as error:
@@ -520,6 +533,7 @@ class EBISVBoxLayout(QVBoxLayout):
                     )
         else:
             self.combobox_connection.setEnabled(True)
+            self.button_connection_refresh.setEnabled(True)
             self.button_connection.setText('Connect')
 
         self.updateAllValues()
@@ -562,7 +576,7 @@ class EBISVBoxLayout(QVBoxLayout):
         self.button_connection.setText('Connect')
 
         self.indicator_high_voltage.setValue(False)
-        self.label_high_voltage.setText('Disabled')
+        self.status_high_voltage.setText('Disabled')
         self.button_high_voltage.setText('Enable')
 
         for indicator in self.indicators:
@@ -585,6 +599,7 @@ class EBISVBoxLayout(QVBoxLayout):
         self.spinbox_current_6.reset()
 
         self.combobox_connection.setEnabled(True)
+        self.button_connection_refresh.setEnabled(True)
         self.setComportsComboBox()
 
     def setComportsComboBox(self):
