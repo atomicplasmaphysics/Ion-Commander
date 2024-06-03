@@ -412,4 +412,54 @@ class FitLogNormRange(FitMethod):
             GlobalConf.logger.info(f'Error in fitting LogNorm: {error}')
 
 
-fittingFunctions: list[type[FitMethod]] = [FitMethod, FitGaussRange, FitGaussCenter, FitLogNormRange]
+class FitCountsRange(FitMethod):
+    """
+    Method to sum up counts from start to stop
+
+    :param parent: parent widget
+    """
+
+    title = 'Counts (range)'
+    tooltip = 'Counts in given range'
+
+    def __init__(self, parent):
+        super().__init__(parent)
+
+        self.widget = FittingWidget({
+            (0, 0): 'Counts'
+        }, parent)
+        self.parameter = [0]
+        self.parameters = 0
+
+        self.bars = createFittingBars([
+            'Start',
+            'End'
+        ])
+
+    def setBarBounds(self, xrange: tuple[float, float]):
+        """
+        Sets boundary of bars
+
+        :param xrange: tuple of xmin, xmax
+        """
+
+        self.bars[0].setBounds((xrange[0], self.bars[1].value()))
+        self.bars[1].setBounds((self.bars[0].value(), xrange[1]))
+
+    def fitting(self, bar_values: list[float], data: tuple[np.ndarray, np.ndarray], view_range: list[list[float, float]]):
+        """
+        Fitting function to determine parameters
+
+        :param bar_values: values of bars
+        :param data: x and y data as np.arrays
+        :param view_range: ranges for visible field [[xmin, xmax], [ymin, ymax]]
+        """
+
+        limit = np.logical_and(data[0] > bar_values[0], data[0] < bar_values[1])
+        y_data_limit = data[1][limit]
+
+        self.parameter = [np.sum(y_data_limit)]
+        self.updateParameters()
+
+
+fittingFunctions: list[type[FitMethod]] = [FitMethod, FitGaussRange, FitGaussCenter, FitLogNormRange, FitCountsRange]

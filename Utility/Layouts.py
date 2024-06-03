@@ -1692,9 +1692,9 @@ class TOFCanvas(pg.PlotWidget):
         else:
             self.fit_class.setBarBounds((view_range[0][0], view_range[0][1]))
 
-        if self.fit_class.parameters:
-            self.fit_class.fitting([bar.value() for bar in self.bars], self.data, view_range)
+        self.fit_class.fitting([bar.value() for bar in self.bars], self.data, view_range)
 
+        if self.fit_class.parameters:
             self.graph_curve_fit.setData(
                 x=self.data[0],
                 y=self.fit_class.fitFunction(self.data[0], *self.fit_class.parameter[0:self.fit_class.parameters])
