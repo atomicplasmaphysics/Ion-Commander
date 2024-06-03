@@ -1075,10 +1075,10 @@ class DisplayLabel(QLabel):
         addon = self.unit
 
         if addon.lower() == 'min' and not self.enable_prefix:
-            text = f'{int(value)}:{round((value * 60) % 60)}'
+            text = f'{int(value)}:{int(value * 60) % 60:02d}'
 
         elif addon.lower() == 'h' and not self.enable_prefix:
-            text = f'{int(value)}:{int((value * 60) % 60)}:{round((value * 3600) % 60)}'
+            text = f'{int(value)}:{int(value * 60) % 60:02d}:{int(value * 3600) % 60:02d}'
 
         else:
             if value is not None and (isinstance(value, float) or isinstance(value, int)):
