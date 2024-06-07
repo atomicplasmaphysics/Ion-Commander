@@ -201,6 +201,7 @@ class AnalyseWindow(TabWidget):
     def clearFiles(self):
         """Clears all opened files"""
         self.list_files.clearAll()
+        self.clearData()
 
     def uncheckFiles(self):
         """Unchecks all files"""
