@@ -7,9 +7,9 @@ from PyQt6.QtWidgets import QGroupBox, QVBoxLayout, QHBoxLayout, QPushButton, QL
 import pyqtgraph as pg
 
 
-from Utility.Layouts import DeleteWidgetList, DeleteWidgetListItem, ComboBox, TOFCanvas, TabWidget
+from Utility.Layouts import DeleteWidgetList, DeleteWidgetListItem, ComboBox, TOFCanvas, TabWidget, IndicatorLedButton
 from Utility.Dialogs import selectFileDialog, TACDialog
-from Utility.Fitting import getFileData, fittingFunctions
+from Utility.Fitting import getFileData, FitMethod, fittingFunctionsSingle, fittingFunctionsMultiple
 
 
 class AnalyseWindow(TabWidget):
@@ -19,6 +19,9 @@ class AnalyseWindow(TabWidget):
     :param parent: parent widget
     """
 
+    # TODO: select multiple data and view at once
+    # TODO: shorten names if too long
+
     def __init__(self, parent):
         super().__init__(parent)
 
@@ -26,7 +29,7 @@ class AnalyseWindow(TabWidget):
         # Global variables
         #
 
-        self.data: tuple[np.ndarray, np.ndarray] = (np.array([]), np.array([]))
+        self.data: list[tuple[np.ndarray, np.ndarray]] = []
         self.files_opened = False
         self.supported_filetypes = ['dat', 'cod']
         self.setAcceptDrops(True)
@@ -59,9 +62,14 @@ class AnalyseWindow(TabWidget):
         self.button_clear.clicked.connect(self.clearFiles)
         self.column_buttons.addWidget(self.button_clear, alignment=Qt.AlignmentFlag.AlignTop)
 
+        self.button_uncheck = QPushButton('Uncheck', self)
+        self.button_uncheck.clicked.connect(self.uncheckFiles)
+        self.column_buttons.addWidget(self.button_uncheck, alignment=Qt.AlignmentFlag.AlignTop)
+
         self.list_files = DeleteWidgetList(self)
         self.list_files.setMaximumHeight(100)
-        self.list_files.currentRowChanged.connect(self.loadData)
+        self.list_files.currentRowChanged.connect(self.loadDataSelected)
+        self.list_files.checkedChanged.connect(self.loadDataChecked)
 
         self.row_menu.addWidget(self.list_files)
 
@@ -77,16 +85,14 @@ class AnalyseWindow(TabWidget):
         self.column_fitting_selector.setAlignment(Qt.AlignmentFlag.AlignTop)
         self.row_fitting.addLayout(self.column_fitting_selector)
 
-        self.fitting_functions = fittingFunctions
+        self.fitting_functions = []
+        self.fitting_functions_state = 0
 
         self.fitting_selector_label = QLabel('Select fit function:')
         self.column_fitting_selector.addWidget(self.fitting_selector_label)
 
-        self.fitting_selector_widget = ComboBox(
-            default=0,
-            entries=[ff.title for ff in self.fitting_functions],
-            tooltips=[ff.tooltip for ff in self.fitting_functions]
-        )
+        self.fitting_selector_widget = ComboBox()
+        self.initializeFitFunctions()
         self.fitting_selector_widget.currentIndexChanged.connect(self.fittingSelectorChanged)
         self.column_fitting_selector.addWidget(self.fitting_selector_widget)
 
@@ -105,6 +111,14 @@ class AnalyseWindow(TabWidget):
 
         self.fit_function_class = self.fitting_functions[0](self)
         self.fitting_parameters_box_layout.addWidget(self.fit_function_class.widget)
+
+        self.column_axis_manipulation = QVBoxLayout()
+        self.column_axis_manipulation.setAlignment(Qt.AlignmentFlag.AlignTop)
+        self.row_fitting.addLayout(self.column_axis_manipulation)
+
+        self.button_log_y = IndicatorLedButton('Log-y')
+        self.button_log_y.clicked.connect(self.logYAxis)
+        self.column_axis_manipulation.addWidget(self.button_log_y, alignment=Qt.AlignmentFlag.AlignTop)
 
         #
         # DISPLAY
@@ -158,9 +172,39 @@ class AnalyseWindow(TabWidget):
             del_item = DeleteWidgetListItem(file, **del_item_kwargs)
             self.list_files.addItem(del_item)
 
+    def initializeFitFunctions(self):
+        """Initializes fit functions"""
+
+        if len(self.list_files.checkedRows()) >= 1:
+            new_fitting_functions_state = 2
+        else:
+            new_fitting_functions_state = 1
+
+        if self.fitting_functions_state == new_fitting_functions_state:
+            return
+
+        self.fitting_functions = [FitMethod]
+        if new_fitting_functions_state == 1:
+            self.fitting_functions.extend(fittingFunctionsSingle)
+        else:
+            self.fitting_functions.extend(fittingFunctionsMultiple)
+
+        self.fitting_functions_state = new_fitting_functions_state
+        self.fitting_selector_widget.setCurrentIndex(0)
+        self.fitting_selector_widget.reinitialize(
+            default=0,
+            entries=[ff.title for ff in self.fitting_functions],
+            tooltips=[ff.tooltip for ff in self.fitting_functions]
+        )
+        self.fitting_selector_widget.setCurrentIndex(0)
+
     def clearFiles(self):
         """Clears all opened files"""
         self.list_files.clearAll()
+
+    def uncheckFiles(self):
+        """Unchecks all files"""
+        self.list_files.uncheckAll()
 
     def fittingSelectorChanged(self, index: int):
         """
@@ -185,59 +229,85 @@ class AnalyseWindow(TabWidget):
             self.fitting_selector_widget.setCurrentIndex(0)
             self.fitting_selector_widget.setCurrentIndex(selected_index)
 
-    def loadData(self, row: int):
+    def clearData(self):
+        """Clears the data"""
+
+        self.data = []
+        self.graph.plotData(self.data)
+
+    def loadData(self, rows: list[int]):
+        """
+        Loads data from selected file
+
+        :param rows: list of indices of selected row
+        """
+
+        self.initializeFitFunctions()
+        self.data = []
+
+        if not rows:
+            self.clearData()
+            return
+
+        if len(rows) > len(self.graph.graph_colors):
+            self.writeStatusBar('Too many datasets selected')
+            self.clearData()
+            return
+
+        view_all = True
+        self.list_files.resetColors()
+
+        for i, row in enumerate(rows):
+            widget = self.list_files.itemWidget(self.list_files.item(row))
+            if isinstance(widget, DeleteWidgetListItem):
+                try:
+                    self.data.append(
+                        getFileData(
+                            widget.path,
+                            tac=widget.tac,
+                            delay=widget.delay
+                        )
+                    )
+
+                    if widget.checked():
+                        widget.setBackgroundColor(self.graph.graph_colors[i])
+
+                    #view_all = (self.files_opened == widget.path)
+                    self.files_opened = False
+
+                except (OSError, ValueError) as error:
+                    self.writeStatusBar(f'File could not be read: {error}')
+
+        self.graph.plotData(self.data, view_all=view_all)
+
+    def loadDataSelected(self, row: int):
         """
         Loads data from selected file
 
         :param row: index of selected row
         """
 
-        self.data = (np.array([]), np.array([]))
-        if row == -1:
-            self.graph.plotData(self.data)
+        if self.list_files.checkedRows():
+            self.loadDataChecked()
             return
 
-        view_all = False
-        widget = self.list_files.itemWidget(self.list_files.item(row))
-        if isinstance(widget, DeleteWidgetListItem):
-            try:
-                self.data = getFileData(
-                    widget.path,
-                    tac=widget.tac,
-                    delay=widget.delay
-                )
-                view_all = (self.files_opened == widget.path)
-                self.files_opened = False
+        self.loadData([row])
 
-            except (OSError, ValueError) as error:
-                self.writeStatusBar(f'File could not be read: {error}')
-
-        else:
-            self.writeStatusBar('File could not be loaded!')
-
-        self.graph.plotData(self.data, view_all=view_all)
-
-    def updatePlotLimits(self, plot_widget: pg.PlotWidget = None, view_range: list[list[float, float]] = None):
+    def loadDataChecked(self):
         """
-        Updates the y limit of the plot depending on the selected x range
-
-        :param plot_widget: PlotWidget from where this is called
-        :param view_range: ranges for x and y: [[x_min, x_max], [y_min, y_max]]
+        Loads data from all selected files
         """
 
-        # default plot widget
-        if plot_widget is None:
-            plot_widget = self.graph
-
-        # default view range
-        if view_range is None:
-            view_range = plot_widget.getViewBox().viewRange()
-
-        selected_range = np.logical_and(self.data[0] > view_range[0][0], self.data[0] < view_range[0][1])
-        selected_ydata = self.data[1][selected_range]
-        if not len(selected_ydata):
+        if not self.list_files.checkedRows():
+            self.loadDataSelected(self.list_files.currentRow())
             return
-        plot_widget.setYRange(np.min(selected_ydata), np.max(selected_ydata))
+
+        self.loadData(self.list_files.checkedRows())
+
+    def logYAxis(self):
+        """Updates the y-axis to be logarithmic or normal"""
+
+        self.graph.setLogY(self.button_log_y.value())
 
     def dragEnterEvent(self, event: QDragEnterEvent):
         """

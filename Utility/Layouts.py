@@ -1,6 +1,7 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING
 from math import log10
+from time import time
 
 
 import numpy as np
@@ -827,6 +828,30 @@ class IndicatorLed(QWidget):
         super().mouseReleaseEvent(event)
 
 
+class IndicatorLedButton(QWidget):
+    """Extends the IndicatorLed with some Label in the same line to the right"""
+
+    clicked = pyqtSignal()
+
+    def __init__(self, label: str, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        self.hbox_layout = QHBoxLayout()
+        self.hbox_layout.setAlignment(Qt.AlignmentFlag.AlignLeft)
+        self.setLayout(self.hbox_layout)
+
+        self.indicator_led = IndicatorLed(**kwargs, clickable=True)
+        self.indicator_led.clicked.connect(lambda: self.clicked.emit())
+        self.hbox_layout.addWidget(self.indicator_led)
+
+        self.label = QLabel(label)
+        self.hbox_layout.addWidget(self.label)
+
+    def value(self) -> bool:
+        """Returns its state"""
+        return self.indicator_led.value()
+
+
 class PressureWidget(QWidget):
     """
     Widget that extends the QWidget to display the pressure
@@ -1345,6 +1370,8 @@ class DeleteWidgetList(QListWidget):
     Extends the QListWidget for deletable Items
     """
 
+    checkedChanged = pyqtSignal()
+
     def __init__(
         self,
         *args,
@@ -1373,6 +1400,7 @@ class DeleteWidgetList(QListWidget):
         item.setSizeHint(aitem.sizeHint())
         self.setItemWidget(item, aitem)
         aitem.deleted.connect(lambda ditem=item: self.deleteItem(ditem))
+        aitem.checkedChanged.connect(lambda: self.checkedChanged.emit())
 
         if not len(self.selectedItems()):
             self.setCurrentRow(0)
@@ -1394,6 +1422,36 @@ class DeleteWidgetList(QListWidget):
 
         self.clear()
         self.addInfoItem()
+
+    def uncheckAll(self):
+        """Unchecks all items"""
+
+        for row in range(self.count()):
+            item = self.itemWidget(self.item(row))
+            if isinstance(item, DeleteWidgetListItem):
+                item.setChecked(False)
+
+    def resetColors(self):
+        """Resets all colors of items"""
+
+        for row in range(self.count()):
+            item = self.itemWidget(self.item(row))
+            if isinstance(item, DeleteWidgetListItem):
+                item.setBackgroundColor(item.default_background_color)
+
+    def checkedRows(self) -> list[int]:
+        """Returns the checked rows"""
+
+        checked = []
+        checked_time = []
+        for row in range(self.count()):
+            item = self.itemWidget(self.item(row))
+            if isinstance(item, DeleteWidgetListItem):
+                if item.checked():
+                    checked.append(row)
+                    checked_time.append(item.checked())
+
+        return [check for _, check in sorted(zip(checked_time, checked))]
 
     def addInfoItem(self):
         """Adds info item to the list"""
@@ -1423,6 +1481,7 @@ class DeleteWidgetListItem(QWidget):
     """
 
     deleted = pyqtSignal()
+    checkedChanged = pyqtSignal()
 
     def __init__(
         self,
@@ -1430,9 +1489,18 @@ class DeleteWidgetListItem(QWidget):
         *args,
         tac: int = -1,
         delay: float = 0,
+        default_background_color: str = '#ffffff',
         **kwargs
     ):
         super().__init__(*args, **kwargs)
+
+        self.path = path
+        self.tac = tac
+        self.delay = delay
+        self.checkbox_time = 0
+        self.default_background_color = default_background_color
+
+        self.setToolTip(self.path)
 
         self.main_layout = QHBoxLayout(self)
         self.main_layout.setAlignment(Qt.AlignmentFlag.AlignLeft)
@@ -1444,16 +1512,45 @@ class DeleteWidgetListItem(QWidget):
         self.delete_button.clicked.connect(lambda: self.deleted.emit())
         self.main_layout.addWidget(self.delete_button, alignment=Qt.AlignmentFlag.AlignLeft)
 
-        self.path = path
+        self.checkbox = QCheckBox()
+        self.setBackgroundColor(self.default_background_color)
+        self.main_layout.addWidget(self.checkbox, alignment=Qt.AlignmentFlag.AlignLeft)
+        self.checkbox.clicked.connect(self.checkboxClicked)
+
         self.label = QLabel(self.path, self)
         self.main_layout.addWidget(self.label, alignment=Qt.AlignmentFlag.AlignLeft)
-
-        self.tac = tac
-        self.delay = delay
 
     def __str__(self) -> str:
         """Represents itself as string by returning its path"""
         return self.path
+
+    def checkboxClicked(self):
+        """Called when checkbox is clicked"""
+
+        self.checkbox_time = 0
+        if self.checkbox.isChecked():
+            self.checkbox_time = time()
+        else:
+            self.setBackgroundColor(self.default_background_color)
+
+        self.checkedChanged.emit()
+
+    def checked(self) -> float:
+        """Returns state of checkbox"""
+        return self.checkbox_time
+
+    def setChecked(self, state: bool):
+        """Set checked state"""
+        self.checkbox.setChecked(state)
+
+    def setBackgroundColor(self, color: str):
+        """Sets background color of the checkbox"""
+
+        self.checkbox.setStyleSheet(f'''
+            QCheckBox::indicator {{ background-color: {color}; }}
+            QCheckBox::indicator::unchecked {{ background-color: {color}; }}
+            QCheckBox::indicator::checked {{ background-color: {color}; }}
+        ''')
 
 
 class StackedVBoxLayout(QVBoxLayout):
@@ -1518,6 +1615,36 @@ class StackedVBoxLayout(QVBoxLayout):
             spinbox.setValue(val)
 
 
+class ButtonGridLayout(QGridLayout):
+    """
+    Class that creates Buttons with labels in a grid layout
+
+    :param labels: list of strings for each button
+    :param max_rows: maximum rows (-1 means no limit)
+    :param max_columns: maximum columns (-1 means no limit)
+    """
+
+    def __init__(
+        self,
+        labels: list[str],
+        max_rows: int = 10,
+        max_columns: int = 10,
+    ):
+        self.labels = labels
+        self.max_rows = max_rows
+        self.max_columns = max_columns
+
+        super().__init__()
+
+        self.createGrid()
+        
+    def createGrid(self):
+        """Fills the grid with provided labels"""
+        if self.max_rows != -1 and self.max_columns != -1:
+            if len(self.labels) > self.max_rows * self.max_columns:
+                raise ValueError(f'more labels provided ({len(self.labels):.0f}) than max number of rows ({self.max_rows:.0f}) and columns ({self.max_columns:.0f})')
+
+
 class FittingWidget(QWidget):
     """
     Creates some sort of GridBoxLayout for DoubleSpinBoxes based on the provided labels
@@ -1560,7 +1687,7 @@ class TOFCanvas(pg.PlotWidget):
 
     def __init__(
         self,
-        data: tuple[np.ndarray, np.ndarray],
+        data: list[tuple[np.ndarray, np.ndarray]],
         fit_class: FitMethod,
         *args,
         **kwargs
@@ -1576,7 +1703,25 @@ class TOFCanvas(pg.PlotWidget):
         self.setLabel('bottom', 'TOF [ns]')
         self.sigRangeChanged.connect(self.updateLimits)
 
-        self.graph_curve: pg.PlotDataItem = self.plotItem.plot(pen=pg.mkPen(color=Colors.cooperate_tu_blue, width=1))
+        self.graph_colors = [
+            Colors.cooperate_tu_blue,
+            Colors.cooperate_orange,
+            Colors.cooperate_maroon,
+            Colors.cooperate_lime,
+            Colors.cooperate_strawberry,
+            Colors.cooperate_petrol,
+            Colors.cooperate_violett_darker,
+            Colors.cooperate_rosa,
+            Colors.cooperate_error,
+            Colors.cooperate_turquoise,
+            Colors.cooperate_violett,
+            Colors.cooperate_nude
+        ]
+
+        if len(data) > len(self.graph_colors):
+            raise AttributeError('Data length can not exceed color length')
+
+        self.graph_curves: list[pg.PlotDataItem] = [self.plotItem.plot(pen=pg.mkPen(color=color, width=1)) for color in self.graph_colors]
         self.graph_curve_fit: pg.PlotDataItem = self.plotItem.plot(pen=pg.mkPen(color=Colors.cooperate_orange, width=2))
         self.setLimits(yMin=0, xMin=0)
 
@@ -1595,7 +1740,7 @@ class TOFCanvas(pg.PlotWidget):
         self.fit_class = fit_class
         self.setBars(self.fit_class.bars)
 
-    def plotData(self, data: tuple[np.ndarray, np.ndarray], view_all: bool = False):
+    def plotData(self, data: list[tuple[np.ndarray, np.ndarray]], view_all: bool = False):
         """
         Plots data if available
 
@@ -1603,22 +1748,32 @@ class TOFCanvas(pg.PlotWidget):
         :param view_all: force all x axes to be shown
         """
 
+        if len(data) > len(self.graph_colors):
+            raise AttributeError('Data length can not exceed color length')
+
         self.data = data
 
-        self.graph_curve.setData(
-            x=self.data[0],
-            y=self.data[1],
-            stepMode='left',
-            fillLevel=0,
-            brush=(*hexToRgb(Colors.cooperate_tu_blue), 80)
-        )
+        for graph_curve in self.graph_curves:
+            graph_curve.setData(x=[], y=[])
+
+        for i, d in enumerate(data):
+            self.graph_curves[i].setData(
+                x=d[0],
+                y=d[1],
+                stepMode='left',
+                fillLevel=0,
+                connect='all',
+                brush=(*hexToRgb(self.graph_colors[i]), 80)
+            )
         self.graph_curve_fit.setData(x=[], y=[])
 
-        if not len(self.data[0]):
+        xdata = [d[0] for d in self.data]
+
+        if not any([len(xd) for xd in xdata]):
             return
 
-        minx = np.min(self.data[0])
-        maxx = np.max(self.data[0])
+        minx = min([np.min(x) for x in xdata])
+        maxx = max([np.max(x) for x in xdata])
 
         self.setLimits(
             xMin=minx,
@@ -1627,10 +1782,18 @@ class TOFCanvas(pg.PlotWidget):
 
         # update if y range in selection would be too big and update x range if needed
         view_range: list[list[float, float]] = self.getViewBox().viewRange()
-        selected_xrange = np.logical_and(self.data[0] > view_range[0][0], self.data[0] < view_range[0][1])
-        selected_ydata = self.data[1][selected_xrange]
-        if len(selected_ydata) and np.max(selected_ydata) > view_range[1][1]:
-            self.setYRange(np.min(selected_ydata), np.max(selected_ydata))
+        selected_ydata_min = []
+        selected_ydata_max = []
+        for d in self.data:
+            selected_xrange = np.logical_and(d[0] > view_range[0][0], d[0] < view_range[0][1])
+            selected_ydata = d[1][selected_xrange]
+            if len(selected_ydata):  # and np.max(selected_ydata) > view_range[1][1]:
+                selected_ydata_min.append(np.min(selected_ydata))
+                selected_ydata_max.append(np.max(selected_ydata))
+
+        if selected_ydata_min and selected_ydata_max:
+            self.setYRange(min(selected_ydata_min), max(selected_ydata_max))
+
         if view_all:
             self.setXRange(minx, maxx)
         else:
@@ -1651,11 +1814,13 @@ class TOFCanvas(pg.PlotWidget):
             for i, bar in enumerate(self.bars):
                 bar.setValue(view_range[0][0] + (i + 1) * distance)
 
-        if not len(self.data[0]):
+        xdata = [d[0] for d in self.data]
+
+        if not any([len(xd) for xd in xdata]):
             return
 
-        minx = np.min(self.data[0])
-        maxx = np.max(self.data[0])
+        minx = min([np.min(x) for x in xdata])
+        maxx = max([np.max(x) for x in xdata])
         xspan = maxx - minx
 
         for bar in self.bars:
@@ -1687,18 +1852,28 @@ class TOFCanvas(pg.PlotWidget):
         """Bar is dragged; Adapt bar boundaries, fit to data and display fit"""
 
         view_range: list[list[float, float]] = self.getViewBox().viewRange()
-        if len(self.data[0]):
-            self.fit_class.setBarBounds((np.min(self.data[0]), np.max(self.data[0])))
+
+        xdata = [d[0] for d in self.data]
+
+        if any([len(xd) for xd in xdata]):
+            self.fit_class.setBarBounds((
+                min([np.min(x) for x in xdata]),
+                max([np.max(x) for x in xdata])
+            ))
         else:
             self.fit_class.setBarBounds((view_range[0][0], view_range[0][1]))
 
-        self.fit_class.fitting([bar.value() for bar in self.bars], self.data, view_range)
+        # only do fitting if we have one data set available
+        if len(self.data) == 1:
+            self.fit_class.fitting([bar.value() for bar in self.bars], self.data[0], view_range)
 
-        if self.fit_class.parameters:
-            self.graph_curve_fit.setData(
-                x=self.data[0],
-                y=self.fit_class.fitFunction(self.data[0], *self.fit_class.parameter[0:self.fit_class.parameters])
-            )
+            if self.fit_class.parameters:
+                self.graph_curve_fit.setData(
+                    x=self.data[0][0],
+                    y=self.fit_class.fitFunction(self.data[0][0], *self.fit_class.parameter[0:self.fit_class.parameters])
+                )
+            else:
+                self.graph_curve_fit.setData(x=[], y=[])
         else:
             self.graph_curve_fit.setData(x=[], y=[])
 
@@ -1720,11 +1895,38 @@ class TOFCanvas(pg.PlotWidget):
         if view_range is None:
             view_range = plot_widget.getViewBox().viewRange()
 
-        selected_range = np.logical_and(self.data[0] > view_range[0][0], self.data[0] < view_range[0][1])
-        selected_ydata = self.data[1][selected_range]
-        if not len(selected_ydata):
+        selected_ydata_min = []
+        selected_ydata_max = []
+        for d in self.data:
+            selected_xrange = np.logical_and(d[0] > view_range[0][0], d[0] < view_range[0][1])
+            selected_ydata = d[1][selected_xrange]
+            if len(selected_ydata):  # and np.max(selected_ydata) > view_range[1][1]:
+                selected_ydata_min.append(np.min(selected_ydata))
+                selected_ydata_max.append(np.max(selected_ydata))
+
+        if not selected_ydata_min or not selected_ydata_max:
             return
-        plot_widget.setYRange(np.min(selected_ydata), np.max(selected_ydata))
+
+        selected_ydata_min = min(selected_ydata_min)
+        selected_ydata_max = max(selected_ydata_max)
+
+        # check if logY is selected... this is stupidly implemented in pyqtgraph
+        if self.plotItem.ctrl.logYCheck.isChecked():
+            if selected_ydata_min != 0:
+                selected_ydata_min = np.log10(selected_ydata_min)
+            selected_ydata_max = np.log10(selected_ydata_max)
+
+        plot_widget.setYRange(selected_ydata_min, selected_ydata_max)
+
+    def setLogY(self, state: bool):
+        """
+        Sets the y-axis to logarithmic or normal
+
+        :param state: True: logarithmic; False: normal
+        """
+
+        # TODO: keep original zoom level
+        self.plotItem.setLogMode(y=state)
 
 
 class FittingBar(pg.InfiniteLine):

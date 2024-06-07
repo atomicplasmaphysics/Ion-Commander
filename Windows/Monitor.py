@@ -29,7 +29,7 @@ class MonitorWindow(TabWidget):
         # TODO: Add tooltips to everything
 
         # PSU CONTROL
-        self.power_meter_vbox = VBoxTitleLayout('PowerMeter', parent=self, add_stretch=True)
+        self.power_meter_vbox = VBoxTitleLayout('Power Meter', parent=self, add_stretch=True)
         self.power_meter_group_vbox = PowerMeterVBoxLayout()
 
         # Stretch to bottom

@@ -117,7 +117,7 @@ class FitMethod:
         pass
 
     @staticmethod
-    def fitFunction(xdata: np.ndarray, *args: float) -> np.ndarray:
+    def fitFunction(xdata, *args) -> np.ndarray:
         """
         Fitting function
 
@@ -171,7 +171,7 @@ class FitGaussRange(FitMethod):
         self.bars[1].setBounds((self.bars[0].value(), xrange[1]))
 
     @staticmethod
-    def fitFunction(xdata: np.ndarray, sigma: float, mu: float, c: float) -> np.ndarray:
+    def fitFunction(xdata, sigma: float, mu: float, c: float) -> np.ndarray:
         """
         Fitting function
 
@@ -258,7 +258,7 @@ class FitGaussCenter(FitMethod):
         self.bars[0].setBounds((xrange[0], xrange[1]))
 
     @staticmethod
-    def fitFunction(xdata: np.ndarray, sigma: float, mu: float, c: float) -> np.ndarray:
+    def fitFunction(xdata, sigma: float, mu: float, c: float) -> np.ndarray:
         """
         Fitting function
 
@@ -356,7 +356,7 @@ class FitLogNormRange(FitMethod):
         self.bars[1].setBounds((self.bars[0].value(), xrange[1]))
 
     @staticmethod
-    def fitFunction(xdata: np.ndarray, sigma: float, mu: float, x0: float, c: float) -> np.ndarray:
+    def fitFunction(xdata, sigma: float, mu: float, x0: float, c: float) -> np.ndarray:
         """
         Fitting function
 
@@ -462,4 +462,5 @@ class FitCountsRange(FitMethod):
         self.updateParameters()
 
 
-fittingFunctions: list[type[FitMethod]] = [FitMethod, FitGaussRange, FitGaussCenter, FitLogNormRange, FitCountsRange]
+fittingFunctionsSingle: list[type[FitMethod]] = [FitGaussRange, FitGaussCenter, FitLogNormRange, FitCountsRange]
+fittingFunctionsMultiple: list[type[FitMethod]] = []
