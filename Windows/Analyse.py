@@ -4,11 +4,10 @@ from PyQt6.QtCore import Qt, QDir
 from PyQt6.QtGui import QDragEnterEvent, QDropEvent
 from PyQt6.QtWidgets import QGroupBox, QVBoxLayout, QHBoxLayout, QPushButton, QLabel
 
-import pyqtgraph as pg
-
 
 from Utility.Layouts import DeleteWidgetList, DeleteWidgetListItem, ComboBox, TOFCanvas, TabWidget, IndicatorLedButton
-from Utility.Dialogs import selectFileDialog, TACDialog
+from Utility.Dialogs import TACDialog
+from Utility.Functions import selectFileDialog
 from Utility.Fitting import getFileData, FitMethod, fittingFunctionsSingle, fittingFunctionsMultiple
 
 

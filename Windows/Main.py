@@ -10,6 +10,7 @@ from Utility.Layouts import TabWidget
 from Windows.Analyse import AnalyseWindow
 from Windows.Control import ControlWindow
 from Windows.Monitor import MonitorWindow
+from Windows.Tips import TipsWindow
 
 
 class MainWindow(QMainWindow):
@@ -165,6 +166,10 @@ class MainWindow(QMainWindow):
         # Add monitor tab
         self.monitor_window = MonitorWindow(self)
         self.addTab(self.monitor_window, 'Control')
+
+        # Add tips tab
+        self.tips_window = TipsWindow(self)
+        self.addTab(self.tips_window, 'Tips')
 
         # Add analyse tab
         self.analyse_window = AnalyseWindow(self)

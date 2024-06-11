@@ -1,17 +1,19 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING
-from math import log10
+from math import log10, inf
 from time import time
+from os import path
+from shutil import copy
 
 
 import numpy as np
 
 from PyQt6.QtCore import Qt, pyqtSignal, QByteArray, QSize, QRect, QRectF
-from PyQt6.QtGui import QIcon, QPainter, QPixmap, QColor, QBrush, QLinearGradient, QPainterPath
+from PyQt6.QtGui import QIcon, QPainter, QPixmap, QColor, QBrush, QLinearGradient, QPainterPath, QAction, QFont, QTextCursor, QKeySequence
 from PyQt6.QtWidgets import (
-    QHBoxLayout, QLabel, QWidget, QVBoxLayout, QSpinBox, QDoubleSpinBox, QCheckBox, QComboBox,
-    QLineEdit, QPushButton, QListWidget, QListWidgetItem, QApplication, QStyleOption, QTableWidget,
-    QTableWidgetItem, QHeaderView, QAbstractItemView, QGridLayout, QLCDNumber, QFrame
+    QHBoxLayout, QLabel, QWidget, QVBoxLayout, QSpinBox, QDoubleSpinBox, QCheckBox, QComboBox, QLineEdit, QPushButton,
+    QListWidget, QListWidgetItem, QApplication, QStyleOption, QTableWidget, QTableWidgetItem, QAbstractItemView, QGridLayout,
+    QLCDNumber, QFrame, QTextEdit, QMenuBar, QMessageBox, QInputDialog, QMenu, QColorDialog
 )
 from PyQt6.QtSvg import QSvgRenderer
 
@@ -22,7 +24,7 @@ from Config.GlobalConf import GlobalConf
 from Config.StylesConf import Colors, Styles, Forms
 
 from Utility.ModifyWidget import setWidgetBackground
-from Utility.Functions import hexToRgb, linearInterpolateColor, getPrefix, qColorToHex
+from Utility.Functions import hexToRgb, linearInterpolateColor, getPrefix, qColorToHex, selectFileDialog
 
 if TYPE_CHECKING:
     from Windows.Main import MainWindow
@@ -1624,6 +1626,8 @@ class ButtonGridLayout(QGridLayout):
     :param max_columns: maximum columns (-1 means no limit)
     """
 
+    buttonPressed = pyqtSignal(int)
+
     def __init__(
         self,
         labels: list[str],
@@ -1631,18 +1635,284 @@ class ButtonGridLayout(QGridLayout):
         max_columns: int = 10,
     ):
         self.labels = labels
+        if max_rows <= 0:
+            max_rows = inf
         self.max_rows = max_rows
+        if max_columns <= 0:
+            max_columns = inf
         self.max_columns = max_columns
 
         super().__init__()
 
-        self.createGrid()
+        self.fillGrid()
+
+    def clearGrid(self):
+        """Clears the grid"""
+
+        for i in range(self.count() - 1, -1, -1):
+            self.itemAt(i).widget().deleteLater()
         
-    def createGrid(self):
-        """Fills the grid with provided labels"""
+    def fillGrid(self):
+        """Fills the grid with buttons of provided labels"""
+
         if self.max_rows != -1 and self.max_columns != -1:
             if len(self.labels) > self.max_rows * self.max_columns:
                 raise ValueError(f'more labels provided ({len(self.labels):.0f}) than max number of rows ({self.max_rows:.0f}) and columns ({self.max_columns:.0f})')
+
+        for index, label in enumerate(self.labels):
+            row, column = divmod(index, self.max_columns)
+            button = QPushButton(label)
+            button.setToolTip(f'Tip #{index}')
+            button.clicked.connect(lambda x, i=index: self.buttonPressed.emit(i))
+            self.addWidget(button, row, column)
+
+    def newLabels(self, labels: list[str]):
+        """Resets the buttons and initializes them with the provided new labels"""
+
+        self.labels = labels
+        self.clearGrid()
+        self.fillGrid()
+
+
+class TextEdit(QWidget):
+    """
+    Text editor, which is a QTextEdit with an menu bar
+
+    :parm
+    """
+
+    def __init__(
+        self,
+        image_directory: str = None,
+        save_button: bool = True,
+        load_button: bool = True,
+        **kwargs
+    ):
+        super().__init__(**kwargs)
+
+        self.main_layout = QVBoxLayout(self)
+        self.setLayout(self.main_layout)
+
+        self.image_directory = image_directory
+
+        # add menu bar
+        self.menu = QMenuBar(self)
+        self.main_layout.setMenuBar(self.menu)
+
+        self.menu_file = self.menu.addMenu('File')
+
+        if save_button:
+            self.menu_file_save = QAction('Save', self)
+            self.menu_file_save.setShortcut('Ctrl+S')
+            self.menu_file_save.triggered.connect(self.saveFile)
+            self.menu_file.addAction(self.menu_file_save)
+
+        if load_button:
+            self.menu_file_load = QAction('Open', self)
+            self.menu_file_load.setShortcut('Ctrl+O')
+            self.menu_file_load.triggered.connect(self.openFile)
+            self.menu_file.addAction(self.menu_file_load)
+
+        self.menu_file_insert_image = QAction('Insert Image', self)
+        self.menu_file_insert_image.setShortcut('Ctrl+G')
+        self.menu_file_insert_image.triggered.connect(self.insertImage)
+        self.menu_file.addAction(self.menu_file_insert_image)
+
+        self.menu_format = self.menu.addMenu('Format')
+
+        self.menu_format_bold = QAction('Bold', self)
+        self.menu_format_bold.setShortcut('Ctrl+B')
+        self.menu_format_bold.triggered.connect(self.setBold)
+        self.menu_format.addAction(self.menu_format_bold)
+
+        self.menu_format_italic = QAction('Italic', self)
+        self.menu_format_italic.setShortcut('Ctrl+I')
+        self.menu_format_italic.triggered.connect(self.setItalic)
+        self.menu_format.addAction(self.menu_format_italic)
+
+        self.menu_format_underline = QAction('Underline', self)
+        self.menu_format_underline.setShortcut('Ctrl+U')
+        self.menu_format_underline.triggered.connect(self.setUnderline)
+        self.menu_format.addAction(self.menu_format_underline)
+
+        self.menu_format_increase_font = QAction('Increase Font', self)
+        self.menu_format_increase_font.setShortcut('Ctrl++')
+        self.menu_format_increase_font.triggered.connect(lambda: self.increaseFontSize(1))
+        self.menu_format.addAction(self.menu_format_increase_font)
+
+        self.menu_format_decrease_font = QAction('Decrease Font', self)
+        self.menu_format_decrease_font.setShortcut('Ctrl+-')
+        self.menu_format_decrease_font.triggered.connect(lambda: self.increaseFontSize(-1))
+        self.menu_format.addAction(self.menu_format_decrease_font)
+
+        self.menu_format_red = QAction('Change Color', self)
+        self.menu_format_red.setShortcut('Ctrl+Q')
+        self.menu_format_red.triggered.connect(self.changeColor)
+        self.menu_format.addAction(self.menu_format_red)
+
+        # actual text editor
+        self.text_editor = QTextEdit(self)
+        self.text_editor.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.text_editor.customContextMenuRequested.connect(self.showContextMenu)
+        self.main_layout.addWidget(self.text_editor)
+
+    def clearContents(self):
+        """Clears contents"""
+        self.text_editor.setHtml('')
+
+    def saveFile(self, file_name: str = ''):
+        """
+        Save the file
+
+        :parm file_name: if provided, this will be used for saving, otherwise file dialog will appear
+        """
+
+        if not file_name:
+            file_name = selectFileDialog(self, True, 'Save File', '', 'Text Files (*.txt);;All Files (*)')
+
+        if not file_name:
+            return 1
+
+        try:
+            with open(file_name, 'w') as file:
+                file.write(self.text_editor.toHtml())
+        except (OSError, FileNotFoundError, FileExistsError) as e:
+            QMessageBox.warning(self, 'Error', f'Failed to save file: {e}')
+            return 2
+
+    def openFile(self, file_name: str = ''):
+        """
+        Opens a file
+
+        :parm file_name: if provided, this will be used for opening, otherwise file dialog will appear
+        """
+
+        if not file_name:
+            file_name = selectFileDialog(self, False, 'Open File', '', 'Text Files (*.txt);;All Files (*)')
+
+        if not file_name:
+            return 1
+
+        try:
+            with open(file_name, 'r') as file:
+                self.text_editor.setHtml(file.read())
+        except (OSError, FileNotFoundError, FileExistsError) as e:
+            QMessageBox.warning(self, 'Error', f'Failed to open file: {e}')
+            return 2
+
+    def insertImage(self):
+        """Insert an image"""
+
+        file_name = selectFileDialog(self, False, 'Open Image File', '', 'Image Files (*.png *.jpg *.bmp *.gif)')
+
+        if not file_name:
+            return
+
+        # get width and heights
+        width, ok = QInputDialog.getInt(self, 'Image Width', 'Enter width:', value=500, min=1)
+        if not ok:
+            return
+        height, ok = QInputDialog.getInt(self, 'Image Height', 'Enter height:', value=500, min=1)
+        if not ok:
+            return
+
+        # copy image if needed
+        image_path = file_name
+        if self.image_directory is not None:
+            image_path = path.join(self.image_directory, f'{time()}_{path.basename(file_name)}')
+            copy(file_name, image_path)
+            image_path = path.relpath(image_path)
+
+        cursor = self.text_editor.textCursor()
+        cursor.insertHtml(f'<img src="{image_path}" width="{width}" height="{height}" />')
+
+    def setBold(self):
+        """Sets text to bold"""
+
+        if self.text_editor.fontWeight() != QFont.Weight.Bold:
+            self.text_editor.setFontWeight(QFont.Weight.Bold)
+        else:
+            self.text_editor.setFontWeight(QFont.Weight.Normal)
+
+    def setItalic(self):
+        """Sets text to italic"""
+        self.text_editor.setFontItalic(not self.text_editor.fontItalic())
+
+    def setUnderline(self):
+        """Sets text to underline"""
+        self.text_editor.setFontUnderline(not self.text_editor.fontUnderline())
+
+    def increaseFontSize(self, increment: int):
+        """Increase font size"""
+
+        font = self.text_editor.currentFont()
+        size = font.pointSize() + increment
+        if size < 1:
+            size = 1
+        font.setPointSize(size)
+        self.text_editor.setCurrentFont(font)
+
+    def changeColor(self):
+        """Change font color"""
+
+        color = QColorDialog.getColor()
+        if color.isValid():
+            self.text_editor.setTextColor(color)
+
+    def showContextMenu(self, position):
+        """Shows a context menu"""
+
+        cursor = self.text_editor.textCursor()
+        cursor.select(QTextCursor.SelectionType.WordUnderCursor)
+
+        menu = QMenu(self)
+        if '<img ' in cursor.selection().toHtml():
+            resize_image = QAction('Resize Image', self)
+            resize_image.triggered.connect(self.resizeImage)
+            menu.addAction(resize_image)
+        menu.exec(self.text_editor.viewport().mapToGlobal(position))
+
+    def resizeImage(self):
+        cursor = self.text_editor.textCursor()
+        cursor.select(QTextCursor.SelectionType.WordUnderCursor)
+        html = cursor.selection().toHtml()
+
+        if '<img ' not in html:
+            return
+
+        # Find the width attribute in the HTML
+        width_start = html.find('width="') + 7
+        width_end = html.find('"', width_start)
+        width = html[width_start:width_end]
+        try:
+            width = int(width)
+        except ValueError:
+            width = 500
+
+        # Find the height attribute in the HTML
+        height_start = html.find('height="') + 8
+        height_end = html.find('"', height_start)
+        height = html[height_start:height_end]
+        try:
+            height = int(height)
+        except ValueError:
+            height = 500
+
+        width, ok = QInputDialog.getInt(self, 'Image Width', 'Enter new width:', value=width, min=1)
+        if not ok:
+            return
+        height, ok = QInputDialog.getInt(self, 'Image Height', 'Enter new height:', value=height, min=1)
+        if not ok:
+            return
+
+        # Find the src attribute in the HTML
+        src_start = html.find('src="') + 5
+        src_end = html.find('"', src_start)
+        src = html[src_start:src_end]
+
+        # Replace the existing image HTML with new dimensions
+        new_img_html = f'<img src="{src}" width="{width}" height="{height}" />'
+        cursor.insertHtml(new_img_html)
 
 
 class FittingWidget(QWidget):
