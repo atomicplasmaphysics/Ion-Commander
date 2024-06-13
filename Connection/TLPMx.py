@@ -407,7 +407,7 @@ class TLPMxConnection:
         result = self.dll.TLPMX_setAttenuation(self.devSession, c_double(attenuation), c_uint16(channel))
         self.checkError(result)
 
-    def getAttenuation(self, attribute: TLPMxValues.Attribute, channel: int = 1):
+    def getAttenuation(self, attribute: TLPMxValues.Attribute, channel: int = 1) -> float:
         """Returns the input attenuation"""
         attenuation = c_double(0)
         result = self.dll.TLPMX_getAttenuation(self.devSession, c_int16(attribute), byref(attenuation), c_uint16(channel))
@@ -1759,6 +1759,30 @@ class TLPMxConnection:
         self.checkError(result)
         return c_char_p(pymessage.raw).value
 
+    def getAutoRange(self, channel: int = 1) -> tuple[float, float, float]:
+        """Gets auto ranges for (Power, Current, Voltage)"""
+        return (
+            self.getPowerAutoRange(channel),
+            self.getCurrentAutoRange(channel),
+            self.getVoltageAutoRange(channel)
+        )
+
+    def getRange(self, attribute: TLPMxValues.Attribute, channel: int = 1) -> tuple[float, float, float]:
+        """Gets ranges for (Power, Current, Voltage)"""
+        return (
+            self.getPowerRange(attribute, channel),
+            self.getCurrentRange(attribute, channel),
+            self.getVoltageRange(attribute, channel)
+        )
+
+    def measure(self, channel: int = 1) -> tuple[float, float, float]:
+        """Obtain (Power, Current, Voltage)"""
+        return (
+            self.measurePower(channel),
+            self.measureCurrent(channel),
+            self.measureVoltage(channel)
+        )
+
     def close(self):
         """Closes the connection"""
         result = self.dll.TLPMX_close(self.devSession)
@@ -1836,6 +1860,18 @@ def main():
 
         st_time = time()
         print('getWavelength', tlpmx.getWavelength(TLPMxValues.Attribute.SetValue))
+        print(f'Took {time() - st_time}s\n')
+
+        st_time = time()
+        print('autoRange', tlpmx.getAutoRange())
+        print(f'Took {time() - st_time}s\n')
+
+        st_time = time()
+        print('range', tlpmx.getRange(TLPMxValues.Attribute.SetValue))
+        print(f'Took {time() - st_time}s\n')
+
+        st_time = time()
+        print('measure', tlpmx.measure())
         print(f'Took {time() - st_time}s\n')
 
         st_time = time()

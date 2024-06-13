@@ -1,15 +1,15 @@
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QIcon
-from PyQt6.QtWidgets import QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QGroupBox, QMessageBox, QLCDNumber, QApplication
+from PyQt6.QtWidgets import QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QGroupBox, QLCDNumber, QApplication, QMessageBox
 
 
 from Config.GlobalConf import GlobalConf
 from Config.StylesConf import Colors
 
-from Utility.Layouts import InsertingGridLayout, IndicatorLed, DoubleSpinBox, DisplayLabel, PolarityButton, SpinBox, ComboBox
+from Utility.Layouts import InsertingGridLayout, IndicatorLed, DoubleSpinBox, DisplayLabel, SpinBox, ComboBox
 from Utility.Dialogs import showMessageBox
 
-from Connection.TLPMx import TLPMxConnection, getResources
+from Connection.TLPMx import TLPMxConnection, TLPMxValues, getResources
 from Connection.Threaded import ThreadedTLPMxConnection, ThreadedDummyConnection
 
 
@@ -19,9 +19,11 @@ class PowerMeterVBoxLayout(QVBoxLayout):
 
         # local variables
         self.update_timer = QTimer()
-        #self.update_timer.timeout.connect(self.updateLoop)
+        self.update_timer.timeout.connect(self.updateLoop)
         self.update_timer.setInterval(GlobalConf.update_timer_time)
         self.update_timer.start()
+
+        self.active_message_box = False
 
         self.connection: None | TLPMxConnection = None
         self.threaded_connection: ThreadedDummyConnection | ThreadedTLPMxConnection = ThreadedDummyConnection()
@@ -51,7 +53,7 @@ class PowerMeterVBoxLayout(QVBoxLayout):
         self.combobox_connection = ComboBox()
         self.connection_hbox_selection.addWidget(self.combobox_connection)
         self.button_connection = QPushButton('Connect')
-        #self.button_connection.pressed.connect(self.connect)
+        self.button_connection.pressed.connect(self.connect)
         self.connection_hbox_selection.addWidget(self.button_connection)
 
         self.button_connection_refresh = QPushButton()
@@ -214,9 +216,209 @@ class PowerMeterVBoxLayout(QVBoxLayout):
 
         self.reset()
 
-        #last_connection = GlobalConf.getConnection('powermeter')
-        #if last_connection:
-        #    self.connect(last_connection, False)
+        last_connection = GlobalConf.getConnection('powermeter')
+        if last_connection:
+            self.connect(last_connection, False)
+            
+    def getDisplayParameter(self, values: tuple[float, float, float]) -> float:
+        """
+        Selects the parameter to display from values
+        
+        :param values: tuple of (Power, Current, Vo
+        """
+
+    def updateLoop(self, set_startup: bool = False):
+        """Called by timer; Updates all values"""
+
+        if not self.checkConnection(False):
+            return
+        
+        self.combobox_display_parameter.currentIndex()
+        # 0: Power
+        # 1: Power dBm
+        # 2: Current
+        # 3: Irradiance
+
+        # get wavelength
+        def setWavelength(wavelength: float):
+            self.status_wavelength.setValue(wavelength)
+            if set_startup:
+                self.status_wavelength.setTargetValue(wavelength)
+                self.spinbox_wavelength.setValue(round(wavelength))
+
+        self.threaded_connection.callback(setWavelength, self.threaded_connection.getWavelength(TLPMxValues.Attribute.SetValue))
+
+        # get autorange
+        def setAutorange(autoranges: tuple[float, float, float]):
+            power, current, voltage = autoranges
+            # TODO: convert properly
+            
+            ...
+
+        self.threaded_connection.callback(setAutorange, self.threaded_connection.getAutoRange())
+
+        # get range
+        def setRange(ranges: tuple[float, float, float]):
+            power, current, voltage = ranges
+            ...
+
+        self.threaded_connection.callback(setRange, self.threaded_connection.getRange(TLPMxValues.Attribute.SetValue))
+
+        # get attenuation
+        def setAttenuation(attenuation: float):
+            self.status_attenuation.setValue(attenuation)
+            if set_startup:
+                self.status_attenuation.setTargetValue(attenuation)
+                self.spinbox_attenuation.setValue(attenuation)
+
+        self.threaded_connection.callback(setAttenuation, self.threaded_connection.getAttenuation(TLPMxValues.Attribute.SetValue))
+
+        # get averaging
+        def setAveraging(averaging: int):
+            self.status_averaging.setValue(averaging)
+            if set_startup:
+                self.status_averaging.setTargetValue(averaging)
+                self.spinbox_averaging.setValue(averaging)
+
+        self.threaded_connection.callback(setAveraging, self.threaded_connection.getAverageCount())
+
+        # get zero adjust
+        def setZeroAdjust(zero_adjust: int):
+            self.status_zero_adjust.setTargetValue(zero_adjust)
+            self.status_zero_adjust.setValue(zero_adjust)
+
+        self.threaded_connection.callback(setZeroAdjust, self.threaded_connection.getDarkAdjustState())
+
+        # get beam diameter
+        def setBeamDiameter(diameter: float):
+            self.status_beam_diameter.setValue(diameter)
+            if set_startup:
+                self.status_beam_diameter.setTargetValue(diameter)
+                self.spinbox_beam_diameter.setValue(diameter)
+
+        self.threaded_connection.callback(setBeamDiameter, self.threaded_connection.getBeamDiameter(TLPMxValues.Attribute.SetValue))
+
+        # get display value
+        def setDisplayValue(values: [float, float, float]):
+            power, current, voltage = values
+            # TODO: also set min and max
+            self.lcd_number_display_power.display(str(power))
+
+        self.threaded_connection.callback(setDisplayValue, self.threaded_connection.measurePower())
+
+    def updateAllValues(self):
+        """Updates all values"""
+        # TODO: get display parameter
+        self.status_display_power_min.setValue(0)
+        self.status_display_power_max.setValue(0)
+        self.updateLoop(set_startup=True)
+
+    def checkConnection(self, messagebox: bool = True) -> bool:
+        """
+        Checks if connection is established and pops up messagebox if it does not
+
+        :param messagebox: enable popup of infobox
+        """
+
+        if self.indicator_connection.value():
+            return True
+
+        if messagebox and not self.active_message_box:
+            self.active_message_box = True
+            showMessageBox(
+                None,
+                QMessageBox.Icon.Warning,
+                'Connection warning!',
+                'ThorLabs Power Meter is not connected, please connect first!'
+            )
+            self.active_message_box = False
+
+        return False
+
+    def connect(self, port: str = '', messagebox: bool = True):
+        """
+        Connect to given comport. If no comport is given, the current selected comport will be connected to
+
+        :param port: port to connect to
+        :param messagebox: show messagebox if failed
+        """
+
+        # TODO: sometimes it crashes or ConnectionError-Popup when disconnecting
+
+        if not port:
+            port = self.combobox_connection.getValue(text=True)
+        self.setPort(port)
+
+        connect = self.threaded_connection.isDummy()
+
+        self.unconnect()
+
+        if connect:
+            self.connection = TLPMxConnection(
+                port,
+                id_query=True,
+                reset_device=False
+            )
+            try:
+                self.connection.open()
+                self.threaded_connection = ThreadedTLPMxConnection(self.connection)
+                self.indicator_connection.setValue(True)
+                self.status_connection.setText('Connected')
+                self.combobox_connection.setEnabled(False)
+                self.button_connection_refresh.setEnabled(False)
+                self.button_connection.setText('Disconnect')
+
+            except ConnectionError as error:
+                try:
+                    self.connection.close()
+                except ConnectionError:
+                    pass
+                self.connection = None
+                self.reset()
+
+                GlobalConf.logger.info(f'Connection error! Could not connect to ThorLabs Power Meter on port "{port}", because of: {error}')
+
+                if messagebox:
+                    showMessageBox(
+                        None,
+                        QMessageBox.Icon.Critical,
+                        'Connection error!',
+                        f'Could not connect to ThorLabs Power Meter on port "{pot}"!',
+                        f'<strong>Encountered Error:</strong><br>{error}',
+                        expand_details=False
+                    )
+        else:
+            self.combobox_connection.setEnabled(True)
+            self.button_connection_refresh.setEnabled(True)
+            self.button_connection.setText('Connect')
+
+        self.updateAllValues()
+
+    def unconnect(self):
+        """Disconnect from any port"""
+
+        self.threaded_connection.close()
+        self.threaded_connection = ThreadedDummyConnection()
+        if self.connection is not None:
+            self.connection.close()
+            self.connection = None
+
+        comport = self.combobox_connection.getValue(text=True)
+        self.reset()
+        self.setPort(comport)
+
+    def setPort(self, port: str):
+        """
+        Selects the port in the list of ports
+
+        :param port: port to be selected
+        """
+
+        port = port.lower()
+
+        entries = {p.lower(): i for i, p in enumerate(self.combobox_connection.entries)}
+        if port in entries.keys():
+            self.combobox_connection.setCurrentIndex(entries[port])
 
     def reset(self):
         """Resets everything to default"""
