@@ -2,7 +2,7 @@ import numpy as np
 
 from PyQt6.QtCore import Qt, QDir
 from PyQt6.QtGui import QDragEnterEvent, QDropEvent
-from PyQt6.QtWidgets import QGroupBox, QVBoxLayout, QHBoxLayout, QPushButton, QLabel
+from PyQt6.QtWidgets import QGroupBox, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QGridLayout
 
 
 from Utility.Layouts import DeleteWidgetList, DeleteWidgetListItem, ComboBox, TOFCanvas, TabWidget, IndicatorLedButton
@@ -49,21 +49,25 @@ class AnalyseWindow(TabWidget):
         self.row_menu.setAlignment(Qt.AlignmentFlag.AlignLeft)
         self.main_layout.addLayout(self.row_menu)
 
-        self.column_buttons = QVBoxLayout(self)
-        self.column_buttons.setAlignment(Qt.AlignmentFlag.AlignTop)
-        self.row_menu.addLayout(self.column_buttons)
+        self.grid_buttons = QGridLayout(self)
+        self.grid_buttons.setAlignment(Qt.AlignmentFlag.AlignTop)
+        self.row_menu.addLayout(self.grid_buttons)
 
         self.button_open = QPushButton('Open', self)
         self.button_open.clicked.connect(self.openFiles)
-        self.column_buttons.addWidget(self.button_open, alignment=Qt.AlignmentFlag.AlignTop)
+        self.grid_buttons.addWidget(self.button_open, 0, 0, alignment=Qt.AlignmentFlag.AlignTop)
 
-        self.button_clear = QPushButton('Clear', self)
+        self.button_clear = QPushButton('Clear all', self)
         self.button_clear.clicked.connect(self.clearFiles)
-        self.column_buttons.addWidget(self.button_clear, alignment=Qt.AlignmentFlag.AlignTop)
+        self.grid_buttons.addWidget(self.button_clear, 1, 0, alignment=Qt.AlignmentFlag.AlignTop)
 
-        self.button_uncheck = QPushButton('Uncheck', self)
+        self.button_check = QPushButton('Check all', self)
+        self.button_check.clicked.connect(self.checkFiles)
+        self.grid_buttons.addWidget(self.button_check, 0, 1, alignment=Qt.AlignmentFlag.AlignTop)
+
+        self.button_uncheck = QPushButton('Uncheck all', self)
         self.button_uncheck.clicked.connect(self.uncheckFiles)
-        self.column_buttons.addWidget(self.button_uncheck, alignment=Qt.AlignmentFlag.AlignTop)
+        self.grid_buttons.addWidget(self.button_uncheck, 1, 1, alignment=Qt.AlignmentFlag.AlignTop)
 
         self.list_files = DeleteWidgetList(self)
         self.list_files.setMaximumHeight(100)
@@ -118,6 +122,10 @@ class AnalyseWindow(TabWidget):
         self.button_log_y = IndicatorLedButton('Log-y')
         self.button_log_y.clicked.connect(self.logYAxis)
         self.column_axis_manipulation.addWidget(self.button_log_y, alignment=Qt.AlignmentFlag.AlignTop)
+
+        self.button_fill_histo = IndicatorLedButton('Fill histogram', initial_state=True)
+        self.button_fill_histo.clicked.connect(self.loadDataChecked)
+        self.column_axis_manipulation.addWidget(self.button_fill_histo, alignment=Qt.AlignmentFlag.AlignTop)
 
         #
         # DISPLAY
@@ -202,6 +210,10 @@ class AnalyseWindow(TabWidget):
         self.list_files.clearAll()
         self.clearData()
 
+    def checkFiles(self):
+        """Checks all files"""
+        self.list_files.checkAll()
+
     def uncheckFiles(self):
         """Unchecks all files"""
         self.list_files.uncheckAll()
@@ -272,13 +284,13 @@ class AnalyseWindow(TabWidget):
                     if widget.checked():
                         widget.setBackgroundColor(self.graph.graph_colors[i])
 
-                    #view_all = (self.files_opened == widget.path)
+                    view_all = view_all and (self.files_opened == widget.path)
                     self.files_opened = False
 
                 except (OSError, ValueError) as error:
                     self.writeStatusBar(f'File could not be read: {error}')
 
-        self.graph.plotData(self.data, view_all=view_all)
+        self.graph.plotData(self.data, view_all=view_all, fill_histogram=self.button_fill_histo.value())
 
     def loadDataSelected(self, row: int):
         """

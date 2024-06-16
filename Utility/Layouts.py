@@ -831,18 +831,23 @@ class IndicatorLed(QWidget):
 
 
 class IndicatorLedButton(QWidget):
-    """Extends the IndicatorLed with some Label in the same line to the right"""
+    """
+    Extends the IndicatorLed with some Label in the same line to the right
+
+    :param label: label for the indicator
+    :param initial_state: initial state (default: False)
+    """
 
     clicked = pyqtSignal()
 
-    def __init__(self, label: str, *args, **kwargs):
+    def __init__(self, label: str, *args, initial_state: bool = False, **kwargs):
         super().__init__(*args, **kwargs)
 
         self.hbox_layout = QHBoxLayout()
         self.hbox_layout.setAlignment(Qt.AlignmentFlag.AlignLeft)
         self.setLayout(self.hbox_layout)
 
-        self.indicator_led = IndicatorLed(**kwargs, clickable=True)
+        self.indicator_led = IndicatorLed(**kwargs, clickable=True, state=initial_state)
         self.indicator_led.clicked.connect(lambda: self.clicked.emit())
         self.hbox_layout.addWidget(self.indicator_led)
 
@@ -1425,6 +1430,14 @@ class DeleteWidgetList(QListWidget):
         self.clear()
         self.addInfoItem()
 
+    def checkAll(self):
+        """Checks all items"""
+
+        for row in range(self.count()):
+            item = self.itemWidget(self.item(row))
+            if isinstance(item, DeleteWidgetListItem):
+                item.setChecked(True)
+
     def uncheckAll(self):
         """Unchecks all items"""
 
@@ -1517,7 +1530,7 @@ class DeleteWidgetListItem(QWidget):
         self.checkbox = QCheckBox()
         self.setBackgroundColor(self.default_background_color)
         self.main_layout.addWidget(self.checkbox, alignment=Qt.AlignmentFlag.AlignLeft)
-        self.checkbox.clicked.connect(self.checkboxClicked)
+        self.checkbox.stateChanged.connect(self.checkboxClicked)
 
         self.label = QLabel(self.path, self)
         self.main_layout.addWidget(self.label, alignment=Qt.AlignmentFlag.AlignLeft)
@@ -2010,13 +2023,16 @@ class TOFCanvas(pg.PlotWidget):
         self.fit_class = fit_class
         self.setBars(self.fit_class.bars)
 
-    def plotData(self, data: list[tuple[np.ndarray, np.ndarray]], view_all: bool = False):
+    def plotData(self, data: list[tuple[np.ndarray, np.ndarray]], view_all: bool = False, fill_histogram: bool = True):
         """
         Plots data if available
 
         :param data: data as tuple of x and y data in np.array form
         :param view_all: force all x axes to be shown
+        :param fill_histogram: fills the histogram
         """
+
+        view_range: list[list[float, float]] = self.getViewBox().viewRange()
 
         if len(data) > len(self.graph_colors):
             raise AttributeError('Data length can not exceed color length')
@@ -2027,14 +2043,19 @@ class TOFCanvas(pg.PlotWidget):
             graph_curve.setData(x=[], y=[])
 
         for i, d in enumerate(data):
-            self.graph_curves[i].setData(
-                x=d[0],
-                y=d[1],
-                stepMode='left',
-                fillLevel=0,
-                connect='all',
-                brush=(*hexToRgb(self.graph_colors[i]), 80)
-            )
+            data_dict = {
+                'x': d[0],
+                'y': d[1],
+                'stepMode': 'left',
+                'fillLevel': None
+            }
+            if fill_histogram:
+                data_dict.update({
+                    'connect': 'all',
+                    'fillLevel': 0,
+                    'brush': (*hexToRgb(self.graph_colors[i]), 80)
+                })
+            self.graph_curves[i].setData(**data_dict)
         self.graph_curve_fit.setData(x=[], y=[])
 
         xdata = [d[0] for d in self.data]
@@ -2051,7 +2072,6 @@ class TOFCanvas(pg.PlotWidget):
         )
 
         # update if y range in selection would be too big and update x range if needed
-        view_range: list[list[float, float]] = self.getViewBox().viewRange()
         selected_ydata_min = []
         selected_ydata_max = []
         for d in self.data:
@@ -2067,7 +2087,7 @@ class TOFCanvas(pg.PlotWidget):
         if view_all:
             self.setXRange(minx, maxx)
         else:
-            self.setXRange(max(minx, view_range[0][0]), min(maxx, view_range[0][1]))
+            self.setXRange(max(minx, view_range[0][0]), min(maxx, view_range[0][1]), padding=0)
 
         self.limitBars()
 
@@ -2195,8 +2215,9 @@ class TOFCanvas(pg.PlotWidget):
         :param state: True: logarithmic; False: normal
         """
 
-        # TODO: keep original zoom level
+        view_range: list[list[float, float]] = self.getViewBox().viewRange()
         self.plotItem.setLogMode(y=state)
+        self.setXRange(view_range[0][0], view_range[0][1], padding=0)
 
 
 class FittingBar(pg.InfiniteLine):

@@ -137,7 +137,7 @@ class TLPMxConnection:
 
         if self.resource_name is not None:
             if not isinstance(self.resource_name, bytearray) and not isinstance(self.resource_name, bytes):
-                raise AttributeError(f'resource_name must be of <class \'bytearray\'>, <class \'bytes\'> or None. Got {type(self.resource_name)}')
+                raise AttributeError(f'resource_name must be of <class "bytearray">, <class "bytes"> or None. Got {type(self.resource_name)}')
             result = self.dll.TLPMX_init(
                 create_string_buffer(self.resource_name),
                 c_bool(self.id_query),
@@ -1759,28 +1759,25 @@ class TLPMxConnection:
         self.checkError(result)
         return c_char_p(pymessage.raw).value
 
-    def getAutoRange(self, channel: int = 1) -> tuple[float, float, float]:
-        """Gets auto ranges for (Power, Current, Voltage)"""
+    def getAutoRange(self, channel: int = 1) -> tuple[float, float]:
+        """Gets auto ranges for (Power, Current)"""
         return (
             self.getPowerAutoRange(channel),
-            self.getCurrentAutoRange(channel),
-            self.getVoltageAutoRange(channel)
+            self.getCurrentAutoRange(channel)
         )
 
-    def getRange(self, attribute: TLPMxValues.Attribute, channel: int = 1) -> tuple[float, float, float]:
-        """Gets ranges for (Power, Current, Voltage)"""
+    def getRange(self, attribute: TLPMxValues.Attribute, channel: int = 1) -> tuple[float, float]:
+        """Gets ranges for (Power, Current)"""
         return (
             self.getPowerRange(attribute, channel),
-            self.getCurrentRange(attribute, channel),
-            self.getVoltageRange(attribute, channel)
+            self.getCurrentRange(attribute, channel)
         )
 
-    def measure(self, channel: int = 1) -> tuple[float, float, float]:
-        """Obtain (Power, Current, Voltage)"""
+    def measure(self, channel: int = 1) -> tuple[float, float]:
+        """Obtain (Power, Current)"""
         return (
             self.measurePower(channel),
-            self.measureCurrent(channel),
-            self.measureVoltage(channel)
+            self.measureCurrent(channel)
         )
 
     def close(self):

@@ -15,6 +15,9 @@ class MonitorWindow(TabWidget):
     :param parent: parent widget
     """
 
+    # TODO: implement powermeter
+    # TODO: implement camera
+
     def __init__(self, parent):
         super().__init__(parent)
 

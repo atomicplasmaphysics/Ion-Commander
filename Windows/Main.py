@@ -18,6 +18,9 @@ class MainWindow(QMainWindow):
     Class used for main layout
     """
 
+    # TODO: start CoboldPC
+    # TODO: popout windows
+
     def __init__(self):
         super().__init__()
         GlobalConf()

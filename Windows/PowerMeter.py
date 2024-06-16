@@ -1,3 +1,6 @@
+from math import log10, sqrt, pi
+
+
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QGroupBox, QLCDNumber, QApplication, QMessageBox
@@ -220,24 +223,36 @@ class PowerMeterVBoxLayout(QVBoxLayout):
         if last_connection:
             self.connect(last_connection, False)
             
-    def getDisplayParameter(self, values: tuple[float, float, float]) -> float:
+    def getDisplayParameter(self, values: tuple[float, float]) -> float:
         """
         Selects the parameter to display from values
         
-        :param values: tuple of (Power, Current, Vo
+        :param values: tuple of (Power, Current)
         """
+
+        combobox_parameter = self.combobox_display_parameter.currentIndex()
+        beam_area = self.status_beam_diameter.value ** 2 * pi
+        # 0: Power
+        # 1: Power dBm
+        # 2: Current
+        # 3: Irradiance
+
+        if combobox_parameter == 0:
+            return values[0]
+        elif combobox_parameter == 1:
+            return 10 * log10(1000 * values[0])
+        elif combobox_parameter == 2:
+            return values[1]
+        elif combobox_parameter == 3:
+            return values[0] / beam_area
+        else:
+            raise IndexError(f'Invalid combobox parameter of index {combobox_parameter}')
 
     def updateLoop(self, set_startup: bool = False):
         """Called by timer; Updates all values"""
 
         if not self.checkConnection(False):
             return
-        
-        self.combobox_display_parameter.currentIndex()
-        # 0: Power
-        # 1: Power dBm
-        # 2: Current
-        # 3: Irradiance
 
         # get wavelength
         def setWavelength(wavelength: float):
@@ -248,19 +263,29 @@ class PowerMeterVBoxLayout(QVBoxLayout):
 
         self.threaded_connection.callback(setWavelength, self.threaded_connection.getWavelength(TLPMxValues.Attribute.SetValue))
 
-        # get autorange
-        def setAutorange(autoranges: tuple[float, float, float]):
-            power, current, voltage = autoranges
-            # TODO: convert properly
-            
-            ...
+        # get auto range
+        def setAutoRange(auto_ranges: tuple[float, float]):
+            power, current = auto_ranges
+            combobox_parameter = self.combobox_display_parameter.currentIndex()
+            # 0: Power
+            # 1: Power dBm
+            # 2: Current
+            # 3: Irradiance
 
-        self.threaded_connection.callback(setAutorange, self.threaded_connection.getAutoRange())
+            if combobox_parameter == 2:
+                auto_range = (current == 1)
+            else:
+                auto_range = (power == 1)
+
+            self.indicator_auto_range.setValue(auto_range)
+
+        self.threaded_connection.callback(setAutoRange, self.threaded_connection.getAutoRange())
 
         # get range
-        def setRange(ranges: tuple[float, float, float]):
-            power, current, voltage = ranges
-            ...
+        def setRange(ranges: tuple[float, float]):
+            value = self.getDisplayParameter(ranges)
+            # TODO: set range
+            #self.combobox_device_range
 
         self.threaded_connection.callback(setRange, self.threaded_connection.getRange(TLPMxValues.Attribute.SetValue))
 
@@ -291,6 +316,7 @@ class PowerMeterVBoxLayout(QVBoxLayout):
 
         # get beam diameter
         def setBeamDiameter(diameter: float):
+            diameter *= sqrt(2)  # conversion from gauss circular beam
             self.status_beam_diameter.setValue(diameter)
             if set_startup:
                 self.status_beam_diameter.setTargetValue(diameter)
@@ -299,12 +325,14 @@ class PowerMeterVBoxLayout(QVBoxLayout):
         self.threaded_connection.callback(setBeamDiameter, self.threaded_connection.getBeamDiameter(TLPMxValues.Attribute.SetValue))
 
         # get display value
-        def setDisplayValue(values: [float, float, float]):
-            power, current, voltage = values
-            # TODO: also set min and max
-            self.lcd_number_display_power.display(str(power))
+        def setDisplayValue(values: [float, float]):
+            print(values)
+            value = self.getDisplayParameter(values)
+            self.status_display_power_min.setValue(min(self.status_display_power_min.value, value))
+            self.status_display_power_max.setValue(max(self.status_display_power_max.value, value))
+            self.lcd_number_display_power.display(str(value))
 
-        self.threaded_connection.callback(setDisplayValue, self.threaded_connection.measurePower())
+        self.threaded_connection.callback(setDisplayValue, self.threaded_connection.measure())
 
     def updateAllValues(self):
         """Updates all values"""
@@ -346,7 +374,7 @@ class PowerMeterVBoxLayout(QVBoxLayout):
         # TODO: sometimes it crashes or ConnectionError-Popup when disconnecting
 
         if not port:
-            port = self.combobox_connection.getValue(text=True)
+            port = self.combobox_connection.getValue(save=True)
         self.setPort(port)
 
         connect = self.threaded_connection.isDummy()
@@ -458,4 +486,6 @@ class PowerMeterVBoxLayout(QVBoxLayout):
 
     def closeEvent(self):
         """Must be called when application is closed"""
-        pass
+
+        # TODO: implement
+        ...
