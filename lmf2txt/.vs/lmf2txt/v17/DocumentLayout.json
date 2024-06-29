@@ -1,0 +1,69 @@
+{
+  "Version": 1,
+  "WorkspaceRootPath": "C:\\Users\\AG_WI\\Desktop\\Ion Commander\\lmf2txt\\",
+  "Documents": [
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\AG_WI\\Desktop\\Ion Commander\\lmf2txt\\lmf2txt.cpp||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:lmf2txt.cpp||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\AG_WI\\Desktop\\Ion Commander\\lmf2txt\\LMF_IO.cpp||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:LMF_IO.cpp||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\AG_WI\\Desktop\\Ion Commander\\lmf2txt\\LMF_IO.h||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:LMF_IO.h||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}"
+    }
+  ],
+  "DocumentGroupContainers": [
+    {
+      "Orientation": 0,
+      "VerticalTabListWidth": 256,
+      "DocumentGroups": [
+        {
+          "DockedWidth": 200,
+          "SelectedChildIndex": 2,
+          "Children": [
+            {
+              "$type": "Document",
+              "DocumentIndex": 1,
+              "Title": "LMF_IO.cpp",
+              "DocumentMoniker": "C:\\Users\\AG_WI\\Desktop\\Ion Commander\\lmf2txt\\LMF_IO.cpp",
+              "RelativeDocumentMoniker": "LMF_IO.cpp",
+              "ToolTip": "C:\\Users\\AG_WI\\Desktop\\Ion Commander\\lmf2txt\\LMF_IO.cpp",
+              "RelativeToolTip": "LMF_IO.cpp",
+              "ViewState": "AQIAAAAAAAAAAAAAAAAAAAAAAAAfAAAA",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000677|",
+              "WhenOpened": "2024-06-29T10:38:48.64Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 2,
+              "Title": "LMF_IO.h",
+              "DocumentMoniker": "C:\\Users\\AG_WI\\Desktop\\Ion Commander\\lmf2txt\\LMF_IO.h",
+              "RelativeDocumentMoniker": "LMF_IO.h",
+              "ToolTip": "C:\\Users\\AG_WI\\Desktop\\Ion Commander\\lmf2txt\\LMF_IO.h",
+              "RelativeToolTip": "LMF_IO.h",
+              "ViewState": "AQIAAAAAAAAAAAAAAAAAABAAAAACAAAA",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000680|",
+              "WhenOpened": "2024-06-29T10:37:40.667Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 0,
+              "Title": "lmf2txt.cpp",
+              "DocumentMoniker": "C:\\Users\\AG_WI\\Desktop\\Ion Commander\\lmf2txt\\lmf2txt.cpp",
+              "RelativeDocumentMoniker": "lmf2txt.cpp",
+              "ToolTip": "C:\\Users\\AG_WI\\Desktop\\Ion Commander\\lmf2txt\\lmf2txt.cpp",
+              "RelativeToolTip": "lmf2txt.cpp",
+              "ViewState": "AQIAAGwBAAAAAAAAAAAmwIABAAApAAAA",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000677|",
+              "WhenOpened": "2024-06-29T10:24:31.751Z",
+              "EditorCaption": ""
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

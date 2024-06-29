@@ -1,0 +1,4 @@
+﻿  lmf2txt.cpp
+C:\Users\AG_WI\Desktop\lmf2txt\lmf2txt.cpp(18,11): warning C4101: "arg": Unreferenzierte lokale Variable
+C:\Users\AG_WI\Desktop\lmf2txt\lmf2txt.cpp(386,27): warning C4018: "<": Konflikt zwischen "signed" und "unsigned"
+  lmf2txt.vcxproj -> C:\Users\AG_WI\Desktop\lmf2txt\x64\Debug\lmf2txt.exe
