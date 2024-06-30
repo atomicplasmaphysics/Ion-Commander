@@ -317,6 +317,7 @@ int main(int argc, char* argv[]) {
                 event_counter++;
                 if (verbose_flag && event_counter % 100000 == 0) {
                     printf("INFO: Event counter = %lld (%.1f%%)\n", event_counter, (double)event_counter / event_counter_max * 100);
+                    fflush(stdout);
                 }
 
                 // get timestamp
@@ -378,6 +379,7 @@ int main(int argc, char* argv[]) {
         }
         if (verbose_flag) {
             printf("INFO: Event counter = %lld (%.1f%%)\n", event_counter, (double)event_counter / event_counter_max * 100);
+            fflush(stdout);
         }
 
         // output histogram
