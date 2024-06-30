@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Callable
 from math import log10, inf
 from time import time
 from os import path
@@ -720,6 +720,69 @@ class ComboBox(QComboBox):
             if i in disabled_list:
                 enable = False
             self.model().item(i, 0).setEnabled(enable)
+
+
+class FilePath(QWidget):
+    """
+    Extension of QLineEdit for selecting and displaying a file path local and remote
+
+    :param placeholder: (optional) placeholder text
+    :param function: (optional) function that will be called when local button is pressed.
+                                Return value of the function will be displayed.
+    :param icon: (optional) icon of pushbutton for local file
+    """
+
+    def __init__(
+        self,
+        placeholder: str = None,
+        function: Callable = None,
+        icon: QIcon = None, **kwargs
+    ):
+        super().__init__(**kwargs)
+
+        self.layout = QHBoxLayout()
+        self.layout.setContentsMargins(0, 0, 0, 0)
+        self.setLayout(self.layout)
+
+        self.path = ''
+        self.path_display = QLineEdit()
+        if placeholder is not None:
+            self.path_display.setPlaceholderText(placeholder)
+        self.path_display.setReadOnly(True)
+        self.path_display.setMinimumWidth(300)
+        self.layout.addWidget(self.path_display, Qt.AlignmentFlag.AlignLeft)
+
+        self.function = function
+        self.button = QPushButton()
+        if self.function is not None:
+            if icon is None:
+                self.button.setText('...')
+            else:
+                self.button.setIcon(icon)
+            self.button.setMinimumSize(40, 10)
+            self.button.setMaximumSize(40, 30)
+            self.layout.addWidget(self.button, Qt.AlignmentFlag.AlignRight)
+
+            self.button.clicked.connect(self.selectPath)
+
+    def setPath(self, new_path: str):
+        """Sets a path"""
+        self.path = new_path
+        self.displayPath()
+
+    def displayPath(self):
+        """Displays the path in QLineEdit"""
+        if not self.path:
+            self.path_display.setText('')
+            return
+        self.path_display.setText(self.path)
+
+    def selectPath(self):
+        """Sets a new local path"""
+        returned_path = self.function()
+        if returned_path is not None:
+            self.path = returned_path
+            self.displayPath()
 
 
 class IndicatorLed(QWidget):

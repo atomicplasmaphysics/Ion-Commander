@@ -19,6 +19,7 @@ from Utility.Layouts import createFittingBars, FittingWidget
 
 simplefilter('ignore', OptimizeWarning)
 simplefilter('ignore', RuntimeWarning)
+supported_file_types = ['dat', 'cod', 'cod2']
 
 
 def getTACFileData(filename: str, tac: int, delay: float = 0) -> tuple[np.ndarray, np.ndarray]:
@@ -71,12 +72,15 @@ def getFileData(filename: str, tac: int = -1, delay: float = 0) -> tuple[np.ndar
 
     filetype = filename.split('.')[-1]
 
-    if filetype == 'cod':
+    if filetype not in supported_file_types:
+        raise ValueError(f'Not supported type of "{filetype}"!')
+
+    if filetype == 'cod' or filetype == 'cod2':
         return getTDCFileData(filename)
     elif filetype == 'dat':
         return getTACFileData(filename, tac, delay)
     else:
-        raise ValueError(f'Not supported type of "{filetype}"!')
+        raise NotImplementedError(f'Not implemented type of "{filetype}"!')
 
 
 class FitMethod:

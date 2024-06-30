@@ -1,3 +1,6 @@
+from copy import copy
+
+
 import numpy as np
 
 from PyQt6.QtCore import Qt, QDir
@@ -6,9 +9,9 @@ from PyQt6.QtWidgets import QGroupBox, QVBoxLayout, QHBoxLayout, QPushButton, QL
 
 
 from Utility.Layouts import DeleteWidgetList, DeleteWidgetListItem, ComboBox, TOFCanvas, TabWidget, IndicatorLedButton
-from Utility.Dialogs import TACDialog
+from Utility.Dialogs import TACDialog, LMFDialog
 from Utility.Functions import selectFileDialog
-from Utility.Fitting import getFileData, FitMethod, fittingFunctionsSingle, fittingFunctionsMultiple
+from Utility.Fitting import getFileData, FitMethod, fittingFunctionsSingle, fittingFunctionsMultiple, supported_file_types
 
 
 class AnalyseWindow(TabWidget):
@@ -30,8 +33,11 @@ class AnalyseWindow(TabWidget):
 
         self.data: list[tuple[np.ndarray, np.ndarray]] = []
         self.files_opened = False
-        self.supported_filetypes = ['dat', 'cod']
+        self.supported_filetypes = copy(supported_file_types)
+        self.supported_filetypes.append('lmf')
+        self.supported_filetypes_filter = '(' + ' '.join(f'*.{file_type}' for file_type in self.supported_filetypes) + ')'
         self.setAcceptDrops(True)
+        self.last_opened_directory = QDir.currentPath()
 
         #
         # SET UP WIDGET AND LAYOUT
@@ -146,13 +152,15 @@ class AnalyseWindow(TabWidget):
                 parent=self,
                 for_saving=False,
                 instruction='Select Files',
-                start_dir=QDir.currentPath(),
-                file_filter='(*.dat *.cod)',
+                start_dir=self.last_opened_directory,
+                file_filter=self.supported_filetypes_filter,
                 multiple=True
             )
 
         if files is None or not len(files):
             return
+
+        self.last_opened_directory = files[0]
 
         for file in files:
             if not file.split('.')[-1].lower() in self.supported_filetypes:
@@ -172,6 +180,14 @@ class AnalyseWindow(TabWidget):
                     'tac': tac_dialog.tac_input.value(),
                     'delay': tac_dialog.delay_input.value(),
                 }
+
+            # open convert window for '.lmf' file
+            if file.endswith('.lmf'):
+                lmf_dialog = LMFDialog(file, parent=self)
+                lmf_dialog.exec()
+                if not lmf_dialog.finish_state:
+                    continue
+                file = lmf_dialog.output_filename.path
 
             if self.files_opened is False:
                 self.files_opened = file
