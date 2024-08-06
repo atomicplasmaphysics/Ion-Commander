@@ -162,17 +162,17 @@ class MainWindow(QMainWindow):
         # TODO: Add measure tab TDC
         # TODO: Add measure tab NDIGO
 
-        # Add control tab
-        self.control_window = ControlWindow(self)
-        self.addTab(self.control_window, 'Control')
-
-        # Add monitor tab
-        self.monitor_window = MonitorWindow(self)
-        self.addTab(self.monitor_window, 'Control')
-
-        # Add tips tab
-        self.tips_window = TipsWindow(self)
-        self.addTab(self.tips_window, 'Tips')
+        # # Add control tab
+        # self.control_window = ControlWindow(self)
+        # self.addTab(self.control_window, 'Control')
+        #
+        # # Add monitor tab
+        # self.monitor_window = MonitorWindow(self)
+        # self.addTab(self.monitor_window, 'Control')
+        #
+        # # Add tips tab
+        # self.tips_window = TipsWindow(self)
+        # self.addTab(self.tips_window, 'Tips')
 
         # Add analyse tab
         self.analyse_window = AnalyseWindow(self)
