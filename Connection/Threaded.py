@@ -8,7 +8,9 @@ from PyQt6.QtCore import QObject, pyqtSignal, QRunnable, pyqtSlot, QThreadPool
 from Config.GlobalConf import GlobalConf
 
 from Connection.ISEG import ISEGConnection
+from Connection.TPG300 import TPG300Connection
 from Connection.Thyracont import ThyracontConnection
+from Connection.MixedPressure import MixedPressureConnection
 from Connection.Monaco import MonacoConnection
 from Connection.TLPMx import TLPMxConnection
 
@@ -16,11 +18,15 @@ from Connection.TLPMx import TLPMxConnection
 if TYPE_CHECKING:
     base_iseg = ISEGConnection
     base_thyracont = ThyracontConnection
+    base_tpg300 = TPG300Connection
+    base_mixedpressure = MixedPressureConnection
     base_monaco = MonacoConnection
     base_tlpmx = TLPMxConnection
 else:
     base_iseg = object
     base_thyracont = object
+    base_tpg300 = object
+    base_mixedpressure = object
     base_monaco = object
     base_tlpmx = object
 
@@ -121,7 +127,7 @@ class ThreadedConnection:
 
     def __init__(
         self,
-        connection: ISEGConnection | ThyracontConnection | MonacoConnection | TLPMxConnection | None
+        connection: ISEGConnection | ThyracontConnection | TPG300Connection | MixedPressureConnection | MonacoConnection | TLPMxConnection | None
     ):
         self.connection = connection
 
@@ -225,6 +231,28 @@ class ThreadedThyracontConnection(ThreadedConnection, base_thyracont):
     """
 
     def __init__(self, connection: ThyracontConnection):
+        super().__init__(connection)
+
+
+class ThreadedTPG300Connection(ThreadedConnection, base_tpg300):
+    """
+    Threaded connection for <TPG300Connection>
+
+    :param connection: TPG300Connection
+    """
+
+    def __init__(self, connection: TPG300Connection):
+        super().__init__(connection)
+
+
+class ThreadedMixedPressureConnection(ThreadedConnection, base_mixedpressure):
+    """
+    Threaded connection for <MixedPressureConnection>
+
+    :param connection: MixedPressureConnection
+    """
+
+    def __init__(self, connection: MixedPressureConnection):
         super().__init__(connection)
 
 

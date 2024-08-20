@@ -450,7 +450,9 @@ def main():
     with LucidControlConnection('COM3') as lc:
         print(lc.ioGet(0))
         print(lc.ioGet(1))
-        print(lc.ioGroupGet((True, True, False, False)))
+        print(lc.ioGet(2))
+        print(lc.ioGet(3))
+        print(lc.ioGroupGet((True, True, True, True)))
 
 
 if __name__ == '__main__':

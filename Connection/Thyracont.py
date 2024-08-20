@@ -4,6 +4,18 @@ from math import pow, log
 from Connection.LucidControl import LucidControlConnection
 
 
+def thyracontVoltageToPressure(voltage: float) -> float:
+    """Convert voltage to pressure in mbar"""
+    if not 1.2 < voltage < 8.7:
+        return 0
+    return pow(10, (voltage - 6.8) / 0.6)
+
+
+def thyracontPressureToVoltage(pressure: float) -> float:
+    """Convert pressure in mbar to voltage"""
+    return 0.6 * log(pressure, 10) + 6.8
+
+
 class ThyracontConnection(LucidControlConnection):
     def __init__(
         self,
@@ -22,32 +34,25 @@ class ThyracontConnection(LucidControlConnection):
     @staticmethod
     def voltageToPressure(voltage: float) -> float:
         """Convert voltage to pressure in mbar"""
-        return pow(10, (voltage - 6.8) / 0.6)
+        return thyracontVoltageToPressure(voltage)
 
     @staticmethod
     def pressureToVoltage(pressure: float) -> float:
         """Convert pressure in mbar to voltage"""
-        return 0.6 * log(pressure, 10) + 6.8
+        return thyracontPressureToVoltage(pressure)
 
-    def getTemperature(self, channel: int) -> float:
+    def getPressure(self, channel: int) -> float:
         """Return pressure in mbar off one channel"""
         return self.voltageToPressure(self.ioGet(channel))
 
-    def getTemperatureAll(self) -> tuple[float, ...]:
+    def getPressureAll(self) -> tuple[float, ...]:
         """Return pressure in mbar off all channels"""
-        voltages = self.ioGroupGet(tuple([True] * self.channels))
-        pressure = []
-        for voltage in voltages:
-            if 1.2 < voltage < 8.7:
-                pressure.append(self.voltageToPressure(voltage))
-            else:
-                pressure.append(0)
-        return tuple(pressure)
+        return tuple([self.voltageToPressure(voltage) for voltage in self.ioGroupGet(tuple([True] * self.channels))])
 
 
 def main():
     with ThyracontConnection('COM3') as thyracont:
-        print(thyracont.getTemperatureAll())
+        print(thyracont.getPressureAll())
 
 
 if __name__ == '__main__':

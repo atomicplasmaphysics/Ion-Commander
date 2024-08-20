@@ -3,12 +3,12 @@
   "WorkspaceRootPath": "C:\\Users\\AG_WI\\Desktop\\Ion Commander\\lmf2txt\\",
   "Documents": [
     {
-      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\AG_WI\\Desktop\\Ion Commander\\lmf2txt\\CppProperties.json||{90A6B3A7-C1A3-4009-A288-E2FF89E96FA0}",
-      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:CppProperties.json||{90A6B3A7-C1A3-4009-A288-E2FF89E96FA0}"
-    },
-    {
       "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\AG_WI\\Desktop\\Ion Commander\\lmf2txt\\lmf2txt.cpp||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}",
       "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:lmf2txt.cpp||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\AG_WI\\Desktop\\Ion Commander\\lmf2txt\\CppProperties.json||{90A6B3A7-C1A3-4009-A288-E2FF89E96FA0}",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:CppProperties.json||{90A6B3A7-C1A3-4009-A288-E2FF89E96FA0}"
     },
     {
       "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\AG_WI\\Desktop\\Ion Commander\\lmf2txt\\LMF_IO.cpp||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}",
@@ -26,11 +26,11 @@
       "DocumentGroups": [
         {
           "DockedWidth": 200,
-          "SelectedChildIndex": 0,
+          "SelectedChildIndex": 3,
           "Children": [
             {
               "$type": "Document",
-              "DocumentIndex": 0,
+              "DocumentIndex": 1,
               "Title": "CppProperties.json",
               "DocumentMoniker": "C:\\Users\\AG_WI\\Desktop\\Ion Commander\\lmf2txt\\CppProperties.json",
               "RelativeDocumentMoniker": "CppProperties.json",
@@ -67,13 +67,13 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 1,
+              "DocumentIndex": 0,
               "Title": "lmf2txt.cpp",
               "DocumentMoniker": "C:\\Users\\AG_WI\\Desktop\\Ion Commander\\lmf2txt\\lmf2txt.cpp",
               "RelativeDocumentMoniker": "lmf2txt.cpp",
               "ToolTip": "C:\\Users\\AG_WI\\Desktop\\Ion Commander\\lmf2txt\\lmf2txt.cpp",
               "RelativeToolTip": "lmf2txt.cpp",
-              "ViewState": "AQIAAGYBAAAAAAAAAAAmwDoBAAAAAAAA",
+              "ViewState": "AQIAAD4BAAAAAAAAAAAuwEkBAABLAAAA",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000677|",
               "WhenOpened": "2024-06-29T10:24:31.751Z",
               "EditorCaption": ""

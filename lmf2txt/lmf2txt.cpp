@@ -115,9 +115,12 @@ int main(int argc, char* argv[]) {
 
     char timing_flag = 0;
     char start_time_flag = 0;
+    double start_time_set = 0;
     double start_time = 0;
     char end_time_flag = 0;
+    double end_time_set = 0;
     double end_time = 0;
+
 
     char split_flag = 0;
     int split_splits = 0;
@@ -149,11 +152,13 @@ int main(int argc, char* argv[]) {
             break;
         case 'a':
             start_time_flag = 1;
-            start_time = atof(optarg);
+            start_time_set = atof(optarg);
+            start_time = start_time_set;
             break;
         case 'b':
             end_time_flag = 1;
-            end_time = atof(optarg);
+            end_time_set = atof(optarg);
+            end_time = end_time_set;
             break;
         case 's':
             split_flag = 1;
@@ -276,8 +281,8 @@ int main(int argc, char* argv[]) {
             sprintf(output_filename, "%s_%d.%s", current_output_filename, split_counter + 1, output_file_extension);
         }
         else if (split_seconds_flag) {
-            start_time = split_seconds_splits * split_counter;
-            end_time = split_seconds_splits * (split_counter + 1);
+            start_time = start_time_set + split_seconds_splits * split_counter;
+            end_time = start_time_set + split_seconds_splits * (split_counter + 1);
             timing_flag = 1;
             sprintf(output_filename, "%s_%ds-%ds.%s", current_output_filename, (int)start_time, (int)end_time, output_file_extension);
         }
@@ -304,7 +309,7 @@ int main(int argc, char* argv[]) {
         }
 
         // data
-        for (;;) {
+        while (1) {
             if (LMF->ReadNextEvent()) {
                 // check error flag
                 if (LMF->errorflag) {

@@ -13,8 +13,10 @@ from Utility.Layouts import PressureWidget, IndicatorLed, ComboBox
 from Utility.Dialogs import showMessageBox
 
 from Connection.USBPorts import getComports
-from Connection.Thyracont import ThyracontConnection
-from Connection.Threaded import ThreadedThyracontConnection, ThreadedDummyConnection
+from Connection.Thyracont import thyracontVoltageToPressure
+from Connection.TPG300 import tpg300VoltageToPressure, TPG300Type
+from Connection.MixedPressure import MixedPressureConnection
+from Connection.Threaded import ThreadedMixedPressureConnection, ThreadedDummyConnection
 
 
 class PressureVBoxLayout(QVBoxLayout):
@@ -27,8 +29,8 @@ class PressureVBoxLayout(QVBoxLayout):
         self.update_timer.setInterval(GlobalConf.update_timer_time)
         self.update_timer.start()
 
-        self.connection: None | ThyracontConnection = None
-        self.threaded_connection: ThreadedDummyConnection | ThreadedThyracontConnection = ThreadedDummyConnection()
+        self.connection: None | MixedPressureConnection = None
+        self.threaded_connection: ThreadedDummyConnection | ThreadedMixedPressureConnection = ThreadedDummyConnection()
 
         # Connection
         self.connection_group_box = QGroupBox('Connection')
@@ -80,6 +82,22 @@ class PressureVBoxLayout(QVBoxLayout):
         self.group_box_lsd.setLayout(self.layout_lsd)
         self.addWidget(self.group_box_lsd)
 
+        # Pre-vacuum
+        self.group_box_prevac = QGroupBox('Pre-Vacuum')
+        self.pressure_widget_prevac = PressureWidget(input_range=(3, -3))
+        self.layout_prevac = QVBoxLayout()
+        self.layout_prevac.addWidget(self.pressure_widget_prevac)
+        self.group_box_prevac.setLayout(self.layout_prevac)
+        self.addWidget(self.group_box_prevac)
+
+        # grouped items
+        self.pressure_widgets = [
+            self.pressure_widget_pitbul,
+            self.pressure_widget_lsd,
+            self.pressure_widget_prevac,
+            None
+        ]
+
         self.reset()
 
         last_connection = GlobalConf.getConnection('pressure')
@@ -92,8 +110,16 @@ class PressureVBoxLayout(QVBoxLayout):
         if self.threaded_connection.isDummy():
             return
 
-        self.threaded_connection.callback(self.pressure_widget_pitbul.setPressure, self.threaded_connection.getTemperature(0))
-        self.threaded_connection.callback(self.pressure_widget_lsd.setPressure, self.threaded_connection.getTemperature(1))
+        def setPressures(pressures: list[float]):
+            if len(pressures) != 4:
+                GlobalConf.logger.error(f'Pressures cannot be set, non matching length: expected len = {len(self.pressure_widgets)}, got len = {len(pressures)}')
+                return
+            for pressure_widget, pressure in zip(self.pressure_widgets, pressures):
+                if pressure_widget is None:
+                    continue
+                pressure_widget.setPressure(pressure)
+
+        self.threaded_connection.callback(setPressures, self.threaded_connection.getPressureAll())
 
     def connect(self, comport: str = '', messagebox: bool = True):
         """
@@ -112,10 +138,15 @@ class PressureVBoxLayout(QVBoxLayout):
         self.unconnect()
 
         if connect:
-            self.connection = ThyracontConnection(comport)
+            self.connection = MixedPressureConnection(comport, [
+                thyracontVoltageToPressure,
+                thyracontVoltageToPressure,
+                lambda voltage: tpg300VoltageToPressure(voltage, TPG300Type.Pirani),
+                lambda voltage: 0
+            ])
             try:
                 self.connection.open()
-                self.threaded_connection = ThreadedThyracontConnection(self.connection)
+                self.threaded_connection = ThreadedMixedPressureConnection(self.connection)
                 self.indicator_connection.setValue(True)
                 self.status_connection.setText('Connected')
                 self.combobox_connection.setEnabled(False)
@@ -185,6 +216,7 @@ class PressureVBoxLayout(QVBoxLayout):
 
         self.pressure_widget_pitbul.setPressure(0)
         self.pressure_widget_lsd.setPressure(0)
+        self.pressure_widget_prevac.setPressure(0)
 
         self.combobox_connection.setEnabled(True)
         self.button_connection_refresh.setEnabled(True)
