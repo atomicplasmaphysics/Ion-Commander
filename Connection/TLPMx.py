@@ -1759,12 +1759,22 @@ class TLPMxConnection:
         self.checkError(result)
         return c_char_p(pymessage.raw).value
 
-    def getAutoRange(self, channel: int = 1) -> tuple[float, float]:
+    def setAutoRange(self, ranges: tuple[int, int], channel: int = 1):
+        """Sets auto ranges for (Power, Current)"""
+        self.setPowerAutoRange(ranges[0], channel)
+        self.setCurrentAutoRange(ranges[1], channel)
+
+    def getAutoRange(self, channel: int = 1) -> tuple[int, int]:
         """Gets auto ranges for (Power, Current)"""
         return (
             self.getPowerAutoRange(channel),
             self.getCurrentAutoRange(channel)
         )
+
+    def setRange(self, ranges: tuple[float, float], channel: int = 1):
+        """Sets ranges for (Power, Current)"""
+        self.setPowerRange(ranges[0], channel)
+        self.setCurrentRange(ranges[1], channel)
 
     def getRange(self, attribute: TLPMxValues.Attribute, channel: int = 1) -> tuple[float, float]:
         """Gets ranges for (Power, Current)"""

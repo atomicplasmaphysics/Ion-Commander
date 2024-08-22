@@ -143,7 +143,7 @@ def getPrefix(number: float | int) -> tuple[float | int, str]:
         raise ValueError(f'Provided argument is of type {type(number)} not <float> or <int>')
 
     prefixes = ['Z', 'E', 'P', 'T', 'G', 'M', 'k', '', 'm', 'μ', 'n', 'p', 'f', 'a', 'z', 'y']
-    # [21, 18, 15, 12, 9, 6, 3, 0, -3, -6, -9, -12, -15, -18, -21, -24]
+    #          [21,  18,  15,  12,   9,   6,    3,  0,  -3,  -6,  -9, -12, -15, -18, -21, -24]
     exponent = int(f'{number:.1E}'.split('E')[1]) + 1
 
     for i, prefix in enumerate(prefixes):

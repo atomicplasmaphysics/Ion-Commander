@@ -1,5 +1,6 @@
 import serial.tools.list_ports as list_ports
 from serial import Serial
+from time import sleep
 
 
 from Config.GlobalConf import GlobalConf
@@ -46,6 +47,8 @@ class COMConnection:
     :param baudrate: Baudrate
     :param echo: If device has echo. Will be checked
     :param cleaning: If output cache should be cleared when entering and exiting
+    :param auto_ctrl_lnf: If automatic control linefeed character should be inserted ('\r\n')
+    :param init_sleep: time for waiting on connection
     :param debug: If debug is enabled
     """
 
@@ -57,6 +60,8 @@ class COMConnection:
         baudrate: int = 9600,
         echo: bool = True,
         cleaning: bool = True,
+        auto_ctrl_lnf: bool = True,
+        init_sleep: int = 0,
         debug: bool = False
     ):
         self.comport = comport
@@ -65,6 +70,8 @@ class COMConnection:
         self.baudrate = baudrate
         self.echo = echo
         self.cleaning = cleaning
+        self.auto_ctrl_lnf = auto_ctrl_lnf
+        self.init_sleep = init_sleep
         self.debug = debug
 
         self.serial: Serial | None = None
@@ -80,6 +87,8 @@ class COMConnection:
                 self.serial = Serial(self.comport, baudrate=self.baudrate, timeout=self.timeout)
             else:
                 self.serial = VirtualSerial()
+
+        sleep(self.init_sleep)
 
         self.clean()
         return self
@@ -117,13 +126,11 @@ class COMConnection:
         if self.serial is None:
             raise ConnectionError('Connection has not been established')
 
-        if not cmd.endswith('\r\n'):
+        if self.auto_ctrl_lnf and not cmd.endswith('\r\n'):
             cmd += '\r\n'
 
         cmd_encode = cmd.encode(self.encoding)
-        self.serial.write(cmd_encode)
-        if self.debug:
-            GlobalConf.logger.debug(f'Command {cmd_encode} was written to port "{self.comport}"')
+        self.writeBytes(cmd_encode)
 
         # if echo is not on
         if not self.echo:
@@ -134,6 +141,17 @@ class COMConnection:
         if echo_cmd != cmd:
             self.clean()
             raise ConnectionError(f'Sent command does not match echo command: {cmd!r} was sent and {echo_cmd!r} was received on port "{self.comport}"')
+
+    def writeBytes(self, cmd: bytes):
+        """
+        Writes command in bytes to connection
+
+        :param cmd: instruction command
+        """
+
+        self.serial.write(cmd)
+        if self.debug:
+            GlobalConf.logger.debug(f'Command {cmd} was written to port "{self.comport}"')
 
     def readline(self) -> str:
         """Reads output line"""

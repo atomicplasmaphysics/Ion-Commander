@@ -4,6 +4,7 @@ from PyQt6.QtCore import Qt
 
 from Utility.Layouts import TabWidget, VBoxTitleLayout
 
+from DB.db import DB
 
 from Windows.PSU import PSUVBoxLayout
 from Windows.EBIS import EBISVBoxLayout
@@ -108,3 +109,12 @@ class ControlWindow(TabWidget):
         self.ebis_group_vbox.closeEvent()
         self.laser_group_vbox.closeEvent()
         self.pressure_group_vbox.closeEvent()
+
+    def log(self, db: DB):
+        """
+        Called to log all important value
+
+        :param db: database class
+        """
+
+        self.pressure_group_vbox.log(db)

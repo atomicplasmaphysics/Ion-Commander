@@ -23,6 +23,8 @@ import pyqtgraph as pg
 from Config.GlobalConf import GlobalConf
 from Config.StylesConf import Colors, Styles, Forms
 
+from DB.db import DB
+
 from Utility.ModifyWidget import setWidgetBackground
 from Utility.Functions import hexToRgb, linearInterpolateColor, getPrefix, qColorToHex, selectFileDialog
 
@@ -95,6 +97,16 @@ class TabWidget(QWidget):
         """
 
         self.main_window.writeStatusBar(msg, visible_time)
+
+    def log(self, db: DB):
+        """
+        Called to log all important value
+
+        :param db: database class
+        """
+
+        pass
+
 
 
 class VBoxTitleLayout(QVBoxLayout):
@@ -1250,6 +1262,18 @@ class DisplayLabel(QLabel):
         """
 
         self.deviation = deviation
+        self._writeOwnText()
+
+    def setUnit(self, unit: str, enable_prefix: bool = False):
+        """
+        Set a new deviation
+
+        :param unit: unit to be displayed
+        :param enable_prefix: enable prefixing
+        """
+
+        self.unit = unit
+        self.enable_prefix = enable_prefix
         self._writeOwnText()
 
     def paintEvent(self, event):

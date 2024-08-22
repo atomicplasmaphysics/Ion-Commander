@@ -9,6 +9,8 @@ from PyQt6.QtCore import Qt, QTimer
 from Config.GlobalConf import GlobalConf
 from Config.StylesConf import Colors
 
+from DB.db import DB
+
 from Utility.Layouts import PressureWidget, IndicatorLed, ComboBox
 from Utility.Dialogs import showMessageBox
 
@@ -245,3 +247,16 @@ class PressureVBoxLayout(QVBoxLayout):
             self.connection.close()
 
         GlobalConf.updateConnections(pressure=last_connection)
+
+    def log(self, db: DB):
+        """
+        Called to log all important value
+
+        :param db: database class
+        """
+
+        db.insertPressure(
+            self.pressure_widget_pitbul.pressure,
+            self.pressure_widget_lsd.pressure,
+            self.pressure_widget_prevac.pressure,
+        )

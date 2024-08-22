@@ -3,13 +3,14 @@ from math import log10, sqrt, pi
 
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QIcon
-from PyQt6.QtWidgets import QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QGroupBox, QLCDNumber, QApplication, QMessageBox
+from PyQt6.QtWidgets import QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QGroupBox, QMessageBox
 
 
 from Config.GlobalConf import GlobalConf
 from Config.StylesConf import Colors
 
 from Utility.Layouts import InsertingGridLayout, IndicatorLed, DoubleSpinBox, DisplayLabel, SpinBox, ComboBox
+from Utility.Functions import getPrefix
 from Utility.Dialogs import showMessageBox
 
 from Connection.TLPMx import TLPMxConnection, TLPMxValues, getResources
@@ -78,12 +79,15 @@ class PowerMeterVBoxLayout(QVBoxLayout):
 
         # display parameter
         self.label_display_parameter = QLabel('Display parameter')
-        self.combobox_display_parameter = ComboBox(entries=[
-            'Power',
-            'Power dBm',
-            'Current',
-            'Irradiance'
-        ])
+        self.combobox_display_parameter_table = [
+            ('Power', 'W'),
+            ('Power dBm', 'dBm'),
+            ('Current', 'A'),
+            ('Irradiance', 'W/cm²')
+        ]
+        self.display_parameter_unit = self.combobox_display_parameter_table[0][1]
+        self.combobox_display_parameter = ComboBox([cdp[0] for cdp in self.combobox_display_parameter_table])
+        self.combobox_display_parameter.currentIndexChanged.connect(lambda: self.updateDisplayParameter())
         self.settings_grid.addWidgets(
             self.label_display_parameter,
             self.combobox_display_parameter
@@ -92,7 +96,7 @@ class PowerMeterVBoxLayout(QVBoxLayout):
         # device wavelength
         self.label_wavelength = QLabel('Wavelength [nm]')
         self.spinbox_wavelength = SpinBox(default=0, input_range=(0, 1024), buttons=False)
-        #self.spinbox_wavelength.editingFinished.connect(lambda: self.)
+        self.spinbox_wavelength.editingFinished.connect(lambda: self.setWavelength(self.spinbox_wavelength.value()))
         self.status_wavelength = DisplayLabel(value=0, unit='nm', target_value=0, deviation=0.1, decimals=0)
         self.settings_grid.addWidgets(
             self.label_wavelength,
@@ -104,6 +108,7 @@ class PowerMeterVBoxLayout(QVBoxLayout):
         self.label_auto_range = QLabel('Auto Range')
         self.indicator_auto_range = IndicatorLed()
         self.button_auto_range = QPushButton('On')
+        self.button_auto_range.pressed.connect(lambda: self.setAutoRange(self.indicator_auto_range.value()))
         self.settings_grid.addWidgets(
             self.label_auto_range,
             self.indicator_auto_range,
@@ -113,6 +118,7 @@ class PowerMeterVBoxLayout(QVBoxLayout):
         # device range
         self.label_device_range = QLabel('Range')
         self.combobox_device_range = ComboBox()
+        #self.combobox_device_range.currentIndexChanged.connect(lambda: self.)  # TODO: needs to be implemented
         self.settings_grid.addWidgets(
             self.label_device_range,
             self.combobox_device_range
@@ -121,7 +127,7 @@ class PowerMeterVBoxLayout(QVBoxLayout):
         # device attenuation
         self.label_attenuation = QLabel('Attenuation [dB]')
         self.spinbox_attenuation = DoubleSpinBox(default=0, step_size=0.01, decimals=2, input_range=(-60, 60), buttons=False)
-        # self.spinbox_attenuation.editingFinished.connect(lambda: self.)
+        self.spinbox_attenuation.editingFinished.connect(lambda: self.setAttenuation(self.spinbox_attenuation.value()))
         self.status_attenuation = DisplayLabel(value=0, unit='dB', target_value=0, deviation=0.1, decimals=2)
         self.settings_grid.addWidgets(
             self.label_attenuation,
@@ -132,7 +138,7 @@ class PowerMeterVBoxLayout(QVBoxLayout):
         # device averaging
         self.label_averaging = QLabel('Averaging')
         self.spinbox_averaging = SpinBox(default=1, input_range=(1, 1024), buttons=False)
-        # self.spinbox_averaging.editingFinished.connect(lambda: self.)
+        self.spinbox_averaging.editingFinished.connect(lambda: self.setAveraging(self.spinbox_averaging.value()))
         self.status_averaging = DisplayLabel(value=1, target_value=0, deviation=0.1, decimals=0)
         self.settings_grid.addWidgets(
             self.label_averaging,
@@ -143,6 +149,8 @@ class PowerMeterVBoxLayout(QVBoxLayout):
         # device zero adjust
         self.label_zero_adjust = QLabel('Zero Adjust')
         self.button_zero_adjust = QPushButton('Adjust')
+        self.zero_adjust_state = 0
+        self.button_zero_adjust.pressed.connect(lambda: self.setZeroAdjust())
         self.status_zero_adjust = DisplayLabel(value=0, unit='W', target_value=0, deviation=0, decimals=2)
         self.settings_grid.addWidgets(
             self.label_zero_adjust,
@@ -153,7 +161,7 @@ class PowerMeterVBoxLayout(QVBoxLayout):
         # beam diameter
         self.label_beam_diameter = QLabel('Beam diameter [mm]')
         self.spinbox_beam_diameter = DoubleSpinBox(default=0, decimals=2, step_size=0.1, input_range=(0, 9.5), buttons=False)
-        # self.spinbox_beam_diameter.editingFinished.connect(lambda: self.)
+        self.spinbox_beam_diameter.editingFinished.connect(lambda: self.setBeamDiameter(self.spinbox_beam_diameter.value()))
         self.spinbox_beam_diameter.setToolTip('Assuming Gaussian profile')
         self.status_beam_diameter = DisplayLabel(value=0, unit='mm', target_value=0, deviation=0.1, decimals=2)
         self.settings_grid.addWidgets(
@@ -172,20 +180,16 @@ class PowerMeterVBoxLayout(QVBoxLayout):
 
         # power
         self.display_hbox = QHBoxLayout()
-        self.display_hbox.setAlignment(Qt.AlignmentFlag.AlignLeft)
+        self.display_hbox.setAlignment(Qt.AlignmentFlag.AlignRight)
         self.display_vbox.addLayout(self.display_hbox)
 
-        self.display_grid = InsertingGridLayout()
-        self.display_hbox.addLayout(self.display_grid)
-
-        self.label_display_power = QLabel('Current')
-        self.display_grid.addWidgets(
-            self.label_display_power
-        )
-        self.lcd_number_display_power = QLCDNumber()
-        self.display_grid.addWidgets(
-            self.lcd_number_display_power
-        )
+        self.display_power = 0
+        self.display_power_label = QLabel('123.456 mW')  # TODO: change this
+        display_power_label_font = self.display_power_label.font()
+        display_power_label_font.setPointSizeF(display_power_label_font.pointSizeF() * 4.5)
+        self.display_power_label.setFont(display_power_label_font)
+        self.display_hbox.addWidget(self.display_power_label)
+        self.updateDisplayPowerLabel()
 
         # min/max
         self.display_hbox_min_max = QHBoxLayout()
@@ -202,8 +206,8 @@ class PowerMeterVBoxLayout(QVBoxLayout):
             self.label_display_power_max
         )
 
-        self.status_display_power_min = DisplayLabel(value=0, unit='W', target_value=0, deviation=0.1, decimals=2)
-        self.status_display_power_max = DisplayLabel(value=0, unit='W', target_value=0, deviation=0.1, decimals=2)
+        self.status_display_power_min = DisplayLabel(value=0, unit='W', enable_prefix=True, target_value=0, deviation=0.1, decimals=2)
+        self.status_display_power_max = DisplayLabel(value=0, unit='W', enable_prefix=True, target_value=0, deviation=0.1, decimals=2)
         self.display_grid_min_max.addWidgets(
             self.status_display_power_min,
             self.status_display_power_max
@@ -215,13 +219,15 @@ class PowerMeterVBoxLayout(QVBoxLayout):
         self.display_vbox.addLayout(self.display_hbox_reset)
 
         self.button_display_power_reset_min_max = QPushButton('Reset min/max')
+        self.button_display_power_reset_min_max.pressed.connect(lambda: self.resetMinMax())
         self.display_hbox_reset.addWidget(self.button_display_power_reset_min_max)
 
         self.reset()
 
-        last_connection = GlobalConf.getConnection('powermeter')
+        last_connection = GlobalConf.getConnection('power_meter')
         if last_connection:
             self.connect(last_connection, False)
+            self.combobox_display_parameter.setCurrentIndex(GlobalConf.getPowerMeterDisplayParameter())
             
     def getDisplayParameter(self, values: tuple[float, float]) -> float:
         """
@@ -264,7 +270,7 @@ class PowerMeterVBoxLayout(QVBoxLayout):
         self.threaded_connection.callback(setWavelength, self.threaded_connection.getWavelength(TLPMxValues.Attribute.SetValue))
 
         # get auto range
-        def setAutoRange(auto_ranges: tuple[float, float]):
+        def setAutoRange(auto_ranges: tuple[int, int]):
             power, current = auto_ranges
             combobox_parameter = self.combobox_display_parameter.currentIndex()
             # 0: Power
@@ -326,11 +332,11 @@ class PowerMeterVBoxLayout(QVBoxLayout):
 
         # get display value
         def setDisplayValue(values: [float, float]):
-            print(values)
             value = self.getDisplayParameter(values)
             self.status_display_power_min.setValue(min(self.status_display_power_min.value, value))
             self.status_display_power_max.setValue(max(self.status_display_power_max.value, value))
-            self.lcd_number_display_power.display(str(value))
+            self.display_power = value
+            self.updateDisplayPowerLabel()
 
         self.threaded_connection.callback(setDisplayValue, self.threaded_connection.measure())
 
@@ -340,6 +346,104 @@ class PowerMeterVBoxLayout(QVBoxLayout):
         self.status_display_power_min.setValue(0)
         self.status_display_power_max.setValue(0)
         self.updateLoop(set_startup=True)
+
+    def updateDisplayParameterUnit(self):
+        """Updates the display parameter unit"""
+
+        self.display_parameter_unit = self.combobox_display_parameter_table[self.combobox_display_parameter.currentIndex()][1]
+        self.status_display_power_min.setUnit(self.display_parameter_unit)
+        self.status_display_power_max.setUnit(self.display_parameter_unit)
+
+    def updateDisplayPowerLabel(self):
+        """Updates the display power label based on the display power"""
+
+        display_power, prefix = getPrefix(self.display_power)
+        self.display_power_label.setText(f'{display_power} {prefix}{self.display_parameter_unit}')
+
+    def updateDisplayParameter(self):
+        """Updates display parameters"""
+
+        self.updateDisplayParameterUnit()
+        self.updateDisplayPowerLabel()
+        self.resetMinMax()
+
+    def setWavelength(self, wavelength: int):
+        """
+        Sets the laser wavelength
+
+        :param wavelength: wavelength in nm
+        """
+
+        if not self.checkConnection():
+            return
+
+        self.threaded_connection.setWavelength(wavelength)
+
+    def setAutoRange(self, state: bool):
+        """
+        Sets auto range
+
+        :param state: state of auto range
+        """
+
+        if not self.checkConnection():
+            return
+
+        self.threaded_connection.setAutoRange((int(state), int(state)))
+
+    def setAttenuation(self, attenuation: float):
+        """
+        Sets the attenuation
+
+        :param attenuation: attenuation in dBm
+        """
+
+        if not self.checkConnection():
+            return
+
+        self.threaded_connection.setAttenuation(attenuation)
+
+    def setAveraging(self, average_count: int):
+        """
+        Sets the average count
+
+        :param average_count: average count per measurement
+        """
+
+        if not self.checkConnection():
+            return
+
+        self.threaded_connection.setAverageCount(average_count)
+
+    def setZeroAdjust(self):
+        """Sets the zero adjust"""
+
+        if not self.checkConnection():
+            return
+
+        # TODO: what does this function actually do?!
+        self.zero_adjust_state = self.threaded_connection.getDarkAdjustState()
+        print(self.zero_adjust_state)
+
+        self.threaded_connection.startDarkAdjust()
+
+    def setBeamDiameter(self, diameter: float):
+        """
+        Sets the beam diameter
+
+        :param diameter: diameter in mm
+        """
+
+        if not self.checkConnection():
+            return
+
+        diameter /= sqrt(2)  # conversion from gauss circular beam
+        self.threaded_connection.setBeamDiameter(diameter)
+
+    def resetMinMax(self):
+        """Resets the min and max values"""
+        self.status_display_power_min.setValue(self.display_power)
+        self.status_display_power_max.setValue(0)
 
     def checkConnection(self, messagebox: bool = True) -> bool:
         """
@@ -382,12 +486,13 @@ class PowerMeterVBoxLayout(QVBoxLayout):
         self.unconnect()
 
         if connect:
-            self.connection = TLPMxConnection(
-                port,
-                id_query=True,
-                reset_device=False
-            )
             try:
+                self.connection = TLPMxConnection(
+                    port,
+                    id_query=True,
+                    reset_device=False
+                )
+
                 self.connection.open()
                 self.threaded_connection = ThreadedTLPMxConnection(self.connection)
                 self.indicator_connection.setValue(True)
@@ -396,22 +501,23 @@ class PowerMeterVBoxLayout(QVBoxLayout):
                 self.button_connection_refresh.setEnabled(False)
                 self.button_connection.setText('Disconnect')
 
-            except ConnectionError as error:
+            except (ConnectionError, AttributeError, FileNotFoundError) as error:
                 try:
                     self.connection.close()
-                except ConnectionError:
+                except (ConnectionError, AttributeError):
                     pass
+
                 self.connection = None
                 self.reset()
 
-                GlobalConf.logger.info(f'Connection error! Could not connect to ThorLabs Power Meter on port "{port}", because of: {error}')
+                GlobalConf.logger.info(f'{type(error).__name__}! Could not connect to ThorLabs Power Meter on port "{port}", because of: {error}')
 
                 if messagebox:
                     showMessageBox(
                         None,
                         QMessageBox.Icon.Critical,
-                        'Connection error!',
-                        f'Could not connect to ThorLabs Power Meter on port "{pot}"!',
+                        f'{type(error).__name__}!',
+                        f'Could not connect to ThorLabs Power Meter on port "{port}"!',
                         f'<strong>Encountered Error:</strong><br>{error}',
                         expand_details=False
                     )
@@ -489,3 +595,15 @@ class PowerMeterVBoxLayout(QVBoxLayout):
 
         # TODO: implement
         ...
+
+
+if __name__ == '__main__':
+    import sys
+    from PyQt6.QtWidgets import QApplication, QWidget
+
+    app = QApplication(sys.argv)
+    window = QWidget()
+    layout = PowerMeterVBoxLayout()
+    window.setLayout(layout)
+    window.show()
+    sys.exit(app.exec())

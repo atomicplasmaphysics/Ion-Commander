@@ -1,9 +1,11 @@
-from PyQt6.QtCore import QCoreApplication, QPoint
+from PyQt6.QtCore import QCoreApplication, QPoint, QTimer
 from PyQt6.QtGui import QCloseEvent, QGuiApplication
 from PyQt6.QtWidgets import QMainWindow, QTabWidget
 
 
 from Config.GlobalConf import GlobalConf
+
+from DB.db import DB
 
 from Utility.Layouts import TabWidget
 
@@ -168,7 +170,7 @@ class MainWindow(QMainWindow):
 
         # Add monitor tab
         self.monitor_window = MonitorWindow(self)
-        self.addTab(self.monitor_window, 'Control')
+        self.addTab(self.monitor_window, 'Monitor')
 
         # Add tips tab
         self.tips_window = TipsWindow(self)
@@ -183,6 +185,16 @@ class MainWindow(QMainWindow):
         #
 
         self.statusBar()
+
+        #
+        # Setup logging for tabs
+        #
+
+        self.database = DB()
+        self.logging_timer = QTimer()
+        self.logging_timer.timeout.connect(self.logTabs)
+        self.logging_timer.setInterval(GlobalConf.update_timer_time)
+        self.logging_timer.start()
 
         #
         # Setup window location and signals
@@ -200,6 +212,12 @@ class MainWindow(QMainWindow):
                 center_point = QGuiApplication.primaryScreen().availableVirtualGeometry().center()
             frame_geometry.moveCenter(center_point)
             self.move(frame_geometry.topLeft())
+
+    def logTabs(self):
+        """Loggs all tabs"""
+
+        for index in range(self.tabs.count()):
+            self.tabs.widget(index).log(self.database)
 
     def addTab(self, widget: TabWidget, title: str):
         """
@@ -262,4 +280,5 @@ class MainWindow(QMainWindow):
         GlobalConf.updateWindowSize(*dimensions)
         GlobalConf.updateWindowCenter(*center)
 
+        self.database.close()
         event.accept()
