@@ -13,6 +13,7 @@ from Windows.Analyse import AnalyseWindow
 from Windows.Control import ControlWindow
 from Windows.Monitor import MonitorWindow
 from Windows.Tips import TipsWindow
+from Windows.Simulation import SimulationWindow
 
 
 class MainWindow(QMainWindow):
@@ -21,7 +22,6 @@ class MainWindow(QMainWindow):
     """
 
     # TODO: start CoboldPC
-    # TODO: popout windows
 
     def __init__(self):
         super().__init__()
@@ -158,8 +158,6 @@ class MainWindow(QMainWindow):
         self.tabs.currentChanged.connect(lambda index: self.tabChanged(index))
         self.setCentralWidget(self.tabs)
 
-        # TODO: Add control tab
-        # TODO: Add laser-control tab
         # TODO: Add measure tab TAC
         # TODO: Add measure tab TDC
         # TODO: Add measure tab NDIGO
@@ -179,6 +177,10 @@ class MainWindow(QMainWindow):
         # Add analyse tab
         self.analyse_window = AnalyseWindow(self)
         self.addTab(self.analyse_window, 'Analyse')
+
+        # Add simulation tab
+        self.simulation_window = SimulationWindow(self)
+        self.addTab(self.simulation_window, 'Simulation')
 
         #
         # STATUS BAR

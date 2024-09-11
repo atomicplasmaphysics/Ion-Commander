@@ -54,8 +54,11 @@ class GlobalConf:
     connection_laser_port_name = 'connection_laser_port'
     connection_power_meter_port_name = 'connection_power_meter_port'
 
-    # power meter
+    # power meter parameters
     power_meter_display_parameter_name = 'power_meter_display_parameter'
+
+    # simulation parameters
+    simulation_paths_parameter_name = 'simulation_paths_parameter'
 
     # timer parameters
     update_timer_time = 1000
@@ -149,3 +152,14 @@ class GlobalConf:
     def getPowerMeterDisplayParameter() -> int:
         """Returns power meter display parameter"""
         return GlobalConf.settings.value(GlobalConf.power_meter_display_parameter_name, defaultValue=0, type=int)
+
+    @staticmethod
+    def updateSimulationPathsParameter(simulation_paths: list[str]):
+        """Updates and saves settings object with simulation paths parameter"""
+        GlobalConf.settings.setValue(GlobalConf.simulation_paths_parameter_name, simulation_paths)
+        GlobalConf.settings.sync()
+
+    @staticmethod
+    def getSimulationPathsParameter() -> list[str]:
+        """Returns simulation paths parameter"""
+        return GlobalConf.settings.value(GlobalConf.simulation_paths_parameter_name, defaultValue=[], type=list)

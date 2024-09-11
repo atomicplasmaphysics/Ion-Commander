@@ -10,7 +10,7 @@ from PyQt6.QtWidgets import QGroupBox, QVBoxLayout, QHBoxLayout, QPushButton, QL
 
 from Utility.Layouts import DeleteWidgetList, DeleteWidgetListItem, ComboBox, TOFCanvas, TabWidget, IndicatorLedButton
 from Utility.Dialogs import TACDialog, LMFDialog
-from Utility.Functions import selectFileDialog
+from Utility.FileDialogs import selectFileDialog
 from Utility.Fitting import getFileData, FitMethod, fittingFunctionsSingle, fittingFunctionsMultiple, supported_file_types
 
 
@@ -21,7 +21,6 @@ class AnalyseWindow(TabWidget):
     :param parent: parent widget
     """
 
-    # TODO: select multiple data and view at once
     # TODO: shorten names if too long
 
     def __init__(self, parent):
@@ -60,22 +59,26 @@ class AnalyseWindow(TabWidget):
         self.row_menu.addLayout(self.grid_buttons)
 
         self.button_open = QPushButton('Open', self)
+        self.button_open.setToolTip('Open data to analyze')
         self.button_open.clicked.connect(self.openFiles)
         self.grid_buttons.addWidget(self.button_open, 0, 0, alignment=Qt.AlignmentFlag.AlignTop)
 
         self.button_clear = QPushButton('Clear all', self)
+        self.button_clear.setToolTip('Clear all opened data')
         self.button_clear.clicked.connect(self.clearFiles)
         self.grid_buttons.addWidget(self.button_clear, 1, 0, alignment=Qt.AlignmentFlag.AlignTop)
 
         self.button_check = QPushButton('Check all', self)
+        self.button_check.setToolTip('Check all data to visualize all')
         self.button_check.clicked.connect(self.checkFiles)
         self.grid_buttons.addWidget(self.button_check, 0, 1, alignment=Qt.AlignmentFlag.AlignTop)
 
         self.button_uncheck = QPushButton('Uncheck all', self)
+        self.button_uncheck.setToolTip('Uncheck all checked data to visualize only one')
         self.button_uncheck.clicked.connect(self.uncheckFiles)
         self.grid_buttons.addWidget(self.button_uncheck, 1, 1, alignment=Qt.AlignmentFlag.AlignTop)
 
-        self.list_files = DeleteWidgetList(self)
+        self.list_files = DeleteWidgetList(self, placeholder='Select files first')
         self.list_files.setMaximumHeight(100)
         self.list_files.currentRowChanged.connect(self.loadDataSelected)
         self.list_files.checkedChanged.connect(self.loadDataChecked)
@@ -197,7 +200,7 @@ class AnalyseWindow(TabWidget):
             if self.files_opened is False:
                 self.files_opened = file
 
-            del_item = DeleteWidgetListItem(file, **del_item_kwargs)
+            del_item = DeleteWidgetListItem(file, data=del_item_kwargs, checkbox_visible=True)
             self.list_files.addItem(del_item)
 
     def initializeFitFunctions(self):
@@ -294,11 +297,12 @@ class AnalyseWindow(TabWidget):
             widget = self.list_files.itemWidget(self.list_files.item(row))
             if isinstance(widget, DeleteWidgetListItem):
                 try:
+                    data = widget.data
                     self.data.append(
                         getFileData(
                             widget.path,
-                            tac=widget.tac,
-                            delay=widget.delay
+                            tac=data.get('tac', 50),
+                            delay=data.get('delay', 0)
                         )
                     )
 
@@ -372,7 +376,3 @@ class AnalyseWindow(TabWidget):
 
         files = [url.toLocalFile() for url in event.mimeData().urls()]
         self.openFiles(files)
-
-    def checkClosable(self) -> bool:
-        """Checks if this tab is currently closeable"""
-        return True

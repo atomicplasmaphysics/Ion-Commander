@@ -1,4 +1,5 @@
 from serial import SerialException
+from time import time
 
 
 from PyQt6.QtWidgets import QVBoxLayout, QGroupBox, QLabel, QPushButton, QHBoxLayout, QMessageBox
@@ -120,6 +121,9 @@ class PressureVBoxLayout(QVBoxLayout):
                 if pressure_widget is None:
                     continue
                 pressure_widget.setPressure(pressure)
+
+            #with open('pressure_log_pitbul_80Cstart.csv', 'a') as file:
+            #    file.write(f'{time()}, {pressures[0]}, {pressures[2]}\n')
 
         self.threaded_connection.callback(setPressures, self.threaded_connection.getPressureAll())
 

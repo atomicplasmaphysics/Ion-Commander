@@ -30,7 +30,8 @@ from Config.StylesConf import Colors, Styles, Forms
 from DB.db import DB
 
 from Utility.ModifyWidget import setWidgetBackground
-from Utility.Functions import hexToRgb, linearInterpolateColor, getPrefix, qColorToHex, selectFileDialog
+from Utility.Functions import hexToRgb, linearInterpolateColor, getPrefix, qColorToHex
+from Utility.FileDialogs import selectFileDialog
 
 if TYPE_CHECKING:
     from Windows.Main import MainWindow
@@ -186,6 +187,7 @@ class VBoxTitleLayout(QVBoxLayout):
 
         if self.popout_enable:
             self.popout_button = QPushButton(self.parent)
+            self.popout_button.setToolTip('Popout widget')
             self.popout_button.setIcon(QIcon('icons/open_external.png'))
             self.popout_button.setStyleSheet(title_style)
             self.popout_button.clicked.connect(self._popout)
@@ -1606,13 +1608,17 @@ class ErrorTable(QTableWidget):
 class DeleteWidgetList(QListWidget):
     """
     Extends the QListWidget for deletable Items
+
+    :param placeholder: placeholder text when nothing is displayed
     """
 
     checkedChanged = pyqtSignal()
+    itemDeleted = pyqtSignal()
 
     def __init__(
         self,
         *args,
+        placeholder: str = 'Noting selected',
         **kwargs
     ):
         super().__init__(*args, **kwargs)
@@ -1621,7 +1627,7 @@ class DeleteWidgetList(QListWidget):
         self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         self.setSpacing(0)
 
-        self.info_text = 'Select files first'
+        self.info_text = placeholder
         self.addInfoItem()
 
     def addItem(self, aitem: DeleteWidgetListItem):
@@ -1655,11 +1661,14 @@ class DeleteWidgetList(QListWidget):
         if not self.count():
             self.addInfoItem()
 
+        self.itemDeleted.emit()
+
     def clearAll(self):
         """Clears all items in this list"""
 
         self.clear()
         self.addInfoItem()
+        self.itemDeleted.emit()
 
     def checkAll(self):
         """Checks all items"""
@@ -1721,9 +1730,10 @@ class DeleteWidgetListItem(QWidget):
     """
     A Widget that acts as deletable ListWidgetItem for the list DeleteWidgetList
 
-    :param path: title of Widget
-    :param tac: tac time
-    :param delay: delay time
+    :param path_str: title of Widget
+    :param data: dict to store data
+    :param default_background_color: background color
+    :param checkbox_visible: make checkbox visible
     """
 
     deleted = pyqtSignal()
@@ -1731,18 +1741,19 @@ class DeleteWidgetListItem(QWidget):
 
     def __init__(
         self,
-        path: str,
+        path_str: str,
         *args,
-        tac: int = -1,
-        delay: float = 0,
+        data: dict = None,
         default_background_color: str = '#ffffff',
+        checkbox_visible: bool = False,
         **kwargs
     ):
         super().__init__(*args, **kwargs)
 
-        self.path = path
-        self.tac = tac
-        self.delay = delay
+        self.path = path_str
+        if data is None:
+            data = dict()
+        self.data = data
         self.checkbox_time = 0
         self.default_background_color = default_background_color
 
@@ -1762,6 +1773,7 @@ class DeleteWidgetListItem(QWidget):
         self.setBackgroundColor(self.default_background_color)
         self.main_layout.addWidget(self.checkbox, alignment=Qt.AlignmentFlag.AlignLeft)
         self.checkbox.stateChanged.connect(self.checkboxClicked)
+        self.checkbox.setVisible(checkbox_visible)
 
         self.label = QLabel(self.path, self)
         self.main_layout.addWidget(self.label, alignment=Qt.AlignmentFlag.AlignLeft)

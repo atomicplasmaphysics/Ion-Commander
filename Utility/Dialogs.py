@@ -5,12 +5,12 @@ from datetime import datetime
 
 
 from PyQt6.QtCore import Qt, QThreadPool, QObject, QRunnable, pyqtSignal, pyqtSlot, QProcess, QDir
-from PyQt6.QtWidgets import QDialog, QVBoxLayout, QLabel, QPushButton, QMessageBox, QCheckBox, QHBoxLayout, QWidget, QProgressBar, QTextEdit
+from PyQt6.QtWidgets import QDialog, QVBoxLayout, QLabel, QPushButton, QCheckBox, QHBoxLayout, QWidget, QProgressBar, QTextEdit, QMessageBox
 from PyQt6.QtGui import QFont
 
 
 from Utility.Layouts import InputHBoxLayout, DoubleSpinBox, SpinBox, SpinBoxRange, FilePath
-from Utility.Functions import selectFileDialog
+from Utility.FileDialogs import selectFileDialog
 from Utility.LMFConvert import LM
 
 

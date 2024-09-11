@@ -1,8 +1,10 @@
 from math import log10, sqrt, pi
 
+
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QIcon, QFont
 from PyQt6.QtWidgets import QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QGroupBox, QMessageBox, QApplication
+
 
 from Config.GlobalConf import GlobalConf
 from Config.StylesConf import Colors
