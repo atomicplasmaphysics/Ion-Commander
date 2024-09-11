@@ -96,8 +96,7 @@ class GlobalConf:
         psu: str = None,
         ebis: str = None,
         pressure: str = None,
-        laser: tuple[int, int, int, int, int] = None,
-        power_meter: str = None
+        laser: tuple[int, int, int, int, int] = None
     ):
         """
         Updates and saves settings object with connection parameters
@@ -106,7 +105,6 @@ class GlobalConf:
         :param ebis: port of EBIS
         :param pressure: port of pressure ADC
         :param laser: tuple of (laser_ip1, laser_ip2, laser_ip3, laser_ip4, laser_port)
-        :param power_meter: port of power meter
         """
 
         if psu is not None:
@@ -121,8 +119,6 @@ class GlobalConf:
             GlobalConf.settings.setValue(GlobalConf.connection_laser_ip3_name, laser[2])
             GlobalConf.settings.setValue(GlobalConf.connection_laser_ip4_name, laser[3])
             GlobalConf.settings.setValue(GlobalConf.connection_laser_port_name, laser[4])
-        if power_meter is not None:
-            GlobalConf.settings.setValue(GlobalConf.connection_power_meter_port_name, power_meter)
 
         GlobalConf.settings.sync()
 
@@ -142,8 +138,6 @@ class GlobalConf:
                     GlobalConf.settings.value(GlobalConf.connection_laser_ip3_name, defaultValue=-1, type=int),
                     GlobalConf.settings.value(GlobalConf.connection_laser_ip4_name, defaultValue=-1, type=int),
                     GlobalConf.settings.value(GlobalConf.connection_laser_port_name, defaultValue=-1, type=int))
-        if connection_type == 'power_meter':
-            return GlobalConf.settings.value(GlobalConf.connection_power_meter_port_name, defaultValue='', type=str)
 
     @staticmethod
     def updatePowerMeterDisplayParameter(display_parameter: int):

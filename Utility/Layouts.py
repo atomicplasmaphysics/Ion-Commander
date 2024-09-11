@@ -4,20 +4,24 @@ from math import log10, inf
 from time import time
 from os import path
 from shutil import copy
+from io import BytesIO
 
 
 import numpy as np
 
 from PyQt6.QtCore import Qt, pyqtSignal, QByteArray, QSize, QRect, QRectF
-from PyQt6.QtGui import QIcon, QPainter, QPixmap, QColor, QBrush, QLinearGradient, QPainterPath, QAction, QFont, QTextCursor
+from PyQt6.QtGui import QIcon, QPainter, QPixmap, QColor, QBrush, QLinearGradient, QPainterPath, QAction, QFont, QFontMetrics, QTextCursor
 from PyQt6.QtWidgets import (
     QHBoxLayout, QLabel, QWidget, QVBoxLayout, QSpinBox, QDoubleSpinBox, QCheckBox, QComboBox, QLineEdit, QPushButton,
     QListWidget, QListWidgetItem, QApplication, QStyleOption, QTableWidget, QTableWidgetItem, QAbstractItemView, QGridLayout,
     QLCDNumber, QFrame, QTextEdit, QMenuBar, QMessageBox, QInputDialog, QMenu, QColorDialog, QDialog, QGroupBox
 )
+from PyQt6.QtSvgWidgets import QSvgWidget
 from PyQt6.QtSvg import QSvgRenderer
 
 import pyqtgraph as pg
+
+import matplotlib.pyplot as plt
 
 
 from Config.GlobalConf import GlobalConf
@@ -1344,7 +1348,7 @@ class DisplayLabel(QLabel):
         self.deviation = deviation
         self._writeOwnText()
 
-    def setUnit(self, unit: str, enable_prefix: bool = False):
+    def setUnit(self, unit: str, enable_prefix: bool | None = None):
         """
         Set a new deviation
 
@@ -1353,7 +1357,8 @@ class DisplayLabel(QLabel):
         """
 
         self.unit = unit
-        self.enable_prefix = enable_prefix
+        if isinstance(enable_prefix, bool):
+            self.enable_prefix = enable_prefix
         self._writeOwnText()
 
     def paintEvent(self, event):
@@ -1384,6 +1389,65 @@ class DisplayLabel(QLabel):
         painter.drawRect(QRectF(0, 0, self.width(), self.height()))
 
         super().paintEvent(event)
+
+
+class LatexLabel(QSvgWidget):
+    """
+    Class for displaying latex inside Label widget
+
+    :param text: text to display
+    :param font_size: font size to display
+    """
+
+    def __init__(self, text: str = '', font_size: float | None = None, font_color: str = 'black'):
+        super().__init__()
+
+        self.text = text
+        if font_size is None:
+            font_size = QFont().pointSizeF()
+        self.font_size = font_size
+        self.font_color = font_color
+
+        self._writeText()
+
+    def setText(self, text: str):
+        """Sets text"""
+        self.text = text
+        self._writeText()
+
+    def setFontSize(self, font_size: float):
+        """Sets font size"""
+        self.font_size = font_size
+        self._writeText()
+
+    def setFontColor(self, font_color: float):
+        """Sets font color"""
+        self.font_color = font_color
+        self._writeText()
+
+    def _writeText(self):
+        """Writes text as latex"""
+
+        # Get height of widget
+        font = QFont()
+        font.setPointSizeF(self.font_size)
+        self.setMinimumHeight(QFontMetrics(font).height())
+
+        # Create matplotlib text with given text and fontsize
+        fig, ax = plt.subplots(figsize=(4, 1))
+        ax.text(0.5, 0.5, self.text, fontsize=self.font_size, color=self.font_color, ha='center', va='center')
+        ax.axis('off')
+
+        # Save the figure to a BytesIO object in SVG format
+        buf = BytesIO()
+        plt.tight_layout()
+        plt.savefig(buf, format='svg', bbox_inches='tight', transparent=True)
+        plt.close(fig)
+        buf.seek(0)
+
+        # Read the SVG data from the buffer into the widget
+        self.load(buf.read())
+        buf.close()
 
 
 class PolarityButton(QWidget):

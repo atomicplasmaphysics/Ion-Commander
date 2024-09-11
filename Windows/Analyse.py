@@ -4,8 +4,8 @@ from copy import copy
 import numpy as np
 
 from PyQt6.QtCore import Qt, QDir
-from PyQt6.QtGui import QDragEnterEvent, QDropEvent
-from PyQt6.QtWidgets import QGroupBox, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QGridLayout
+from PyQt6.QtGui import QDragEnterEvent, QDropEvent, QIcon
+from PyQt6.QtWidgets import QGroupBox, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QGridLayout, QApplication
 
 
 from Utility.Layouts import DeleteWidgetList, DeleteWidgetListItem, ComboBox, TOFCanvas, TabWidget, IndicatorLedButton
@@ -114,11 +114,16 @@ class AnalyseWindow(TabWidget):
         self.row_fitting.addLayout(self.row_fitting_parameters)
 
         self.fitting_parameters_box = QGroupBox('Fitting Parameters')
+        self.fitting_parameters_copy_button = QPushButton(self)
+        self.fitting_parameters_copy_button.setIcon(QIcon('icons/copy.png'))
+        self.fitting_parameters_copy_button.setToolTip('Copy fitting parameters')
+        self.fitting_parameters_copy_button.clicked.connect(self.copyFittingParameters)
+        self.row_fitting_parameters.addWidget(self.fitting_parameters_copy_button)
         self.row_fitting_parameters.addWidget(self.fitting_parameters_box, stretch=1)
         self.fitting_parameters_box_layout = QVBoxLayout()
         self.fitting_parameters_box.setLayout(self.fitting_parameters_box_layout)
 
-        self.fit_function_class = self.fitting_functions[0](self)
+        self.fit_function_class: FitMethod = self.fitting_functions[0](self)
         self.fitting_parameters_box_layout.addWidget(self.fit_function_class.widget)
 
         self.column_axis_manipulation = QVBoxLayout()
@@ -336,6 +341,13 @@ class AnalyseWindow(TabWidget):
         """Updates the y-axis to be logarithmic or normal"""
 
         self.graph.setLogY(self.button_log_y.value())
+
+    def copyFittingParameters(self):
+        """Copies the fitting parameters"""
+
+        parameters_copy = self.fit_function_class.copyParameters()
+        if parameters_copy:
+            QApplication.clipboard().setText(parameters_copy)
 
     def dragEnterEvent(self, event: QDragEnterEvent):
         """

@@ -96,7 +96,7 @@ class FitMethod:
     def __init__(self, parent):
         self.parent: MainWindow = parent
         self.widget = FittingWidget({}, parent)
-        self.parameter = []
+        self.parameter: list[float] = []
         self.parameters = 0
         self.bars: list[pg.InfiniteLine] = []
 
@@ -131,6 +131,11 @@ class FitMethod:
         """
 
         return np.zeros(xdata.shape)
+
+    def copyParameters(self) -> str:
+        """Returns string that will be copied when copy button is pressed"""
+
+        return ''
 
     def updateParameters(self):
         """Updates parameters"""
@@ -225,6 +230,12 @@ class FitGaussRange(FitMethod):
             self.parent.writeStatusBar(f'Error in fitting Gauss: {error}')
             GlobalConf.logger.info(f'Error in fitting Gauss (edge-bars): {error}')
 
+    def copyParameters(self) -> str:
+        """Returns string that will be copied when copy button is pressed"""
+
+        # (mu, c, fwhm)
+        return f'({self.parameter[1]}, {self.parameter[2]}, {self.parameter[3]})'
+
 
 class FitGaussCenter(FitMethod):
     """
@@ -318,6 +329,12 @@ class FitGaussCenter(FitMethod):
         except (ValueError, RuntimeError) as error:
             self.parent.writeStatusBar(f'Error in fitting Gauss: {error}')
             GlobalConf.logger.info(f'Error in fitting Gauss (center-bar): {error}')
+
+    def copyParameters(self) -> str:
+        """Returns string that will be copied when copy button is pressed"""
+
+        # (mu, c, fwhm)
+        return f'({self.parameter[1]}, {self.parameter[2]}, {self.parameter[3]})'
 
 
 class FitLogNormRange(FitMethod):
@@ -465,6 +482,110 @@ class FitCountsRange(FitMethod):
         self.parameter = [np.sum(y_data_limit)]
         self.updateParameters()
 
+    def copyParameters(self) -> str:
+        """Returns string that will be copied when copy button is pressed"""
 
-fittingFunctionsSingle: list[type[FitMethod]] = [FitGaussRange, FitGaussCenter, FitLogNormRange, FitCountsRange]
+        # counts
+        return f'{self.parameter[0]}'
+
+
+class FitGaussCountsRange(FitMethod):
+    """
+    Method combining FitGaussRange and FitCountsRange
+
+    :param parent: parent widget
+    """
+
+    title = 'Gauss & Count (range)'
+    tooltip = 'Makes Gaussian fit in given range and also outputs counts'
+
+    def __init__(self, parent):
+        super().__init__(parent)
+
+        self.widget = FittingWidget({
+            (0, 0): 'σ',
+            (0, 1): 'μ',
+            (0, 2): 'c',
+            (0, 3): 'FWHM',
+            (0, 4): 'Counts'
+        }, parent)
+        self.parameter = [0.0, 0.0, 0.0, 0.0, 0]
+        self.parameters = 3
+
+        self.bars = createFittingBars([
+            'Start',
+            'End'
+        ])
+
+    def setBarBounds(self, xrange: tuple[float, float]):
+        """
+        Sets boundary of bars
+
+        :param xrange: tuple of xmin, xmax
+        """
+
+        self.bars[0].setBounds((xrange[0], self.bars[1].value()))
+        self.bars[1].setBounds((self.bars[0].value(), xrange[1]))
+
+    @staticmethod
+    def fitFunction(xdata, sigma: float, mu: float, c: float) -> np.ndarray:
+        """
+        Fitting function
+
+        :param xdata: x-values for function
+        :param sigma: sigma of gauss
+        :param mu: mu of gauss
+        :param c: c of gauss
+        :return: y-values
+        """
+
+        return c * np.exp(-(xdata - mu) ** 2 / (2 * sigma ** 2))
+
+    def fitting(self, bar_values: list[float], data: tuple[np.ndarray, np.ndarray], view_range: list[list[float, float]]):
+        """
+        Fitting function to determine parameters
+
+        :param bar_values: values of bars
+        :param data: x and y data as np.arrays
+        :param view_range: ranges for visible field [[xmin, xmax], [ymin, ymax]]
+        """
+
+        limit = np.logical_and(data[0] > bar_values[0], data[0] < bar_values[1])
+        x_data_limit = data[0][limit]
+        y_data_limit = data[1][limit]
+
+        if not len(x_data_limit):
+            self.parent.writeStatusBar('Not enough datapoints in given range')
+            return
+
+        # self.parameter = [sigma, mu, c, FWHM, Counts]
+        self.parameter[4] = np.sum(y_data_limit)
+
+        max_index = np.argmax(y_data_limit)
+        # TODO: better first approximation for sigma
+        p0 = [(x_data_limit[-1] - x_data_limit[0]) / 4, x_data_limit[max_index], y_data_limit[max_index]]
+        bounds = ([0, 0, 0], [np.inf, np.inf, np.inf])
+
+        try:
+            popt = curve_fit(self.fitFunction, x_data_limit, y_data_limit, p0=p0, bounds=bounds)
+            # self.parameter = [sigma, mu, c, FWHM, Counts]
+            self.parameter[0] = float(popt[0][0])
+            self.parameter[1] = float(popt[0][1])
+            self.parameter[2] = float(popt[0][2])
+            self.parameter[3] = 2 * np.sqrt(2 * np.log(2)) * popt[0][0]
+
+        except (ValueError, RuntimeError) as error:
+            self.parent.writeStatusBar(f'Error in fitting Gauss: {error}')
+            GlobalConf.logger.info(f'Error in fitting Gauss (edge-bars): {error}')
+
+        self.updateParameters()
+
+    def copyParameters(self) -> str:
+        """Returns string that will be copied when copy button is pressed"""
+
+        # (mu, c, fwhm, counts)
+        return f'({self.parameter[1]}, {self.parameter[2]}, {self.parameter[3]}, {self.parameter[4]})'
+
+
+fittingFunctionsSingle: list[type[FitMethod]] = [FitGaussRange, FitGaussCenter, FitLogNormRange, FitCountsRange, FitGaussCountsRange]
 fittingFunctionsMultiple: list[type[FitMethod]] = []
