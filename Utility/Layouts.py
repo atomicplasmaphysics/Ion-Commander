@@ -9,11 +9,11 @@ from shutil import copy
 import numpy as np
 
 from PyQt6.QtCore import Qt, pyqtSignal, QByteArray, QSize, QRect, QRectF
-from PyQt6.QtGui import QIcon, QPainter, QPixmap, QColor, QBrush, QLinearGradient, QPainterPath, QAction, QFont, QTextCursor, QKeySequence
+from PyQt6.QtGui import QIcon, QPainter, QPixmap, QColor, QBrush, QLinearGradient, QPainterPath, QAction, QFont, QTextCursor
 from PyQt6.QtWidgets import (
     QHBoxLayout, QLabel, QWidget, QVBoxLayout, QSpinBox, QDoubleSpinBox, QCheckBox, QComboBox, QLineEdit, QPushButton,
     QListWidget, QListWidgetItem, QApplication, QStyleOption, QTableWidget, QTableWidgetItem, QAbstractItemView, QGridLayout,
-    QLCDNumber, QFrame, QTextEdit, QMenuBar, QMessageBox, QInputDialog, QMenu, QColorDialog
+    QLCDNumber, QFrame, QTextEdit, QMenuBar, QMessageBox, QInputDialog, QMenu, QColorDialog, QDialog, QGroupBox
 )
 from PyQt6.QtSvg import QSvgRenderer
 
@@ -108,6 +108,34 @@ class TabWidget(QWidget):
         pass
 
 
+class PopoutWidget(QDialog):
+    """
+    Popout widget used in VBoxTitleLayout if popout is requested
+
+    :param vbox_title_layout: parent VBoxTitleLayout
+    """
+
+    def __init__(
+        self,
+        vbox_title_layout: VBoxTitleLayout
+    ):
+        self.vbox_title_layout = vbox_title_layout
+        super().__init__(self.vbox_title_layout.parent)
+
+        self.setWindowTitle(self.vbox_title_layout.title_str)
+        self.setWindowFlags(Qt.WindowType.Tool | Qt.WindowType.WindowStaysOnTopHint)
+
+        self.vbox_layout = QVBoxLayout()
+        self.setLayout(self.vbox_layout)
+
+        self.vbox_title_layout.body_widget.setParent(self)
+        self.vbox_layout.addWidget(self.vbox_title_layout.body_widget)
+
+    def closeEvent(self, event):
+        """Called when close button is pressed"""
+        self.vbox_title_layout.restoreMainWidget()
+        event.accept()
+
 
 class VBoxTitleLayout(QVBoxLayout):
     """
@@ -130,6 +158,7 @@ class VBoxTitleLayout(QVBoxLayout):
         title_style: str = Styles.title_style_sheet,
         title_style_busy: str = Styles.title_style_sheet,
         busy_symbol: str = '⧖',
+        popout_enable: bool = False,
         spacing: int = 0,
         add_stretch: bool | int = 0
     ):
@@ -139,20 +168,47 @@ class VBoxTitleLayout(QVBoxLayout):
         self.title_style = title_style
         self.title_style_busy = title_style_busy
         self.busy_symbol = busy_symbol
+        self.popout_enable = popout_enable
 
         self.setSpacing(spacing)
-        self.hl = QHBoxLayout()
+        self.header_layout = QHBoxLayout()
 
         self.title = QLabel(self.title_str, self.parent)
         self.title.setStyleSheet(title_style)
-        self.hl.addWidget(self.title)
+        self.header_layout.addWidget(self.title)
+
+        self.popout_button: QPushButton | None = None
+        self.popout_widget: PopoutWidget | None = None
+
+        if self.popout_enable:
+            self.popout_button = QPushButton(self.parent)
+            self.popout_button.setIcon(QIcon('icons/open_external.png'))
+            self.popout_button.setStyleSheet(title_style)
+            self.popout_button.clicked.connect(self._popout)
+            self.header_layout.addWidget(self.popout_button)
 
         if isinstance(add_stretch, bool) and add_stretch:
-            self.hl.addStretch(1)
+            self.header_layout.addStretch(1)
         elif isinstance(add_stretch, int):
-            self.hl.addSpacing(add_stretch)
+            self.header_layout.addSpacing(add_stretch)
 
-        self.addLayout(self.hl)
+        self.addLayout(self.header_layout)
+
+        self.body_widget = QGroupBox(self.parent)
+        self.addWidget(self.body_widget)
+
+        self.body_replacement_widget = QGroupBox(self.parent)
+        self.body_replacement_layout = QVBoxLayout(self.parent)
+        self.body_replacement_layout.setAlignment(Qt.AlignmentFlag.AlignHCenter)
+        self.label_popped_out = QLabel('Widget is popped out.', self.parent)
+        self.body_replacement_layout.addWidget(self.label_popped_out)
+        self.body_replacement_widget.setLayout(self.body_replacement_layout)
+        self.addWidget(self.body_replacement_widget)
+        self.body_replacement_widget.setVisible(False)
+
+    def setBodyLayout(self, layout):
+        """Sets the layout of the body"""
+        self.body_widget.setLayout(layout)
 
     def busy(self, busy: bool = True, busy_text: str = ''):
         """
@@ -172,6 +228,30 @@ class VBoxTitleLayout(QVBoxLayout):
         else:
             self.title.setText(self.title_str)
             self.title.setStyleSheet(self.title_style)
+
+    def _popout(self):
+        """Removes all widgets from this QVBoxTitleLayout and stores them in the popout widget"""
+
+        if self.popout_widget is None:
+            self.removeWidget(self.body_widget)
+            self.body_widget.setParent(None)
+
+            self.popout_widget = PopoutWidget(self)
+            self.popout_widget.show()
+            self.body_replacement_widget.setVisible(True)
+
+        else:
+            self.restoreMainWidget()
+
+    def restoreMainWidget(self):
+        """Restores all widgets inside this VBoxTitleLayout"""
+
+        self.body_replacement_widget.setVisible(False)
+
+        if self.popout_widget:
+            self.popout_widget.close()
+            self.popout_widget = None
+        self.addWidget(self.body_widget)
 
 
 class InsertingGridLayout(QGridLayout):

@@ -33,7 +33,7 @@ class ControlWindow(TabWidget):
         # TODO: Add tooltips to everything
 
         # PSU CONTROL
-        self.psu_vbox = VBoxTitleLayout('PSU', parent=self, add_stretch=True)
+        self.psu_vbox = VBoxTitleLayout('PSU', parent=self, add_stretch=True, popout_enable=True)
         self.psu_group_vbox = PSUVBoxLayout()
 
         # Stretch to bottom
@@ -42,14 +42,12 @@ class ControlWindow(TabWidget):
 
         # Add a parent to the basic_control_vbox and add that to the splitter
         self.psu_vbox_parent = QWidget(self)
-        self.psu_group = QGroupBox(self)
-        self.psu_group.setLayout(self.psu_group_vbox)
-        self.psu_vbox.addWidget(self.psu_group)
+        self.psu_vbox.setBodyLayout(self.psu_group_vbox)
         self.psu_vbox_parent.setLayout(self.psu_vbox)
         self.splitter.addWidget(self.psu_vbox_parent)
 
         # EBIS CONTROL
-        self.ebis_vbox = VBoxTitleLayout('EBIS', parent=self, add_stretch=True)
+        self.ebis_vbox = VBoxTitleLayout('EBIS', parent=self, add_stretch=True, popout_enable=True)
         self.ebis_group_vbox = EBISVBoxLayout()
 
         # Stretch to bottom
@@ -58,14 +56,12 @@ class ControlWindow(TabWidget):
 
         # Add a parent to the simulationConfigurationListLayout and add that to the splitter
         self.ebis_parent = QWidget(self)
-        self.ebis_group = QGroupBox(self)
-        self.ebis_group.setLayout(self.ebis_group_vbox)
-        self.ebis_vbox.addWidget(self.ebis_group)
+        self.ebis_vbox.setBodyLayout(self.ebis_group_vbox)
         self.ebis_parent.setLayout(self.ebis_vbox)
         self.splitter.addWidget(self.ebis_parent)
 
         # LASER CONTROL
-        self.laser_vbox = VBoxTitleLayout('LASER', parent=self, add_stretch=True)
+        self.laser_vbox = VBoxTitleLayout('LASER', parent=self, add_stretch=True, popout_enable=True)
         self.laser_group_vbox = LaserVBoxLayout()
 
         # Stretch to bottom
@@ -74,14 +70,12 @@ class ControlWindow(TabWidget):
 
         # Add a parent to the simulationConfigurationListLayout and add that to the splitter
         self.laser_parent = QWidget(self)
-        self.laser_group = QGroupBox(self)
-        self.laser_group.setLayout(self.laser_group_vbox)
-        self.laser_vbox.addWidget(self.laser_group)
+        self.laser_vbox.setBodyLayout(self.laser_group_vbox)
         self.laser_parent.setLayout(self.laser_vbox)
         self.splitter.addWidget(self.laser_parent)
 
         # PRESSURE CONTROL
-        self.pressure_vbox = VBoxTitleLayout('Pressure', parent=self, add_stretch=True)
+        self.pressure_vbox = VBoxTitleLayout('Pressure', parent=self, add_stretch=True, popout_enable=True)
         self.pressure_group_vbox = PressureVBoxLayout()
 
         # Stretch to bottom
@@ -90,9 +84,7 @@ class ControlWindow(TabWidget):
 
         # Add a parent to the simulationConfigurationListLayout and add that to the splitter
         self.pressure_parent = QWidget(self)
-        self.pressure_group = QGroupBox(self)
-        self.pressure_group.setLayout(self.pressure_group_vbox)
-        self.pressure_vbox.addWidget(self.pressure_group)
+        self.pressure_vbox.setBodyLayout(self.pressure_group_vbox)
         self.pressure_parent.setLayout(self.pressure_vbox)
         self.splitter.addWidget(self.pressure_parent)
 

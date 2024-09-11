@@ -32,7 +32,7 @@ class MonitorWindow(TabWidget):
         # TODO: Add tooltips to everything
 
         # PSU CONTROL
-        self.power_meter_vbox = VBoxTitleLayout('Power Meter', parent=self, add_stretch=True)
+        self.power_meter_vbox = VBoxTitleLayout('Power Meter', parent=self, add_stretch=True, popout_enable=True)
         self.power_meter_group_vbox = PowerMeterVBoxLayout()
 
         # Stretch to bottom
@@ -41,9 +41,7 @@ class MonitorWindow(TabWidget):
 
         # Add a parent to the basic_control_vbox and add that to the splitter
         self.power_meter_vbox_parent = QWidget(self)
-        self.power_meter_group = QGroupBox(self)
-        self.power_meter_group.setLayout(self.power_meter_group_vbox)
-        self.power_meter_vbox.addWidget(self.power_meter_group)
+        self.power_meter_vbox.setBodyLayout(self.power_meter_group_vbox)
         self.power_meter_vbox_parent.setLayout(self.power_meter_vbox)
         self.splitter.addWidget(self.power_meter_vbox_parent)
 

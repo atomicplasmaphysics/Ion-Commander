@@ -55,9 +55,7 @@ class TipsWindow(TabWidget):
 
         # Add a parent to the basic_control_vbox and add that to the splitter
         self.tip_selection_vbox_parent = QWidget(self)
-        self.tip_selection_group = QGroupBox(self)
-        self.tip_selection_group.setLayout(self.tip_selection_group_vbox)
-        self.tip_selection_vbox.addWidget(self.tip_selection_group)
+        self.tip_selection_vbox.setBodyLayout(self.tip_selection_group_vbox)
         self.tip_selection_vbox_parent.setLayout(self.tip_selection_vbox)
         self.splitter.addWidget(self.tip_selection_vbox_parent)
 
@@ -82,9 +80,7 @@ class TipsWindow(TabWidget):
 
         # Add a parent to the basic_control_vbox and add that to the splitter
         self.tip_editor_vbox_parent = QWidget(self)
-        self.tip_editor_group = QGroupBox(self)
-        self.tip_editor_group.setLayout(self.tip_editor_group_vbox)
-        self.tip_editor_vbox.addWidget(self.tip_editor_group)
+        self.tip_editor_vbox.setBodyLayout(self.tip_editor_group_vbox)
         self.tip_editor_vbox_parent.setLayout(self.tip_editor_vbox)
         self.splitter.addWidget(self.tip_editor_vbox_parent)
 
