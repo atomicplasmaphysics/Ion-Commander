@@ -52,6 +52,7 @@ class LucidControlConnection:
     :param timeout: Timeout [in s]
     :param baudrate: Baudrate
     :param channels: Number of channels
+    :param debug: If debug is enabled
     """
 
     class ReturnCode(IntEnum):
@@ -123,12 +124,14 @@ class LucidControlConnection:
         comport: str,
         timeout: float = 0.05,
         baudrate: int = 9600,
-        channels: int = 4
+        channels: int = 4,
+        debug: bool = False
     ):
         self.comport = comport
         self.timeout = timeout
         self.baudrate = baudrate
         self.channels = channels
+        self.debug = debug
 
         self.id = LucidControlId()
 
@@ -210,7 +213,8 @@ class LucidControlConnection:
         data_write.append(len(data))
         data_write += data
 
-        GlobalConf.logger.debug(f'Data {data_write} was written to port {self.comport}')
+        if self.debug:
+            GlobalConf.logger.debug(f'Data {data_write} was written to port {self.comport}')
         self.serial.write(data_write)
 
     def query(

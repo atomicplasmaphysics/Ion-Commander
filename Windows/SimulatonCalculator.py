@@ -6,7 +6,7 @@ import numpy as np
 from PyQt6.QtWidgets import QVBoxLayout
 
 
-from Utility.Layouts import DoubleSpinBox, SpinBox, ComboBox, InputHBoxLayout
+from Utility.Layouts import DoubleSpinBox, SpinBox, SpinBoxRange, ComboBox, InputHBoxLayout
 
 
 class SimulationCalculator:
@@ -126,7 +126,7 @@ class MassCalculatorVBoxLayout(QVBoxLayout):
         self.laser_offset = DoubleSpinBox(
             default=23.79,
             decimals=4,
-            input_range=(0, 1000)
+            input_range=SpinBoxRange.INF_INF
         )
         self.laser_offset_layout = InputHBoxLayout(
             'Laser offset [ns]:',
@@ -158,7 +158,7 @@ class MassCalculatorVBoxLayout(QVBoxLayout):
         self.tof = DoubleSpinBox(
             default=0,
             decimals=4,
-            input_range=(0, 10000)
+            input_range=SpinBoxRange.INF_INF
         )
         self.tof_layout = InputHBoxLayout(
             'TOF in [ns]:',
@@ -174,6 +174,7 @@ class MassCalculatorVBoxLayout(QVBoxLayout):
         self.mass = DoubleSpinBox(
             default=0,
             decimals=2,
+            input_range=SpinBoxRange.INF_INF,
             readonly=True
         )
         self.mass_layout = InputHBoxLayout(
@@ -254,7 +255,7 @@ class TOFCalculatorVBoxLayout(QVBoxLayout):
         self.laser_offset = DoubleSpinBox(
             default=23.79,
             decimals=4,
-            input_range=(0, 1000)
+            input_range=SpinBoxRange.INF_INF
         )
         self.laser_offset_layout = InputHBoxLayout(
             'Laser offset [ns]:',
@@ -285,7 +286,7 @@ class TOFCalculatorVBoxLayout(QVBoxLayout):
         # Mass
         self.mass = SpinBox(
             default=1,
-            input_range=(0, 10000)
+            input_range=SpinBoxRange.ZERO_INF
         )
         self.mass_layout = InputHBoxLayout(
             'Mass in [u]:',
@@ -301,6 +302,7 @@ class TOFCalculatorVBoxLayout(QVBoxLayout):
         self.tof_mean = DoubleSpinBox(
             default=0,
             decimals=2,
+            input_range=SpinBoxRange.INF_INF,
             readonly=True
         )
         self.tof_mean_layout = InputHBoxLayout(
@@ -316,6 +318,7 @@ class TOFCalculatorVBoxLayout(QVBoxLayout):
         self.tof_fwhm = DoubleSpinBox(
             default=0,
             decimals=2,
+            input_range=SpinBoxRange.INF_INF,
             readonly=True
         )
         self.tof_fwhm_layout = InputHBoxLayout(
@@ -355,7 +358,14 @@ class TOFCalculatorVBoxLayout(QVBoxLayout):
         self.simulation_selection.setCurrentIndex(0)
 
 
-if __name__ == '__main__':
+def simulation_calculator_test():
+    file = 'D:\\Simion\\LSD - mit DTs\\mass_sweep\\with DT (6500,-1850,-1850,-1950).txt'
+    calculator = SimulationCalculator(file)
+    for mass in range(1, 1000):
+        print(f'{mass}: {calculator.getTofMean(mass)},')
+
+
+def main():
     import sys
     from os import listdir
 
@@ -378,7 +388,7 @@ if __name__ == '__main__':
 
             central_widget = QWidget()
             layout = MassCalculatorVBoxLayout()
-            #layout = TOFCalculatorVBoxLayout()
+            # layout = TOFCalculatorVBoxLayout()
             central_widget.setLayout(layout)
             layout.updateCalculators(calculators)
             self.setCentralWidget(central_widget)
@@ -387,3 +397,8 @@ if __name__ == '__main__':
     main_window = MainWindow()
     main_window.show()
     sys.exit(app.exec())
+
+
+if __name__ == '__main__':
+    simulation_calculator_test()
+    #main()

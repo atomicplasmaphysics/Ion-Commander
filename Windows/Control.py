@@ -1,4 +1,4 @@
-from PyQt6.QtWidgets import QSplitter, QWidget, QGroupBox, QBoxLayout
+from PyQt6.QtWidgets import QSplitter, QWidget, QBoxLayout
 from PyQt6.QtCore import Qt
 
 
@@ -109,4 +109,6 @@ class ControlWindow(TabWidget):
         :param db: database class
         """
 
+        self.psu_group_vbox.log(db)
+        self.laser_group_vbox.log(db)
         self.pressure_group_vbox.log(db)

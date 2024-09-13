@@ -11,6 +11,7 @@ PyQt6       6.5.2
 pyqtgraph   0.13.3
 numpy       1.24.3
 scipy       1.10.1
+matplotlib  3.8.3
 pyserial    3.5
 ```
 

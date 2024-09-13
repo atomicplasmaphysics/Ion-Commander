@@ -9,6 +9,8 @@ from PyQt6.QtWidgets import QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QGrou
 from Config.GlobalConf import GlobalConf
 from Config.StylesConf import Colors
 
+from DB.db import DB
+
 from Utility.Layouts import InsertingGridLayout, IndicatorLed, DoubleSpinBox, DisplayLabel, SpinBox, ComboBox, LatexLabel
 from Utility.Functions import getPrefix
 from Utility.Dialogs import showMessageBox
@@ -146,12 +148,13 @@ class PowerMeterVBoxLayout(QVBoxLayout):
         self.display_vbox.setAlignment(Qt.AlignmentFlag.AlignTop)
         self.display_group_box.setLayout(self.display_vbox)
 
-        # power
+        # power / power_dbm / irradiance / current
         self.display_hbox = QHBoxLayout()
         self.display_hbox.setAlignment(Qt.AlignmentFlag.AlignLeft)
         self.display_vbox.addLayout(self.display_hbox)
 
         self.display_power = 0
+        self.state_display_parameters = [0, 0, 0, 0]
         self.display_power_label = LatexLabel(
             font_size=QFont().pointSizeF() * 4.5,
             font_color='white'
@@ -208,19 +211,19 @@ class PowerMeterVBoxLayout(QVBoxLayout):
         # 2: Current
         # 3: Irradiance
 
-        if combobox_parameter == 0:
-            return values[0]
-        elif combobox_parameter == 1:
-            return 10 * log10(1000 * values[0])
-        elif combobox_parameter == 2:
-            return values[1]
-        elif combobox_parameter == 3:
-            beam_area = (self.status_beam_diameter.value / sqrt(2) / 10) ** 2 / 4 * pi
-            if beam_area == 0:
-                return 0
-            return values[0] / beam_area
-        else:
-            raise IndexError(f'Invalid combobox parameter of index {combobox_parameter}')
+        irradiance = 0
+        beam_area = (self.status_beam_diameter.value / sqrt(2) / 10) ** 2 / 4 * pi
+        if beam_area != 0:
+            irradiance = values[0] / beam_area
+
+        self.state_display_parameters = [
+            values[0],
+            10 * log10(1000 * values[0]),
+            values[1],
+            irradiance
+        ]
+
+        return self.state_display_parameters[combobox_parameter]
 
     def updateLoop(self, set_startup: bool = False):
         """Called by timer; Updates all values"""
@@ -560,8 +563,29 @@ class PowerMeterVBoxLayout(QVBoxLayout):
 
         GlobalConf.updatePowerMeterDisplayParameter(self.combobox_display_parameter.currentIndex())
 
+    def log(self, db: DB):
+        """
+        Called to log all important value
 
-if __name__ == '__main__':
+        :param db: database class
+        """
+
+        if not self.checkConnection(False):
+            return
+
+        db.insertPowerMeter(
+            self.state_display_parameters[0],
+            self.state_display_parameters[1],
+            self.state_display_parameters[2],
+            self.state_display_parameters[3],
+            self.status_beam_diameter.value,
+            self.status_attenuation.value,
+            int(self.status_averaging.value),
+            int(self.status_wavelength.value),
+        )
+
+
+def main():
     import sys
     from PyQt6.QtWidgets import QApplication, QWidget
 
@@ -571,3 +595,7 @@ if __name__ == '__main__':
     window.setLayout(layout)
     window.show()
     sys.exit(app.exec())
+
+
+if __name__ == '__main__':
+    main()

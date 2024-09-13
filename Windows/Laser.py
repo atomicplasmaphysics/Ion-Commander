@@ -6,6 +6,8 @@ from PyQt6.QtWidgets import QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QGrou
 from Config.GlobalConf import GlobalConf
 from Config.StylesConf import Colors
 
+from DB.db import DB
+
 from Utility.Layouts import InsertingGridLayout, IndicatorLed, ErrorTable, DoubleSpinBox, SpinBox, ComboBox, DisplayLabel
 from Utility.Dialogs import IPDialog, showMessageBox
 from Utility.Functions import getPrefix, getSignificantDigits, getIntIfInt
@@ -127,6 +129,7 @@ class LaserVBoxLayout(QVBoxLayout):
 
         # System status
         self.label_system_status = QLabel('System Status')
+        self.state_system_status = 0
         self.indicator_system_status = IndicatorLed()
         self.status_system_status = QLabel('Standby')
         self.button_system_status = QPushButton('Start')
@@ -208,6 +211,8 @@ class LaserVBoxLayout(QVBoxLayout):
 
         # System faults table
         # TODO: why is this f***ing table not setting its f***ing widths as intended??? F***ing piece of sh**
+        # TODO: table does not really update correctly
+        # TODO: set tooltip on error messages if hover over table cells
         self.table_system_faults = ErrorTable()
         self.faults_vbox.addWidget(self.table_system_faults)
 
@@ -232,6 +237,9 @@ class LaserVBoxLayout(QVBoxLayout):
 
         # Output Settings
         self.combobox_settings_output = ComboBox()
+        self.state_mrr_setting = 0
+        self.state_rrd_setting = 0
+        self.state_sb_setting = 0
         self.combobox_settings_output.currentIndexChanged.connect(self.setOutputFrequency)
         # TODO: deviation and target value to this on update
         self.status_settings_output = DisplayLabel(value=0, target_value=0, deviation=0, unit='Hz', enable_prefix=True, alignment_flag=Qt.AlignmentFlag.AlignLeft)
@@ -325,6 +333,7 @@ class LaserVBoxLayout(QVBoxLayout):
             self.status_system_status.setText(l_info[0])
             self.button_system_status.setText('Stop' if l_info[1] else 'Start')
             self.status_baseplate_temperature.setTargetValue(self.baseplate_temperature_on if l_info[1] else self.baseplate_temperature_off)
+            self.state_system_status = l_info[2]
 
         self.threaded_connection.callback(systemStatus, self.threaded_connection.lGetInfo())
 
@@ -502,6 +511,10 @@ class LaserVBoxLayout(QVBoxLayout):
             self.status_settings_pulsewidth.setValue(int(params[1]))
             self.status_settings_pulsewidth.setTargetValue(int(params[1]))
             self.spinbox_settings_pulsewidth.setValue(int(params[1]))
+
+            self.state_mrr_setting = params[0]
+            self.state_rdd_setting = params[2]
+            self.state_sb_setting = params[3]
 
         self.threaded_connection.callback(settings, self.threaded_connection.setGet())
 
@@ -982,3 +995,28 @@ class LaserVBoxLayout(QVBoxLayout):
             self.connection.close()
 
         GlobalConf.updateConnections(laser=last_connection)
+
+    def log(self, db: DB):
+        """
+        Called to log all important value
+
+        :param db: database class
+        """
+
+        if not self.checkConnection(False):
+            return
+
+        db.insertLaser(
+            self.indicator_shutter.value(),
+            self.indicator_pulsing.value(),
+            self.state_system_status,
+            self.status_chiller_temperature.value,
+            self.status_chiller_temperature.target_value,
+            self.status_baseplate_temperature.value,
+            self.status_chiller_flow.value,
+            self.state_mrr_setting,
+            int(self.status_settings_pulsewidth.value),
+            self.state_rrd_setting,
+            self.state_sb_setting,
+            self.status_settings_rflevel.value,
+        )

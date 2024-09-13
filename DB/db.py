@@ -1,7 +1,11 @@
+from __future__ import annotations
 from sqlite3 import connect, OperationalError
 from time import time
 from datetime import datetime, timedelta
 from pathlib import Path
+
+
+import numpy as np
 
 
 from Config.GlobalConf import GlobalConf
@@ -14,7 +18,7 @@ class Tables:
 
     name = ''
     structure = {
-        'Time': 'DATETIME default CURRENT_TIMESTAMP',
+        'Time': '''INTEGER DEFAULT (strftime('%s', 'now'))''',
     }
 
     def __init__(self):
@@ -94,7 +98,65 @@ class PressureTable(Tables):
         'Time': '''INTEGER DEFAULT (strftime('%s', 'now'))''',
         'PITBUL': 'FLOAT default 0',
         'LSD': 'FLOAT default 0',
-        'Prevac': 'FLOAT default 0'
+        'Prevac': 'FLOAT default 0',
+    }
+
+    def __init__(self):
+        super().__init__()
+
+
+class PSUTable(Tables):
+    name = 'PSU'
+    structure = {
+        'Time': '''INTEGER DEFAULT (strftime('%s', 'now'))''',
+        'CH0V': 'FLOAT default 0',
+        'CH0I': 'FLOAT default 0',
+        'CH1V': 'FLOAT default 0',
+        'CH1I': 'FLOAT default 0',
+        'CH2V': 'FLOAT default 0',
+        'CH2I': 'FLOAT default 0',
+        'CH3V': 'FLOAT default 0',
+        'CH3I': 'FLOAT default 0',
+    }
+
+    def __init__(self):
+        super().__init__()
+
+
+class LaserTable(Tables):
+    name = 'Laser'
+    structure = {
+        'Time': '''INTEGER DEFAULT (strftime('%s', 'now'))''',
+        'S': 'INTEGER default 0',
+        'PC': 'INTEGER default 0',
+        'L': 'INTEGER default 0',
+        'CHT': 'FLOAT default 0',
+        'CHST': 'FLOAT default 0',
+        'BT': 'FLOAT default 0',
+        'CHF': 'FLOAT default 0',
+        'MRR': 'FLOAT default 0',
+        'PW': 'INTEGER default 0',
+        'RRD': 'INTEGER default 0',
+        'SB': 'INTEGER default 0',
+        'RL': 'FLOAT default 0',
+    }
+
+    def __init__(self):
+        super().__init__()
+
+
+class PowerMeterTable(Tables):
+    name = 'PowerMeter'
+    structure = {
+        'Time': '''INTEGER DEFAULT (strftime('%s', 'now'))''',
+        'Power': 'FLOAT default 0',
+        'Power_dBm': 'FLOAT default 0',
+        'Current': 'FLOAT default 0',
+        'Irradiance': 'FLOAT default 0',
+        'Beam_diameter': 'FLOAT default 0',
+        'Attenuation': 'FLOAT default 0',
+        'Averaging': 'INTEGER default 0',
+        'Wavelength': 'INTEGER default 0',
     }
 
     def __init__(self):
@@ -107,14 +169,19 @@ class DB:
 
     :param commit_time_interval: interval in seconds until database will be committed if a query is executed
     :param no_setup: no setup at startup
+    :param debug: if debug is enabled
     """
+
+    default_last_seconds = 300
 
     def __init__(
         self,
         commit_time_interval: int = 300,
-        no_setup: bool = False
+        no_setup: bool = False,
+        debug: bool = True  # TODO: change this
     ):
         self.commit_time_interval = commit_time_interval
+        self.debug = debug
         
         # TODO: there might occur errors?!
         root_path = Path(__file__).parents[1]
@@ -124,7 +191,15 @@ class DB:
         self.new_commit_time = datetime.now()
 
         self.pressure_table = PressureTable()
-        self.tables = [self.pressure_table]
+        self.psu_table = PSUTable()
+        self.laser_table = LaserTable()
+        self.power_meter_table = PowerMeterTable()
+        self.tables = [
+            self.pressure_table,
+            self.psu_table,
+            self.laser_table,
+            self.power_meter_table
+        ]
 
         if not no_setup:
             self.setUp()
@@ -137,7 +212,8 @@ class DB:
         :param force_commit: forces a commit
         """
 
-        GlobalConf.logger.debug(f'DB query: {query}')
+        if self.debug:
+            GlobalConf.logger.debug(f'DB query: {query}')
         self.cursor.execute(query)
 
         now = datetime.now()
@@ -236,14 +312,10 @@ class DB:
             if diff_columns:
                 self._execute(table.alter_remove(diff_columns))
 
-    def insertPressure(self, pressure_pitbul: float, pressure_lsd: float, pressure_prevac: float):
-        """Inserts pressure values"""
-        self._execute(self.pressure_table.insert(pressure_pitbul, pressure_lsd, pressure_prevac))
+    def _getData(self, table_idx: int, last_seconds: int | None) -> bool | list[np.ndarray]:
+        """Get values from table with table_idx"""
 
-    def getPressure(self, last_seconds: int | None = 300):
-        """Get pressure values"""
-
-        results = self._execute_return(self.pressure_table.get(last_seconds))
+        results = self._execute_return(self.tables[table_idx].get(last_seconds))
         if not results:
             return False
         lists = []
@@ -252,7 +324,186 @@ class DB:
         for result in results:
             for i, res in enumerate(result):
                 lists[i].append(res)
+        for i in range(len(results[0])):
+            lists[i] = np.array(lists[i])
         return lists
+
+    def insertPressure(
+        self,
+        pitbul: float,
+        lsd: float,
+        prevac: float
+    ):
+        """
+        Inserts pressure values
+
+        :param pitbul: pressure for PITBUL in [mbar]
+        :param lsd: pressure for LSD in [mbar]
+        :param prevac: pressure for prevacuum in [mbar]
+        """
+
+        self._execute(self.pressure_table.insert(pitbul, lsd, prevac))
+
+    def getPressure(self, last_seconds: int | None = default_last_seconds) -> bool | list[np.ndarray]:
+        """
+        Get pressure values
+
+        :returns: list of np.ndarrays[
+            times,
+            PITBUL pressures in [mbar],
+            LSD pressures in [mbar],
+            prevacuum pressures in [mbar]
+        ]
+        """
+
+        return self._getData(self.tables.index(self.pressure_table), last_seconds)
+
+    def insertPSU(
+        self,
+        ch0v: float,
+        ch0i: float,
+        ch1v: float,
+        ch1i: float,
+        ch2v: float,
+        ch2i: float,
+        ch3v: float,
+        ch3i: float,
+    ):
+        """
+        Inserts PSU values
+
+        :param ch0v: measured voltage of channel 0 in [V]
+        :param ch0i: measured current of channel 0 in [A]
+        :param ch1v: measured voltage of channel 1 in [V]
+        :param ch1i: measured current of channel 1 in [A]
+        :param ch2v: measured voltage of channel 2 in [V]
+        :param ch2i: measured current of channel 2 in [A]
+        :param ch3v: measured voltage of channel 3 in [V]
+        :param ch3i: measured current of channel 3 in [A]
+        """
+
+        self._execute(self.psu_table.insert(ch0v, ch0i, ch1v, ch1i, ch2v, ch2i, ch3v, ch3i))
+
+    def getPSU(self, last_seconds: int | None = default_last_seconds) -> bool | list[np.ndarray]:
+        """
+        Get PSU values
+
+        :returns: list of np.ndarrays[
+            times,
+            channel 0 measured voltages in [V],
+            channel 0 measured currents in [A],
+            channel 1 measured voltages in [V],
+            channel 1 measured currents in [A],
+            channel 2 measured voltages in [V],
+            channel 2 measured currents in [A],
+            channel 3 measured voltages in [V],
+            channel 3 measured currents in [A]
+        ]
+        """
+
+        return self._getData(self.tables.index(self.psu_table), last_seconds)
+
+    def insertLaser(
+        self,
+        s: bool | int,
+        pc: bool | int,
+        l: int,
+        cht: float,
+        chst: float,
+        bt: float,
+        chf: float,
+        mrr: float,
+        pw: int,
+        rrd: int,
+        sb: int,
+        rl: float
+    ):
+        """
+        Inserts Laser values
+
+        :param s: shutter on
+        :param pc: pulsing on
+        :param l: system status
+        :param cht: chiller temperature in [°C]
+        :param chst: chiller set temperature in [°C]
+        :param bt: baseplate temperature in [°C]
+        :param chf: chiller flowrate in [lpm]
+        :param mrr: amplifier repetition rate in [kHz]
+        :param pw: pulse width in [fs]
+        :param rrd: repetition rate divisor
+        :param sb: number of seeder bursts
+        :param rl: RF level in [%]
+        """
+
+        self._execute(self.laser_table.insert(int(s), int(pc), l, cht, chst, bt, chf, mrr, pw, rrd, sb, rl))
+
+    def getLaser(self, last_seconds: int | None = default_last_seconds) -> bool | list[np.ndarray]:
+        """
+        Get Laser values
+
+        :returns: list of np.ndarrays[
+            times,
+            shutter ons,
+            pulsing ons,
+            system stati,
+            chiller temperatures in [°C],
+            chiller set temperatures in [°C],
+            baseplate temperatures in [°C],
+            chiller flowrates in [lpm],
+            amplifier repetition rates in [kHz],
+            pulse widths in [fs],
+            repetition rate divisors,
+            numbers of seeder bursts,
+            RF levels in [%]
+        ]
+        """
+
+        return self._getData(self.tables.index(self.laser_table), last_seconds)
+
+    def insertPowerMeter(
+        self,
+        power: float,
+        power_dbm: float,
+        current: float,
+        irradiance: float,
+        beam_diameter: float,
+        attenuation: float,
+        averaging: int,
+        wavelength: int
+    ):
+        """
+        Inserts Power Meter values
+
+        :param power: power in [W]
+        :param power_dbm: power in [dBm]
+        :param current: current in [A]
+        :param irradiance: irradiance in [W/cm²]
+        :param beam_diameter: beam diameter in [mm]
+        :param attenuation: attenuation in [dBm]
+        :param averaging: count of averaging events
+        :param wavelength: wavelength in [nm]
+        """
+
+        self._execute(self.power_meter_table.insert(power, power_dbm, current, irradiance, beam_diameter, attenuation, averaging, wavelength))
+
+    def getPowerMeter(self, last_seconds: int | None = default_last_seconds) -> bool | list[np.ndarray]:
+        """
+        Get Power Meter values
+
+        :returns: list of np.ndarrays[
+            times
+            powers in [W]
+            powers in [dBm]
+            currents in [A]
+            irradiances in [W/cm²]
+            beam diameters in [mm]
+            attenuations in [dBm]
+            counts of averaging events
+            wavelengths in [nm]
+        ]
+        """
+
+        return self._getData(self.tables.index(self.power_meter_table), last_seconds)
 
     def close(self):
         """Must be called on close"""

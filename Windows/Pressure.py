@@ -259,8 +259,9 @@ class PressureVBoxLayout(QVBoxLayout):
         :param db: database class
         """
 
-        db.insertPressure(
-            self.pressure_widget_pitbul.pressure,
-            self.pressure_widget_lsd.pressure,
-            self.pressure_widget_prevac.pressure,
-        )
+        if self.connection is not None:
+            db.insertPressure(
+                self.pressure_widget_pitbul.pressure,
+                self.pressure_widget_lsd.pressure,
+                self.pressure_widget_prevac.pressure,
+            )

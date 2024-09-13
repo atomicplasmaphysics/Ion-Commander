@@ -437,7 +437,7 @@ class MonacoConnection(TelnetConnection):
             return 0
         if rrd == -1 or mmr == -1:
             return -1
-        return self.mrrGet() / self.rrdGet()
+        return mmr / rrd
 
     # TODO: better errors
     def dafGet(self) -> str:

@@ -12,6 +12,8 @@ from PyQt6.QtWidgets import QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QGrou
 from Config.GlobalConf import GlobalConf
 from Config.StylesConf import Colors
 
+from DB.db import DB
+
 from Utility.Layouts import InsertingGridLayout, IndicatorLed, DoubleSpinBox, DisplayLabel, PolarityButton, SpinBox, ComboBox
 from Utility.Dialogs import showMessageBox
 
@@ -774,3 +776,24 @@ class PSUVBoxLayout(QVBoxLayout):
             self.connection.close()
 
         GlobalConf.updateConnections(psu=last_connection)
+
+    def log(self, db: DB):
+        """
+        Called to log all important value
+
+        :param db: database class
+        """
+
+        if not self.checkConnection(False):
+            return
+
+        db.insertPSU(
+            self.status_voltage_1.value,
+            self.status_current_1.value,
+            self.status_voltage_2.value,
+            self.status_current_2.value,
+            self.status_voltage_3.value,
+            self.status_current_3.value,
+            self.status_voltage_4.value,
+            self.status_current_4.value,
+        )

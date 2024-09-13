@@ -1,9 +1,10 @@
-from PyQt6.QtWidgets import QSplitter, QWidget, QGroupBox, QBoxLayout
+from PyQt6.QtWidgets import QSplitter, QWidget, QBoxLayout
 from PyQt6.QtCore import Qt
 
 
-from Utility.Layouts import TabWidget, VBoxTitleLayout
+from DB.db import DB
 
+from Utility.Layouts import TabWidget, VBoxTitleLayout
 
 from Windows.PowerMeter import PowerMeterVBoxLayout
 
@@ -52,3 +53,12 @@ class MonitorWindow(TabWidget):
     def closeEvent(self, event):
         """Closes all connections"""
         self.power_meter_group_vbox.closeEvent()
+
+    def log(self, db: DB):
+        """
+        Called to log all important value
+
+        :param db: database class
+        """
+
+        self.power_meter_group_vbox.log(db)

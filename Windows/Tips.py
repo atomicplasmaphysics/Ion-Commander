@@ -1,7 +1,7 @@
 from os import listdir
 
 
-from PyQt6.QtWidgets import QSplitter, QWidget, QGroupBox, QBoxLayout, QVBoxLayout, QPushButton, QLabel
+from PyQt6.QtWidgets import QSplitter, QWidget, QBoxLayout, QVBoxLayout, QPushButton, QLabel
 from PyQt6.QtCore import Qt
 
 
