@@ -1,6 +1,7 @@
 import logging
 
-from PyQt6.QtCore import QSettings
+from PyQt6.QtCore import QSettings, QRect
+from PyQt6.QtWidgets import QApplication
 
 
 class LoggerSettings(QSettings):
@@ -42,6 +43,7 @@ class GlobalConf:
     window_height_name = 'window_height'
     window_center_x_name = 'window_center_x'
     window_center_y_name = 'window_center_y'
+    window_maximized_value = int(1E9)
 
     # connection parameters
     connection_psu_port_name = 'connection_psu_port'
@@ -65,34 +67,45 @@ class GlobalConf:
     ramp_timer_time = 10000
 
     @staticmethod
-    def updateWindowSize(width: int, height: int):
+    def updateWindowSizeCenter(width: int, height: int, center_x: int, center_y: int):
         """Updates and saves settings object with window parameters"""
         GlobalConf.settings.setValue(GlobalConf.window_width_name, width)
         GlobalConf.settings.setValue(GlobalConf.window_height_name, height)
+        GlobalConf.settings.setValue(GlobalConf.window_center_x_name, center_x)
+        GlobalConf.settings.setValue(GlobalConf.window_center_y_name, center_y)
 
         GlobalConf.settings.sync()
 
     @staticmethod
-    def getWindowSize() -> tuple[int, int]:
-        """Returns (width, height) of window"""
-        return (GlobalConf.settings.value(GlobalConf.window_width_name, defaultValue=-1, type=int),
-                GlobalConf.settings.value(GlobalConf.window_height_name, defaultValue=-1, type=int))
-
-    @staticmethod
-    def updateWindowCenter(x: int, y: int):
-        """Updates and saves settings object with window center parameters"""
-        GlobalConf.settings.setValue(GlobalConf.window_center_x_name, x)
-        GlobalConf.settings.setValue(GlobalConf.window_center_y_name, y)
-
-        GlobalConf.settings.sync()
-
-    @staticmethod
-    def getWindowCenter() -> tuple[int, int]:
-        """Returns (x, y) of window center"""
-        # TODO: check if coordinates even exist on screen, if not, than return center of the screen
+    def getWindowSizeCenter() -> tuple[int, int, int, int]:
+        """
+        Returns (width, height, center_x, center_y) of window.
+        Returns (GlobalConf.window_maximized_value, GlobalConf.window_maximized_value) for width and height if should be maximized.
+        """
         # TODO: should also be implemented in the BCA-GUIDE
-        return (GlobalConf.settings.value(GlobalConf.window_center_x_name, defaultValue=0, type=int),
-                GlobalConf.settings.value(GlobalConf.window_center_y_name, defaultValue=0, type=int))
+        width = GlobalConf.settings.value(GlobalConf.window_width_name, defaultValue=GlobalConf.window_maximized_value, type=int)
+        height = GlobalConf.settings.value(GlobalConf.window_height_name, defaultValue=GlobalConf.window_maximized_value, type=int)
+        center_x = GlobalConf.settings.value(GlobalConf.window_center_x_name, defaultValue=0, type=int)
+        center_y = GlobalConf.settings.value(GlobalConf.window_center_y_name, defaultValue=0, type=int)
+
+        test_width = width if width != GlobalConf.window_maximized_value else 100
+        test_height = height if height != GlobalConf.window_maximized_value else 100
+        window_geometry = QRect(int(center_x - test_width / 2), int(center_y - test_height / 2), test_width, test_height)
+        for screen in QApplication.screens():
+            geometry = screen.geometry()
+            if geometry.intersects(window_geometry):
+                if geometry.width() < width:
+                    width = geometry.width()
+                    if geometry.height() < height:
+                        width = GlobalConf.window_maximized_value
+                        height = GlobalConf.window_maximized_value
+                elif geometry.height() < height:
+                    height = geometry.height()
+                return width, height, center_x, center_y
+
+        geometry = QApplication.primaryScreen().availableVirtualGeometry()
+        return (GlobalConf.window_maximized_value, GlobalConf.window_maximized_value,
+                int(geometry.x() + geometry.width() / 2), int(geometry.y() + geometry.height() / 2))
 
     @staticmethod
     def updateConnections(

@@ -1,6 +1,6 @@
 from PyQt6.QtCore import QCoreApplication, QPoint, QTimer
-from PyQt6.QtGui import QCloseEvent, QGuiApplication
-from PyQt6.QtWidgets import QMainWindow, QTabWidget
+from PyQt6.QtGui import QCloseEvent
+from PyQt6.QtWidgets import QMainWindow, QTabWidget, QApplication
 
 
 from Config.GlobalConf import GlobalConf
@@ -202,18 +202,15 @@ class MainWindow(QMainWindow):
         # Setup window location and signals
         #
 
-        width, height = GlobalConf.getWindowSize()
-        x, y = GlobalConf.getWindowCenter()
-        if width == height == -1:
-            self.showMaximized()
-        else:
+        width, height, center_x, center_y = GlobalConf.getWindowSizeCenter()
+        maximized = width == height == GlobalConf.window_maximized_value
+        if not maximized:
             self.resize(width, height)
-            frame_geometry = self.frameGeometry()
-            center_point = QPoint(x, y)
-            if x == y == 0:
-                center_point = QGuiApplication.primaryScreen().availableVirtualGeometry().center()
-            frame_geometry.moveCenter(center_point)
-            self.move(frame_geometry.topLeft())
+        frame_geometry = self.frameGeometry()
+        frame_geometry.moveCenter(QPoint(center_x, center_y))
+        self.move(frame_geometry.topLeft())
+        if maximized:
+            self.showMaximized()
 
     def logTabs(self):
         """Loggs all tabs"""
@@ -273,14 +270,13 @@ class MainWindow(QMainWindow):
         for index in range(self.tabs.count()):
             self.tabs.widget(index).close()
 
+        center = (int(self.pos().x() + self.width() / 2), int(self.pos().y() + self.height() / 2))
+        dimensions = (self.width(), self.height())
         if self.isMaximized():
-            dimensions = (-1, -1)
-            center = (0, 0)
-        else:
-            dimensions = (self.width(), self.height())
-            center = (int(self.pos().x() + self.width() / 2), int(self.pos().y() + self.height() / 2))
-        GlobalConf.updateWindowSize(*dimensions)
-        GlobalConf.updateWindowCenter(*center)
+            dimensions = (GlobalConf.window_maximized_value, GlobalConf.window_maximized_value)
+
+        print(*dimensions, *center)
+        GlobalConf.updateWindowSizeCenter(*dimensions, *center)
 
         self.database.close()
         event.accept()

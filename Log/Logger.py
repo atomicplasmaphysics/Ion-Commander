@@ -1,6 +1,7 @@
 import logging
 import logging.config
 import logging.handlers
+from contextlib import contextmanager
 import json
 from pathlib import Path
 from os import mkdir
@@ -57,6 +58,23 @@ def setupLogging(level: int = logging.WARNING):
     config['handlers']['console']['level'] = logging.getLevelName(level)
     config['handlers']['file']['filename'] = str(root_path / 'Log' / 'logs' / f'{GlobalConf.title.replace(" ", "_")}.log')
     logging.config.dictConfig(config)
+
+
+@contextmanager
+def matplotlibLogLevel(level):
+    """
+    Contextmanager for matplotlib log levels
+
+    :param level: logging level
+    """
+
+    logger = logging.getLogger('matplotlib')
+    previous_level = logger.getEffectiveLevel()
+    logger.setLevel(level)
+    try:
+        yield
+    finally:
+        logger.setLevel(previous_level)
 
 
 def main():

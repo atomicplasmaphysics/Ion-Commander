@@ -182,7 +182,7 @@ class DB:
     ):
         self.commit_time_interval = commit_time_interval
         self.debug = debug
-        
+
         # TODO: there might occur errors?!
         root_path = Path(__file__).parents[1]
         self.connection = connect(root_path / 'DB' / 'Laserlab.db')

@@ -5,6 +5,7 @@ from time import time
 from os import path
 from shutil import copy
 from io import BytesIO
+import logging
 
 
 import numpy as np
@@ -26,6 +27,8 @@ import matplotlib.pyplot as plt
 
 from Config.GlobalConf import GlobalConf
 from Config.StylesConf import Colors, Styles, Forms
+
+from Log.Logger import matplotlibLogLevel
 
 from DB.db import DB
 
@@ -1435,16 +1438,18 @@ class LatexLabel(QSvgWidget):
         font.setPointSizeF(self.font_size)
         self.setMinimumHeight(QFontMetrics(font).height())
 
-        # Create matplotlib text with given text and fontsize
-        fig, ax = plt.subplots(figsize=(4, 1))
-        ax.text(0.5, 0.5, self.text, fontsize=self.font_size, color=self.font_color, ha='center', va='center')
-        ax.axis('off')
-
         # Save the figure to a BytesIO object in SVG format
         buf = BytesIO()
-        plt.tight_layout()
-        plt.savefig(buf, format='svg', bbox_inches='tight', transparent=True)
-        plt.close(fig)
+
+        # Create matplotlib text with given text and fontsize
+        with matplotlibLogLevel(logging.WARNING):
+            fig, ax = plt.subplots(figsize=(4, 1))
+            ax.text(0.5, 0.5, self.text, fontsize=self.font_size, color=self.font_color, ha='center', va='center')
+            ax.axis('off')
+
+            plt.tight_layout()
+            plt.savefig(buf, format='svg', bbox_inches='tight', transparent=True)
+            plt.close(fig)
         buf.seek(0)
 
         # Read the SVG data from the buffer into the widget
