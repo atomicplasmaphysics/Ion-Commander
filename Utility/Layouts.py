@@ -33,7 +33,8 @@ from Log.Logger import matplotlibLogLevel
 from DB.db import DB
 
 from Utility.ModifyWidget import setWidgetBackground
-from Utility.Functions import hexToRgb, linearInterpolateColor, getPrefix, qColorToHex
+from Utility.Functions import CyclicList, getPrefix
+from Utility.Color import hexToRgb, linearInterpolateColor, qColorToHex
 from Utility.FileDialogs import selectFileDialog
 
 if TYPE_CHECKING:
@@ -904,7 +905,7 @@ class IndicatorLed(QWidget):
         *args,
         state: bool = False,
         clickable: bool = False,
-        on_color: str = Colors.cooperate_lime,
+        on_color: str = Colors.color_green,
         off_color: str = Colors.app_background,
         size: QSize | None = Styles.indicator_size,
         **kwargs
@@ -1044,8 +1045,8 @@ class PressureWidget(QWidget):
         self.setLayout(self.main_layout)
 
         self.stack_widget = StackWidget(
-            color_top=Colors.cooperate_lime,
-            color_bottom=Colors.cooperate_strawberry,
+            color_top=Colors.color_green,
+            color_bottom=Colors.color_red,
             color_grayed=Colors.app_background_event
         )
         self.main_layout.addWidget(self.stack_widget, alignment=Qt.AlignmentFlag.AlignHCenter)
@@ -1108,8 +1109,8 @@ class StackWidget(QLCDNumber):
         size: QSize = QSize(100, 100),
         border_radius: float = 5,
         spacing: float = 1,
-        color_top: QColor | Qt.GlobalColor | str = Colors.cooperate_lime,
-        color_bottom: QColor | Qt.GlobalColor | str = Colors.cooperate_strawberry,
+        color_top: QColor | Qt.GlobalColor | str = Colors.color_green,
+        color_bottom: QColor | Qt.GlobalColor | str = Colors.color_red,
         color_grayed: QColor | Qt.GlobalColor | str = Colors.app_background_event,
         percentage_grey: float = 0,
         enable_digits: bool = True,
@@ -1238,8 +1239,8 @@ class DisplayLabel(QLabel):
         enable_prefix: bool = False,
         alignment_flag: Qt.AlignmentFlag = Qt.AlignmentFlag.AlignRight,
         antialiased: bool = True,
-        color_good: QColor | Qt.GlobalColor | str = Colors.cooperate_lime,
-        color_bad: QColor | Qt.GlobalColor | str = Colors.cooperate_strawberry,
+        color_good: QColor | Qt.GlobalColor | str = Colors.color_green,
+        color_bad: QColor | Qt.GlobalColor | str = Colors.color_red,
         color_grayed: QColor | Qt.GlobalColor | str = Colors.app_background_event,
         tooltip: bool = True,
         **kwargs
@@ -1472,8 +1473,8 @@ class PolarityButton(QWidget):
     def __init__(
         self,
         *args,
-        color_positive: QColor | Qt.GlobalColor | str = Colors.cooperate_lime,
-        color_negative: QColor | Qt.GlobalColor | str = Colors.cooperate_strawberry,
+        color_positive: QColor | Qt.GlobalColor | str = Colors.color_green,
+        color_negative: QColor | Qt.GlobalColor | str = Colors.color_red,
         color_grayed: QColor | Qt.GlobalColor | str = Colors.app_background_event,
         connected_buttons: bool = True,
         **kwargs
@@ -2244,26 +2245,10 @@ class TOFCanvas(pg.PlotWidget):
         self.setLabel('bottom', 'TOF [ns]')
         self.sigRangeChanged.connect(self.updateLimits)
 
-        self.graph_colors = [
-            Colors.cooperate_tu_blue,
-            Colors.cooperate_orange,
-            Colors.cooperate_maroon,
-            Colors.cooperate_lime,
-            Colors.cooperate_strawberry,
-            Colors.cooperate_petrol,
-            Colors.cooperate_violett_darker,
-            Colors.cooperate_rosa,
-            Colors.cooperate_error,
-            Colors.cooperate_turquoise,
-            Colors.cooperate_violett,
-            Colors.cooperate_nude
-        ]
+        self.graph_colors = CyclicList(Colors.colors)
 
-        if len(data) > len(self.graph_colors):
-            raise AttributeError('Data length can not exceed color length')
-
-        self.graph_curves: list[pg.PlotDataItem] = [self.plotItem.plot(pen=pg.mkPen(color=color, width=1)) for color in self.graph_colors]
-        self.graph_curve_fit: pg.PlotDataItem = self.plotItem.plot(pen=pg.mkPen(color=Colors.cooperate_orange, width=2))
+        self.graph_curves: list[pg.PlotDataItem] = []
+        self.graph_curve_fit: pg.PlotDataItem = self.plotItem.plot(pen=pg.mkPen(color=Colors.color_orange, width=2))
         self.setLimits(yMin=0, xMin=0)
 
         self.bars: list[pg.InfiniteLine] = []
@@ -2292,13 +2277,11 @@ class TOFCanvas(pg.PlotWidget):
 
         view_range: list[list[float, float]] = self.getViewBox().viewRange()
 
-        if len(data) > len(self.graph_colors):
-            raise AttributeError('Data length can not exceed color length')
-
         self.data = data
 
         for graph_curve in self.graph_curves:
-            graph_curve.setData(x=[], y=[])
+            graph_curve.clear()
+        self.graph_curves = []
 
         for i, d in enumerate(data):
             data_dict = {
@@ -2313,7 +2296,9 @@ class TOFCanvas(pg.PlotWidget):
                     'fillLevel': 0,
                     'brush': (*hexToRgb(self.graph_colors[i]), 80)
                 })
-            self.graph_curves[i].setData(**data_dict)
+            graph_curve = self.plotItem.plot(pen=pg.mkPen(color=self.graph_colors[i], width=1))
+            graph_curve.setData(**data_dict)
+            self.graph_curves.append(graph_curve)
         self.graph_curve_fit.setData(x=[], y=[])
 
         xdata = [d[0] for d in self.data]
@@ -2499,9 +2484,9 @@ class FittingBar(pg.InfiniteLine):
             'pos': pos,
             'movable': True,
             'label': name,
-            'labelOpts': {'color': Colors.cooperate_lime, 'position': label_position},
-            'pen': pg.mkPen(color=Colors.cooperate_lime, width=2),
-            'hoverPen': pg.mkPen(color=Colors.cooperate_strawberry, width=3),
+            'labelOpts': {'color': Colors.color_green, 'position': label_position},
+            'pen': pg.mkPen(color=Colors.color_green, width=2),
+            'hoverPen': pg.mkPen(color=Colors.color_red, width=3),
         }
         super_dict.update(kwargs)
 

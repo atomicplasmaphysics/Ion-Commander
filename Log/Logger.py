@@ -7,7 +7,7 @@ from pathlib import Path
 from os import mkdir
 
 
-from Config.GlobalConf import GlobalConf
+from Config.GlobalConf import GlobalConf, DefaultParams
 
 
 class CustomFormatter(logging.Formatter):
@@ -49,14 +49,14 @@ def setupLogging(level: int = logging.WARNING):
     root_path = Path(__file__).parents[1]
 
     try:
-        mkdir(root_path / 'Log' / 'logs')
+        mkdir(root_path / DefaultParams.logging_folder / DefaultParams.logging_log_folder)
     except FileExistsError:
         pass
 
-    with open(root_path / 'Log' / 'log_config.json', 'r') as log_file:
+    with open(root_path / DefaultParams.logging_folder / DefaultParams.logging_json_file, 'r') as log_file:
         config = json.load(log_file)
     config['handlers']['console']['level'] = logging.getLevelName(level)
-    config['handlers']['file']['filename'] = str(root_path / 'Log' / 'logs' / f'{GlobalConf.title.replace(" ", "_")}.log')
+    config['handlers']['file']['filename'] = str(root_path / DefaultParams.logging_folder / DefaultParams.logging_log_folder / f'{GlobalConf.title.replace(" ", "_")}.log')
     logging.config.dictConfig(config)
 
 

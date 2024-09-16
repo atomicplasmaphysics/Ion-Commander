@@ -1,5 +1,4 @@
 from serial import SerialException
-from time import time
 
 
 from PyQt6.QtWidgets import QVBoxLayout, QGroupBox, QLabel, QPushButton, QHBoxLayout, QMessageBox
@@ -7,7 +6,7 @@ from PyQt6.QtGui import QIcon
 from PyQt6.QtCore import Qt, QTimer
 
 
-from Config.GlobalConf import GlobalConf
+from Config.GlobalConf import GlobalConf, DefaultParams
 from Config.StylesConf import Colors
 
 from DB.db import DB
@@ -29,7 +28,7 @@ class PressureVBoxLayout(QVBoxLayout):
         # local variables
         self.update_timer = QTimer()
         self.update_timer.timeout.connect(self.updatePressure)
-        self.update_timer.setInterval(GlobalConf.update_timer_time)
+        self.update_timer.setInterval(DefaultParams.update_timer_time)
         self.update_timer.start()
 
         self.connection: None | MixedPressureConnection = None
@@ -48,7 +47,7 @@ class PressureVBoxLayout(QVBoxLayout):
 
         self.label_connection = QLabel('Connection')
         self.connection_hbox.addWidget(self.label_connection)
-        self.indicator_connection = IndicatorLed(off_color=Colors.cooperate_error)
+        self.indicator_connection = IndicatorLed(off_color=Colors.color_red)
         self.connection_hbox.addWidget(self.indicator_connection)
         self.status_connection = QLabel('Not connected')
         self.connection_hbox.addWidget(self.status_connection)
@@ -121,9 +120,6 @@ class PressureVBoxLayout(QVBoxLayout):
                 if pressure_widget is None:
                     continue
                 pressure_widget.setPressure(pressure)
-
-            #with open('pressure_log_pitbul_80Cstart.csv', 'a') as file:
-            #    file.write(f'{time()}, {pressures[0]}, {pressures[2]}\n')
 
         self.threaded_connection.callback(setPressures, self.threaded_connection.getPressureAll())
 

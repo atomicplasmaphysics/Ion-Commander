@@ -6,7 +6,7 @@ from PyQt6.QtGui import QIcon, QFont
 from PyQt6.QtWidgets import QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QGroupBox, QMessageBox, QApplication
 
 
-from Config.GlobalConf import GlobalConf
+from Config.GlobalConf import GlobalConf, DefaultParams
 from Config.StylesConf import Colors
 
 from DB.db import DB
@@ -26,7 +26,7 @@ class PowerMeterVBoxLayout(QVBoxLayout):
         # local variables
         self.update_timer = QTimer()
         self.update_timer.timeout.connect(self.updateLoop)
-        self.update_timer.setInterval(GlobalConf.update_timer_time)
+        self.update_timer.setInterval(DefaultParams.update_timer_time)
         self.update_timer.start()
 
         self.active_message_box = False
@@ -47,7 +47,7 @@ class PowerMeterVBoxLayout(QVBoxLayout):
 
         self.label_connection = QLabel('Connection')
         self.connection_hbox.addWidget(self.label_connection)
-        self.indicator_connection = IndicatorLed(off_color=Colors.cooperate_error)
+        self.indicator_connection = IndicatorLed(off_color=Colors.color_red)
         self.connection_hbox.addWidget(self.indicator_connection)
         self.status_connection = QLabel('Not connected')
         self.connection_hbox.addWidget(self.status_connection)
@@ -412,8 +412,6 @@ class PowerMeterVBoxLayout(QVBoxLayout):
         :param messagebox: show messagebox if failed
         """
 
-        # TODO: sometimes it crashes or ConnectionError-Popup when disconnecting
-
         if not port:
             port = self.combobox_connection.getValue(save=True)
         self.setPort(port)
@@ -539,11 +537,9 @@ class PowerMeterVBoxLayout(QVBoxLayout):
         descriptions = []
 
         for resource, resource_info in resources.items():
-            # TODO: decoding/encoding type in GlobalConfig
-            names.append(resource_info[0].decode('utf-8'))
+            names.append(resource_info[0].decode(DefaultParams.TLPMx_encoding))
             resource_names.append(resource)
-            descriptions.append(
-                f'{resource_info[0].decode("utf-8")}: {resource_info[2].decode("utf-8")} [SN: {resource_info[1].decode("utf-8")}]')
+            descriptions.append(f'{resource_info[0].decode(DefaultParams.TLPMx_encoding)}: {resource_info[2].decode(DefaultParams.TLPMx_encoding)} [SN: {resource_info[1].decode(DefaultParams.TLPMx_encoding)}]')
 
         self.combobox_connection.reinitialize(
             entries=names,

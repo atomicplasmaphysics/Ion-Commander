@@ -6,7 +6,7 @@ from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QGroupBox, QMessageBox
 
 
-from Config.GlobalConf import GlobalConf
+from Config.GlobalConf import GlobalConf, DefaultParams
 from Config.StylesConf import Colors
 
 from Utility.Layouts import InsertingGridLayout, IndicatorLed, DoubleSpinBox, DisplayLabel, ComboBox
@@ -24,7 +24,7 @@ class EBISVBoxLayout(QVBoxLayout):
         # local variables
         self.update_timer = QTimer()
         self.update_timer.timeout.connect(self.updateLoop)
-        self.update_timer.setInterval(GlobalConf.update_timer_time)
+        self.update_timer.setInterval(DefaultParams.update_timer_time)
         self.update_timer.start()
 
         self.active_message_box = False
@@ -32,11 +32,10 @@ class EBISVBoxLayout(QVBoxLayout):
         self.connection: None | ISEGConnection = None
         self.threaded_connection: ThreadedDummyConnection | ThreadedISEGConnection = ThreadedDummyConnection()
 
-        # TODO: put them in the GlobalConfig
-        self.voltage_deviation = 5
-        self.voltage_maximum = 10000
-        self.current_maximum = 1E-4
-        self.current_deviation = 0.05
+        self.voltage_deviation = DefaultParams.ebis_voltage_deviation
+        self.voltage_maximum = DefaultParams.ebis_voltage_maximum
+        self.current_maximum = DefaultParams.ebis_current_maximum
+        self.current_deviation = DefaultParams.ebis_current_deviation
 
         # Connection Group Box
         self.connection_group_box = QGroupBox('Connection')
@@ -51,7 +50,7 @@ class EBISVBoxLayout(QVBoxLayout):
 
         # Connection
         self.label_connection = QLabel('Connection')
-        self.indicator_connection = IndicatorLed(off_color=Colors.cooperate_error)
+        self.indicator_connection = IndicatorLed(off_color=Colors.color_red)
         self.status_connection = QLabel('Not connected')
         self.combobox_connection = ComboBox()
         self.button_connection = QPushButton('Connect')
@@ -485,8 +484,6 @@ class EBISVBoxLayout(QVBoxLayout):
         :param comport: comport to connect to
         :param messagebox: show messagebox if failed
         """
-
-        # TODO: sometimes it crashes or ConnectionError-Popup when disconnecting
 
         if not comport:
             comport = self.combobox_connection.getValue(text=True)

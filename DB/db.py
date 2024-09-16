@@ -1,5 +1,5 @@
 from __future__ import annotations
-from sqlite3 import connect, OperationalError
+from sqlite3 import connect, OperationalError, Connection, Cursor
 from time import time
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -8,7 +8,7 @@ from pathlib import Path
 import numpy as np
 
 
-from Config.GlobalConf import GlobalConf
+from Config.GlobalConf import GlobalConf, DefaultParams
 
 
 class Tables:
@@ -183,10 +183,15 @@ class DB:
         self.commit_time_interval = commit_time_interval
         self.debug = debug
 
-        # TODO: there might occur errors?!
-        root_path = Path(__file__).parents[1]
-        self.connection = connect(root_path / 'DB' / 'Laserlab.db')
-        self.cursor = self.connection.cursor()
+        database_path = Path(__file__).parents[1] / DefaultParams.db_folder / DefaultParams.db_file
+        self.connection: Connection | None = None
+        self.cursor: Cursor | None = None
+
+        try:
+            self.connection = connect(database_path)
+            self.cursor = self.connection.cursor()
+        except OperationalError as error:
+            GlobalConf.logger.error(f'DB: Can not connect to database in file "{database_path}" because: {error}')
         
         self.new_commit_time = datetime.now()
 
@@ -212,6 +217,10 @@ class DB:
         :param force_commit: forces a commit
         """
 
+        if self.connection is None or self.cursor is None:
+            GlobalConf.logger.error(f'DB: connection or cursor is None')
+            return
+
         if self.debug:
             GlobalConf.logger.debug(f'DB query: {query}')
         self.cursor.execute(query)
@@ -232,16 +241,29 @@ class DB:
         :return: list of results
         """
 
+        if self.connection is None or self.cursor is None:
+            GlobalConf.logger.error(f'DB: connection or cursor is None')
+            return
+
         self._execute(query, force_commit)
         return self.cursor.fetchall()
 
     def _commit(self):
         """Commits to database"""
+
+        if self.connection is None or self.cursor is None:
+            GlobalConf.logger.error(f'DB: connection or cursor is None')
+            return
+
         self.connection.commit()
         self.new_commit_time = datetime.now() + timedelta(self.commit_time_interval)
 
     def deleteAllTables(self):
         """Deletes all tables on the database"""
+
+        if self.connection is None or self.cursor is None:
+            GlobalConf.logger.error(f'DB: connection or cursor is None')
+            return
 
         self._execute('''SELECT name FROM sqlite_master WHERE type='table';''')
         tables = self.cursor.fetchall()
@@ -258,7 +280,7 @@ class DB:
             try:
                 self._execute(table.exists())
             except OperationalError:
-                GlobalConf.logger.info(f'INFO: Table "{table.name}" did not exist, will create it...')
+                GlobalConf.logger.info(f'DB: Table "{table.name}" did not exist, will create it...')
                 self._execute(table.create())
 
             result = [res[1] for res in self._execute_return(table.columns())]
@@ -507,6 +529,9 @@ class DB:
 
     def close(self):
         """Must be called on close"""
+        if self.connection is None or self.cursor is None:
+            GlobalConf.logger.error(f'DB: connection or cursor is None')
+            return
 
         self.connection.commit()
 

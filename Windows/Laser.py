@@ -3,7 +3,7 @@ from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QGroupBox, QMessageBox
 
 
-from Config.GlobalConf import GlobalConf
+from Config.GlobalConf import GlobalConf, DefaultParams
 from Config.StylesConf import Colors
 
 from DB.db import DB
@@ -21,13 +21,12 @@ class LaserVBoxLayout(QVBoxLayout):
         super().__init__(*args, **kwargs)
 
         # Local variables
-        # TODO: get this variables form GlobalConfig
-        self.ip = (169, 254, 21, 151)
-        self.port = 23
+        self.ip = DefaultParams.laser_ip
+        self.port = DefaultParams.laser_port
 
         self.update_timer = QTimer()
         self.update_timer.timeout.connect(self.updateLoop)
-        self.update_timer.setInterval(GlobalConf.update_timer_time)
+        self.update_timer.setInterval(DefaultParams.update_timer_time)
         self.update_timer.start()
 
         self.active_message_box = False
@@ -37,13 +36,12 @@ class LaserVBoxLayout(QVBoxLayout):
         self.connection: None | MonacoConnection = None
         self.threaded_connection: ThreadedDummyConnection | ThreadedMonacoConnection = ThreadedDummyConnection()
 
-        # TODO: transfer these variables into GlobalConfig
-        self.chiller_temperature_low = 12
-        self.chiller_temperature_high = 33
-        self.chiller_flow_low = 4.7
-        self.chiller_flow_high = 5.3
-        self.baseplate_temperature_off = 27.5
-        self.baseplate_temperature_on = 28
+        self.chiller_temperature_low = DefaultParams.laser_chiller_temperature_low
+        self.chiller_temperature_high = DefaultParams.laser_chiller_temperature_high
+        self.chiller_flow_low = DefaultParams.laser_chiller_flow_low
+        self.chiller_flow_high = DefaultParams.laser_chiller_flow_high
+        self.baseplate_temperature_off = DefaultParams.laser_baseplate_temperature_off
+        self.baseplate_temperature_on = DefaultParams.laser_baseplate_temperature_on
 
         self.energy_total = 40000
         self.amplifiers: list[tuple[tuple[float, int], float]] = [
@@ -76,7 +74,7 @@ class LaserVBoxLayout(QVBoxLayout):
 
         # Connection
         self.label_connection = QLabel('Connection')
-        self.indicator_connection = IndicatorLed(off_color=Colors.cooperate_error)
+        self.indicator_connection = IndicatorLed(off_color=Colors.color_red)
         self.status_connection = QLabel('Not connected')
         self.button_connection = QPushButton('Connect')
         self.button_connection.pressed.connect(self.connect)
@@ -201,7 +199,7 @@ class LaserVBoxLayout(QVBoxLayout):
         # System faults
         self.button_system_faults = QPushButton('Clear')
         self.button_system_faults.pressed.connect(self.clearFaults)
-        self.indicator_system_faults = IndicatorLed(on_color=Colors.cooperate_error, off_color=Colors.cooperate_lime)
+        self.indicator_system_faults = IndicatorLed(on_color=Colors.color_red, off_color=Colors.color_green)
         self.status_system_faults = QLabel('No faults')
         self.faults_grid.addWidgets(
             self.button_system_faults,
@@ -860,8 +858,6 @@ class LaserVBoxLayout(QVBoxLayout):
         :param port: port number to connect to
         :param messagebox: show messagebox if failed
         """
-
-        # TODO: sometimes it crashes or ConnectionError-Popup when disconnecting
 
         if ip is None or port is None:
             ip = self.ip

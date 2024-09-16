@@ -1,9 +1,9 @@
 from PyQt6.QtCore import QCoreApplication, QPoint, QTimer
 from PyQt6.QtGui import QCloseEvent
-from PyQt6.QtWidgets import QMainWindow, QTabWidget, QApplication
+from PyQt6.QtWidgets import QMainWindow, QTabWidget
 
 
-from Config.GlobalConf import GlobalConf
+from Config.GlobalConf import GlobalConf, DefaultParams
 
 from DB.db import DB
 
@@ -195,7 +195,7 @@ class MainWindow(QMainWindow):
         self.database = DB()
         self.logging_timer = QTimer()
         self.logging_timer.timeout.connect(self.logTabs)
-        self.logging_timer.setInterval(GlobalConf.update_timer_time)
+        self.logging_timer.setInterval(DefaultParams.update_timer_time)
         self.logging_timer.start()
 
         #

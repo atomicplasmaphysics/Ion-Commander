@@ -9,7 +9,7 @@ from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QGroupBox, QMessageBox
 
 
-from Config.GlobalConf import GlobalConf
+from Config.GlobalConf import GlobalConf, DefaultParams
 from Config.StylesConf import Colors
 
 from DB.db import DB
@@ -29,12 +29,12 @@ class PSUVBoxLayout(QVBoxLayout):
         # local variables
         self.update_timer = QTimer()
         self.update_timer.timeout.connect(self.updateLoop)
-        self.update_timer.setInterval(GlobalConf.update_timer_time)
+        self.update_timer.setInterval(DefaultParams.update_timer_time)
         self.update_timer.start()
 
         self.ramp_timer = QTimer()
         self.ramp_timer.timeout.connect(self.updateRamp)
-        self.ramp_timer.setInterval(GlobalConf.ramp_timer_time)
+        self.ramp_timer.setInterval(DefaultParams.ramp_timer_time)
         self.ramp_start_time = datetime.now()
         self.ramp_channel = 0
         self.ramp_start_voltage = 0
@@ -44,11 +44,10 @@ class PSUVBoxLayout(QVBoxLayout):
         self.connection: None | ISEGConnection = None
         self.threaded_connection: ThreadedDummyConnection | ThreadedISEGConnection = ThreadedDummyConnection()
 
-        # TODO: put them in the GlobalConfig
-        self.voltage_deviation = 5
-        self.voltage_maximum = 6000
-        self.current_maximum = 1E-4
-        self.time_ramp_default = 15
+        self.voltage_deviation = DefaultParams.psu_voltage_deviation
+        self.voltage_maximum = DefaultParams.psu_voltage_maximum
+        self.current_maximum = DefaultParams.psu_current_maximum
+        self.time_ramp_default = DefaultParams.psu_time_ramp_default
 
         # Connection Group Box
         self.connection_group_box = QGroupBox('Connection')
@@ -63,7 +62,7 @@ class PSUVBoxLayout(QVBoxLayout):
 
         # Connection
         self.label_connection = QLabel('Connection')
-        self.indicator_connection = IndicatorLed(off_color=Colors.cooperate_error)
+        self.indicator_connection = IndicatorLed(off_color=Colors.color_red)
         self.status_connection = QLabel('Not connected')
         self.combobox_connection = ComboBox()
         self.button_connection = QPushButton('Connect')
@@ -208,7 +207,7 @@ class PSUVBoxLayout(QVBoxLayout):
         self.label_limit_1 = QLabel('MCP Front/Back')
         self.spinbox_limit_current_1 = DoubleSpinBox(default=0.002, step_size=0.001, input_range=(0.002, 2), decimals=5, buttons=False)
         self.spinbox_limit_current_1.editingFinished.connect(lambda: self.setCurrentLimit(0, self.spinbox_limit_current_1.value()))
-        self.indicator_limit_1 = IndicatorLed(on_color=Colors.cooperate_error)
+        self.indicator_limit_1 = IndicatorLed(on_color=Colors.color_red)
         self.limits_grid.addWidgets(
             self.label_limit_1,
             self.spinbox_limit_current_1,
@@ -219,7 +218,7 @@ class PSUVBoxLayout(QVBoxLayout):
         self.label_limit_2 = QLabel('Anode')
         self.spinbox_limit_current_2 = DoubleSpinBox(default=0.002, step_size=0.001, input_range=(0.002, 2), decimals=5, buttons=False)
         self.spinbox_limit_current_2.editingFinished.connect(lambda: self.setCurrentLimit(1, self.spinbox_limit_current_2.value()))
-        self.indicator_limit_2 = IndicatorLed(on_color=Colors.cooperate_error)
+        self.indicator_limit_2 = IndicatorLed(on_color=Colors.color_red)
         self.limits_grid.addWidgets(
             self.label_limit_2,
             self.spinbox_limit_current_2,
@@ -230,7 +229,7 @@ class PSUVBoxLayout(QVBoxLayout):
         self.label_limit_3 = QLabel('Cathode LSD')
         self.spinbox_limit_current_3 = DoubleSpinBox(default=0.002, step_size=0.001, input_range=(0.002, 2), decimals=5, buttons=False)
         self.spinbox_limit_current_3.editingFinished.connect(lambda: self.setCurrentLimit(2, self.spinbox_limit_current_3.value()))
-        self.indicator_limit_3 = IndicatorLed(on_color=Colors.cooperate_error)
+        self.indicator_limit_3 = IndicatorLed(on_color=Colors.color_red)
         self.limits_grid.addWidgets(
             self.label_limit_3,
             self.spinbox_limit_current_3,
@@ -241,7 +240,7 @@ class PSUVBoxLayout(QVBoxLayout):
         self.label_limit_4 = QLabel('Focus LSD')
         self.spinbox_limit_current_4 = DoubleSpinBox(default=0.002, step_size=0.001, input_range=(0.002, 2), decimals=5, buttons=False)
         self.spinbox_limit_current_4.editingFinished.connect(lambda: self.setCurrentLimit(3, self.spinbox_limit_current_4.value()))
-        self.indicator_limit_4 = IndicatorLed(on_color=Colors.cooperate_error)
+        self.indicator_limit_4 = IndicatorLed(on_color=Colors.color_red)
         self.limits_grid.addWidgets(
             self.label_limit_4,
             self.spinbox_limit_current_4,
@@ -571,8 +570,6 @@ class PSUVBoxLayout(QVBoxLayout):
         :param comport: comport to connect to
         :param messagebox: show messagebox if failed
         """
-
-        # TODO: sometimes it crashes or ConnectionError-Popup when disconnecting
 
         if not comport:
             comport = self.combobox_connection.getValue(text=True)

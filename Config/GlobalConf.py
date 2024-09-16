@@ -24,6 +24,50 @@ class LoggerSettings(QSettings):
         return super().value(key, **kwargs)
 
 
+class DefaultParams:
+    """
+    Class storing default parameters
+    """
+
+    # timer parameters
+    update_timer_time = 1000
+    ramp_timer_time = 10000
+
+    # PSU parameters
+    psu_voltage_deviation = 5
+    psu_voltage_maximum = 6000
+    psu_current_maximum = 1E-4
+    psu_time_ramp_default = 15
+
+    # EBIS parameters
+    ebis_voltage_deviation = 5
+    ebis_voltage_maximum = 10000
+    ebis_current_maximum = 1E-4
+    ebis_current_deviation = 0.05
+
+    # laser parameters
+    laser_ip = (169, 254, 21, 151)
+    laser_port = 23
+    laser_chiller_temperature_low = 12
+    laser_chiller_temperature_high = 33
+    laser_chiller_flow_low = 4.7
+    laser_chiller_flow_high = 5.3
+    laser_baseplate_temperature_off = 27.5
+    laser_baseplate_temperature_on = 28
+
+    # power meter parameters
+    TLPMx_encoding = 'utf-8'
+
+    # database parameters
+    db_folder = 'DB'
+    db_file = 'Laserlab.db'
+
+    # logging parameters
+    logging_folder = 'log'
+    logging_log_folder = 'logs'
+    logging_json_file = 'log_config.json'
+
+
 class GlobalConf:
     """
     Class storing global configurations
@@ -61,10 +105,6 @@ class GlobalConf:
 
     # simulation parameters
     simulation_paths_parameter_name = 'simulation_paths_parameter'
-
-    # timer parameters
-    update_timer_time = 1000
-    ramp_timer_time = 10000
 
     @staticmethod
     def updateWindowSizeCenter(width: int, height: int, center_x: int, center_y: int):

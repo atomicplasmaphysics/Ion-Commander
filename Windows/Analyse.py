@@ -286,9 +286,7 @@ class AnalyseWindow(TabWidget):
             return
 
         if len(rows) > len(self.graph.graph_colors):
-            self.writeStatusBar('Too many datasets selected')
-            self.clearData()
-            return
+            self.writeStatusBar('INFO: Too many datasets selected, same colors will be reused multiple times')
 
         view_all = True
         self.list_files.resetColors()

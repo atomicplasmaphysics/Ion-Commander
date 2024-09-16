@@ -13,19 +13,27 @@ class Colors:
     app_background_light = '#AAAAAA'
     app_text = '#CCCCCC'
 
-    # cooperate colors
-    cooperate_maroon = '#941751'
-    cooperate_tu_blue = '#006699'
-    cooperate_orange = '#FF9300'
-    cooperate_petrol = '#007E71'
-    cooperate_violett_darker = '#531B93'
-    cooperate_rosa = '#FF818E'
-    cooperate_error = '#D6002E'
-    cooperate_lime = '#8EFA00'
-    cooperate_turquoise = '#00FDFF'
-    cooperate_strawberry = '#FF2F92'
-    cooperate_violett = '#9E7BFF'
-    cooperate_nude = '#FFBFBA'
+    color_blue_light = '#00AEFF'
+    color_blue_dark = '#0400FF'
+    color_purple = '#A100FF'
+    color_pink = '#FF00DC'
+    color_red = '#FF2600'
+    color_orange = '#FF9000'
+    color_yellow = '#FFF600'
+    color_green = '#1DFF00'
+    color_turquoise = '#00FFCB'
+
+    colors = [
+        color_blue_light,
+        color_orange,
+        color_green,
+        color_pink,
+        color_yellow,
+        color_red,
+        color_purple,
+        color_turquoise,
+        color_blue_dark,
+    ]
 
 
 class Styles:
