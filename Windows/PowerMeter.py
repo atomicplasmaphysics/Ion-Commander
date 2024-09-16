@@ -283,7 +283,6 @@ class PowerMeterVBoxLayout(QVBoxLayout):
 
     def updateAllValues(self):
         """Updates all values"""
-        # TODO: get display parameter
         self.status_display_power_min.setValue(0)
         self.status_display_power_max.setValue(0)
         self.updateLoop(set_startup=True)

@@ -16,7 +16,6 @@ class MonitorWindow(TabWidget):
     :param parent: parent widget
     """
 
-    # TODO: implement powermeter
     # TODO: implement camera
 
     def __init__(self, parent):
@@ -47,7 +46,6 @@ class MonitorWindow(TabWidget):
         self.splitter.addWidget(self.power_meter_vbox_parent)
 
         # Division between columns
-        # TODO: does not work properly
         self.splitter.setStretchFactor(0, 30)
 
     def closeEvent(self, event):

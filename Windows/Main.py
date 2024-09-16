@@ -275,7 +275,6 @@ class MainWindow(QMainWindow):
         if self.isMaximized():
             dimensions = (GlobalConf.window_maximized_value, GlobalConf.window_maximized_value)
 
-        print(*dimensions, *center)
         GlobalConf.updateWindowSizeCenter(*dimensions, *center)
 
         self.database.close()

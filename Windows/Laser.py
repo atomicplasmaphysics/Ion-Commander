@@ -289,7 +289,6 @@ class LaserVBoxLayout(QVBoxLayout):
             return
 
         def keyOn(state: int):
-            # TODO: factor this checks out
             if not isinstance(state, int) or state == -1:
                 GlobalConf.logger.error(f'State for Key must be <int> and not -1, got {type(state)} with value "{state}"')
                 return

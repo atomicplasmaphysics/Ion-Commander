@@ -1558,7 +1558,7 @@ class ErrorTable(QTableWidget):
         self.setRowCount(self.default_rows)
         self.verticalHeader().setVisible(False)
         self.setHorizontalHeaderLabels(['#', 'Type', 'Description'])
-        self.setColumnWidth(0, 50)
+        self.setColumnWidth(0, 10)
         self.setColumnWidth(1, 100)
         self.horizontalHeader().setStretchLastSection(True)
         self.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
@@ -1575,9 +1575,19 @@ class ErrorTable(QTableWidget):
 
         if self.rowCount() <= self.actual_row:
             self.insertRow(self.actual_row)
-        self.setItem(self.actual_row, 0, QTableWidgetItem(str(error_code)))
-        self.setItem(self.actual_row, 1, QTableWidgetItem(error_type))
-        self.setItem(self.actual_row, 2, QTableWidgetItem(error_description))
+
+        error_code_widget = QTableWidgetItem(str(error_code))
+        error_code_widget.setToolTip(f'Error #: {error_code}')
+        self.setItem(self.actual_row, 0, error_code_widget)
+
+        error_type_widget = QTableWidgetItem(error_type)
+        error_type_widget.setToolTip(f'Error type: {error_type}')
+        self.setItem(self.actual_row, 1, error_type_widget)
+
+        error_description_widget = QTableWidgetItem(f'Error description: {error_description}')
+        error_description_widget.setToolTip(error_description)
+        self.setItem(self.actual_row, 2, error_description_widget)
+
         self.actual_row += 1
 
     def getErrorList(self) -> list[int]:

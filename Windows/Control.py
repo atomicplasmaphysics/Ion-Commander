@@ -30,8 +30,6 @@ class ControlWindow(TabWidget):
         self.splitter.setChildrenCollapsible(False)
         self.main_layout.addWidget(self.splitter)
 
-        # TODO: Add tooltips to everything
-
         # PSU CONTROL
         self.psu_vbox = VBoxTitleLayout('PSU', parent=self, add_stretch=True, popout_enable=True)
         self.psu_group_vbox = PSUVBoxLayout()
@@ -89,7 +87,6 @@ class ControlWindow(TabWidget):
         self.splitter.addWidget(self.pressure_parent)
 
         # Division between columns
-        # TODO: does not work properly
         self.splitter.setStretchFactor(0, 30)
         self.splitter.setStretchFactor(1, 30)
         self.splitter.setStretchFactor(2, 30)
