@@ -1,3 +1,6 @@
+import numpy as np
+
+
 class CyclicList(list):
     """Cyclic list"""
 
@@ -56,6 +59,29 @@ def getIntIfInt(number: float) -> float | int:
     if int(number) == number:
         return int(number)
     return number
+
+
+def mergeArraysFirstColumn(arrays: list[np.ndarray], missing_value: float = np.nan):
+    """
+    Merge numpy arrays in one, where first column will be the same (only integer steps)
+
+    :param arrays: list of numpy arrays to merge
+    :param missing_value: default replacement for missing values
+    """
+
+    min_x = int(min(arr[:, 0].min() for arr in arrays))
+    max_x = int(max(arr[:, 0].max() for arr in arrays))
+    x_range = np.arange(min_x, max_x + 1)
+
+    result = np.full((len(x_range), sum(arr.shape[1] - 1 for arr in arrays) + 1), missing_value)
+    result[:, 0] = x_range
+
+    offset = 1
+    for array in arrays:
+        result[(array[:, 0] - min_x).astype(int), offset:offset + array.shape[1] - 1] = array[:, 1:]
+        offset += array.shape[1] - 1
+
+    return result
 
 
 def assertionTests():

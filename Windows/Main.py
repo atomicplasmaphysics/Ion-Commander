@@ -9,10 +9,11 @@ from DB.db import DB
 
 from Utility.Layouts import TabWidget
 
-from Windows.Analyse import AnalyseWindow
 from Windows.Control import ControlWindow
 from Windows.Monitor import MonitorWindow
+from Windows.History import HistoryWindow
 from Windows.Tips import TipsWindow
+from Windows.Analyse import AnalyseWindow
 from Windows.Simulation import SimulationWindow
 
 
@@ -36,6 +37,8 @@ class MainWindow(QMainWindow):
         QCoreApplication.setApplicationName(GlobalConf.title)
 
         self.window_title = GlobalConf.title
+
+        self.database = DB()
 
         #
         # MENU BAR
@@ -170,6 +173,10 @@ class MainWindow(QMainWindow):
         self.monitor_window = MonitorWindow(self)
         self.addTab(self.monitor_window, 'Monitor')
 
+        # Add history tab
+        self.history_window = HistoryWindow(self, self.database)
+        self.addTab(self.history_window, 'History')
+
         # Add tips tab
         self.tips_window = TipsWindow(self)
         self.addTab(self.tips_window, 'Tips')
@@ -192,7 +199,6 @@ class MainWindow(QMainWindow):
         # Setup logging for tabs
         #
 
-        self.database = DB()
         self.logging_timer = QTimer()
         self.logging_timer.timeout.connect(self.logTabs)
         self.logging_timer.setInterval(DefaultParams.update_timer_time)

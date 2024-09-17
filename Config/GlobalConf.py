@@ -67,6 +67,10 @@ class DefaultParams:
     logging_log_folder = 'logs'
     logging_json_file = 'log_config.json'
 
+    # tip parameters
+    tip_folder = 'Tips'
+    tip_file_folder = 'entries'
+
 
 class GlobalConf:
     """

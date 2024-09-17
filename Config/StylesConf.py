@@ -51,7 +51,8 @@ class Styles:
         QComboBox,
         QDoubleSpinBox,
         QSpinBox,
-        QTabBar::tab {{
+        QTabBar::tab,
+        QDial {{
             background-color: {Colors.app_background_event};
             border: 1px solid {Colors.app_background_lighter};
             padding: 3px;
@@ -65,7 +66,6 @@ class Styles:
             background-color: #666666;
         }}
         
-        
         QLabel {{
             background: None;
         }}
@@ -75,7 +75,8 @@ class Styles:
             border-top: 1px solid #CCCCCC;
         }}
         
-        QTabBar::tab:selected {{
+        QTabBar::tab:selected,
+        QDial {{
             background-color: {Colors.app_background_light};
             color: #000000;
         }}
@@ -87,7 +88,8 @@ class Styles:
             gridline-color: {Colors.app_background_event};
         }}
         
-        QHeaderView {{   
+        QHeaderView,
+        QCalendarWidget QTableView {{   
             color: #000000;
             background-color: {Colors.app_background_light};
         }}

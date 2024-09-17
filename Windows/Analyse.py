@@ -145,7 +145,8 @@ class AnalyseWindow(TabWidget):
         # DISPLAY
         #
 
-        self.graph = TOFCanvas(parent=self, data=self.data, fit_class=self.fit_function_class)
+        # TODO: check if legend=False is needed
+        self.graph = TOFCanvas(parent=self, data=self.data, fit_class=self.fit_function_class, grid=True)
         self.main_layout.addWidget(self.graph)
 
     def openFiles(self, files: list[str] = None):
@@ -269,7 +270,7 @@ class AnalyseWindow(TabWidget):
         """Clears the data"""
 
         self.data = []
-        self.graph.plotData(self.data)
+        self.graph.plotTOF(self.data)
 
     def loadData(self, rows: list[int]):
         """
@@ -313,7 +314,7 @@ class AnalyseWindow(TabWidget):
                 except (OSError, ValueError) as error:
                     self.writeStatusBar(f'File could not be read: {error}')
 
-        self.graph.plotData(self.data, view_all=view_all, fill_histogram=self.button_fill_histo.value())
+        self.graph.plotTOF(self.data, view_all=view_all, fill_histogram=self.button_fill_histo.value())
 
     def loadDataSelected(self, row: int):
         """

@@ -2,20 +2,25 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Callable
 from math import log10, inf
 from time import time
+from datetime import datetime
 from os import path
 from shutil import copy
 from io import BytesIO
+from enum import Enum, auto
 import logging
 
 
 import numpy as np
 
-from PyQt6.QtCore import Qt, pyqtSignal, QByteArray, QSize, QRect, QRectF
-from PyQt6.QtGui import QIcon, QPainter, QPixmap, QColor, QBrush, QLinearGradient, QPainterPath, QAction, QFont, QFontMetrics, QTextCursor
+from PyQt6.QtCore import Qt, pyqtSignal, QByteArray, QSize, QRect, QRectF, QPointF
+from PyQt6.QtGui import (
+    QIcon, QPainter, QPixmap, QColor, QBrush, QLinearGradient, QPainterPath, QAction, QFont, QFontMetrics, QTextCursor, QPen
+)
 from PyQt6.QtWidgets import (
     QHBoxLayout, QLabel, QWidget, QVBoxLayout, QSpinBox, QDoubleSpinBox, QCheckBox, QComboBox, QLineEdit, QPushButton,
     QListWidget, QListWidgetItem, QApplication, QStyleOption, QTableWidget, QTableWidgetItem, QAbstractItemView, QGridLayout,
-    QLCDNumber, QFrame, QTextEdit, QMenuBar, QMessageBox, QInputDialog, QMenu, QColorDialog, QDialog, QGroupBox
+    QLCDNumber, QFrame, QTextEdit, QMenuBar, QMessageBox, QInputDialog, QMenu, QColorDialog, QDialog, QGroupBox, QDateTimeEdit,
+    QCalendarWidget, QDial
 )
 from PyQt6.QtSvgWidgets import QSvgWidget
 from PyQt6.QtSvg import QSvgRenderer
@@ -838,7 +843,8 @@ class FilePath(QWidget):
         self,
         placeholder: str = None,
         function: Callable = None,
-        icon: QIcon = None, **kwargs
+        icon: QIcon = None,
+        **kwargs
     ):
         super().__init__(**kwargs)
 
@@ -858,9 +864,8 @@ class FilePath(QWidget):
         self.button = QPushButton()
         if self.function is not None:
             if icon is None:
-                self.button.setText('...')
-            else:
-                self.button.setIcon(icon)
+                icon = QIcon('icons/open.png')
+            self.button.setIcon(icon)
             self.button.setMinimumSize(40, 10)
             self.button.setMaximumSize(40, 30)
             self.layout.addWidget(self.button, Qt.AlignmentFlag.AlignRight)
@@ -885,6 +890,469 @@ class FilePath(QWidget):
         if returned_path is not None:
             self.path = returned_path
             self.displayPath()
+
+
+class ClockDial(QDial):
+    """
+    Class extending the QDial as Clock interface
+
+    :param clock_type: type of clock <ClockType>
+    :param size: size of clock
+    """
+
+    clockValueChanged = pyqtSignal(int)
+
+    class ClockType(Enum):
+        """
+        Supported clock types
+        """
+
+        Hour12 = auto()
+        Hour24 = auto()
+        Minute = auto()
+        Second = auto()
+
+    def __init__(
+        self,
+        clock_type: ClockType,
+        *args,
+        size: int | None = None,
+        **kwargs
+    ):
+        super().__init__(*args, **kwargs)
+
+        self.clock_type = clock_type
+        self.size = size
+
+        if self.clock_type == ClockDial.ClockType.Hour12:
+            self.max_value = 12
+            self.division = 1
+        elif self.clock_type == ClockDial.ClockType.Hour24:
+            self.max_value = 24
+            self.division = 2
+        elif self.clock_type == ClockDial.ClockType.Minute or self.clock_type == ClockDial.ClockType.Second:
+            self.max_value = 60
+            self.division = 5
+        else:
+            raise NotImplementedError(f'ClockDial of type {self.clock_type} is not implemented.')
+
+        self.setRange(0, self.max_value)
+        self.setNotchesVisible(False)
+        self.setWrapping(True)
+
+        if self.size is None:
+            self.size = 100
+        self.setMinimumSize(self.size, self.size)
+        self.setPageStep(1)
+        self.setValue(0)
+
+        self.valueChanged.connect(lambda: self.clockValueChanged.emit(self.value()))
+
+    def setValue(self, value: int):
+        """Sets the value"""
+        super().setValue(int(value + self.max_value / 2) % self.max_value)
+
+    def value(self):
+        """Gets the value"""
+        return int(super().value() + self.max_value / 2) % self.max_value
+
+    def paintEvent(self, event):
+        """Custom paint event to draw the labels around the QDial"""
+
+        painter_notches = QPainter(self)
+
+        rect = self.rect()
+        # TODO: somehow the center is not really the center of the QDial?
+        center_x, center_y = rect.center().x() + 2, rect.center().y() + 2
+        size = min(rect.width(), rect.height())
+        radius = size / 2
+
+        # draw notches
+        for i in range(0, self.max_value):
+            angle = (i / self.max_value) * 2 * np.pi
+
+            if i % self.division == 0:
+                notch_end_radius = radius
+                pen = QPen(Qt.GlobalColor.black, 1.5)
+            else:
+                notch_end_radius = radius * 0.9
+                pen = QPen(Qt.GlobalColor.darkGray, 1)
+
+            painter_notches.setPen(pen)
+
+            notch_end_x = int(center_x + (notch_end_radius * np.cos(angle)))
+            notch_end_y = int(center_y + (notch_end_radius * np.sin(angle)))
+
+            painter_notches.drawLine(center_x, center_y, notch_end_x, notch_end_y)
+
+        # draw dial
+        super().paintEvent(event)
+
+        painter_label = QPainter(self)
+
+        font = QFont()
+        font_size = size // 12
+        font.setPointSize(font_size)
+        painter_label.setFont(font)
+
+        radius_label = radius - font_size * 1.75
+
+        # draw text
+        divisions = self.max_value // self.division
+        for i in range(0, divisions):
+            angle = (i / divisions) * 2 * np.pi
+
+            label_x = center_x - radius_label * 0.8 * np.sin(angle)
+            label_y = center_y - radius_label * 0.8 * np.cos(angle)
+
+            text_rect = QRectF(QPointF(label_x - font_size, label_y - font_size),
+                               QPointF(label_x + font_size, label_y + font_size))
+            painter_label.drawText(text_rect, Qt.AlignmentFlag.AlignCenter, str(self.max_value - i * self.division))
+
+
+class Clock(QWidget):
+    """
+    Clock widget to select a time
+
+    :param am_pm: select between am and pm OR have a 24 hour clock
+    :param seconds_flag: show seconds
+    :clock_size: size of ClockDial Widget
+    :timestamp: time to be displayed
+    """
+
+    def __init__(
+        self,
+        *args,
+        am_pm: bool = False,
+        seconds_flag: bool = True,
+        clock_size: int | None = None,
+        timestamp: datetime | None = None,
+        **kwargs
+    ):
+        super().__init__(*args, **kwargs)
+
+        self.am_pm = am_pm
+        self.seconds_flag = seconds_flag
+        self.clock_size = clock_size
+
+        self.main_layout = QHBoxLayout()
+        self.setLayout(self.main_layout)
+
+        if self.am_pm:
+            self.hour_dial = ClockDial(ClockDial.ClockType.Hour12)
+            self.hour_spinbox = SpinBox(input_range=(0, 11), buttons=True)
+
+            self.am_pm_vbox = QVBoxLayout()
+            self.am_pm_vbox.setAlignment(Qt.AlignmentFlag.AlignVCenter)
+            self.am_button = QPushButton('AM')
+            self.am_button.setToolTip('Swith to AM')
+            self.am_button.setCheckable(True)
+            self.am_button.setChecked(True)
+            self.am_button.clicked.connect(lambda: self._amClicked(True))
+            self.am_pm_vbox.addWidget(self.am_button)
+            self.pm_button = QPushButton('PM')
+            self.pm_button.setToolTip('Swith to PM')
+            self.pm_button.setCheckable(True)
+            self.pm_button.setChecked(False)
+            self.pm_button.clicked.connect(lambda: self._amClicked(False))
+            self.am_pm_vbox.addWidget(self.pm_button)
+            self.main_layout.addLayout(self.am_pm_vbox)
+        else:
+            self.hour_dial = ClockDial(ClockDial.ClockType.Hour24)
+            self.hour_spinbox = SpinBox(input_range=(0, 23), buttons=True)
+        self.hour_dial.setToolTip('Select hour')
+        self.hour_spinbox.setToolTip('Select hour')
+        self.hour_dial.clockValueChanged.connect(self.hour_spinbox.setValue)
+        self.hour_spinbox.valueChanged.connect(self.hour_dial.setValue)
+        self.hour_vbox = QVBoxLayout()
+        self.hour_vbox.addWidget(self.hour_dial)
+        self.hour_hbox = QHBoxLayout()
+        self.hour_vbox.addLayout(self.hour_hbox)
+        self.hour_hbox.addWidget(QLabel('Hour:'))
+        self.hour_hbox.addWidget(self.hour_spinbox)
+        self.main_layout.addLayout(self.hour_vbox)
+
+        self.minute_dial = ClockDial(ClockDial.ClockType.Minute)
+        self.minute_spinbox = SpinBox(input_range=(0, 59), buttons=True)
+        self.minute_dial.setToolTip('Select minute')
+        self.minute_spinbox.setToolTip('Select minute')
+        self.minute_dial.clockValueChanged.connect(self.minute_spinbox.setValue)
+        self.minute_spinbox.valueChanged.connect(self.minute_dial.setValue)
+        self.minute_vbox = QVBoxLayout()
+        self.minute_vbox.addWidget(self.minute_dial)
+        self.minute_hbox = QHBoxLayout()
+        self.minute_vbox.addLayout(self.minute_hbox)
+        self.minute_hbox.addWidget(QLabel('Minute:'))
+        self.minute_hbox.addWidget(self.minute_spinbox)
+        self.main_layout.addLayout(self.minute_vbox)
+
+        if self.seconds_flag:
+            self.second_dial = ClockDial(ClockDial.ClockType.Second)
+            self.second_spinbox = SpinBox(input_range=(0, 59), buttons=True)
+            self.second_dial.setToolTip('Select second')
+            self.second_spinbox.setToolTip('Select second')
+            self.second_dial.clockValueChanged.connect(self.second_spinbox.setValue)
+            self.second_spinbox.valueChanged.connect(self.second_dial.setValue)
+            self.second_vbox = QVBoxLayout()
+            self.second_vbox.addWidget(self.second_dial)
+            self.second_hbox = QHBoxLayout()
+            self.second_vbox.addLayout(self.second_hbox)
+            self.second_hbox.addWidget(QLabel('Second:'))
+            self.second_hbox.addWidget(self.second_spinbox)
+            self.main_layout.addLayout(self.second_vbox)
+
+        if timestamp is None:
+            timestamp = datetime.now()
+        self.setTime(timestamp)
+
+    def _amClicked(self, state):
+        """AM button is clicked"""
+
+        self.am_button.setChecked(state)
+        self.pm_button.setChecked(not state)
+
+    def setTime(self, timestamp: datetime):
+        """
+        Set the time to given datetime
+
+        :param timestamp: datetime object
+        """
+
+        if self.am_pm:
+            self._amClicked(timestamp.hour < 12)
+
+        self.hour_dial.setValue(timestamp.hour)
+        self.minute_dial.setValue(timestamp.minute)
+
+        if self.seconds_flag:
+            self.second_dial.setValue(timestamp.second)
+
+    def getTime(self) -> datetime:
+        """
+        Get the time of clock widget
+
+        :returns: datetime object
+        """
+
+        hour = self.hour_dial.value()
+        if self.am_pm and self.pm_button.isChecked():
+            hour += 12
+
+        second = 0
+        if self.seconds_flag:
+            second = self.second_dial.value()
+
+        return datetime(2000, 1, 1, hour, self.minute_dial.value(), second)
+
+
+class DateTimeWidget(QWidget):
+    """
+    Date time widget
+
+    :param am_pm: select between am and pm OR have a 24 hour clock
+    :param seconds_flag: show seconds
+    :clock_size: size of ClockDial Widget
+    :timestamp: time to be displayed
+    """
+
+    def __init__(
+        self,
+        *args,
+        am_pm: bool = False,
+        seconds_flag: bool = True,
+        clock_size: int | None = None,
+        timestamp: datetime | None = None,
+        **kwargs
+    ):
+        super().__init__(*args, **kwargs)
+
+        self.main_layout = QVBoxLayout()
+        self.setLayout(self.main_layout)
+
+        self.calendar_widget = QCalendarWidget()
+        self.main_layout.addWidget(QLabel('Pick date:'), alignment=Qt.AlignmentFlag.AlignHCenter)
+        self.main_layout.addWidget(self.calendar_widget)
+
+        self.clock_widget = Clock(am_pm=am_pm, seconds_flag=seconds_flag, clock_size=clock_size)
+        self.main_layout.addWidget(QLabel('Pick time:'), alignment=Qt.AlignmentFlag.AlignHCenter)
+        self.main_layout.addWidget(self.clock_widget)
+
+        self.selection_hbox = QHBoxLayout()
+        self.main_layout.addLayout(self.selection_hbox)
+
+        self.now_button = QPushButton('Set date-time to now')
+        self.now_button.setToolTip('Update the date-time to current date-time')
+        self.now_button.clicked.connect(self.setNow)
+        self.selection_hbox.addWidget(self.now_button)
+
+        if timestamp is None:
+            timestamp = datetime.now()
+        self.setTime(timestamp)
+
+    def setNow(self):
+        """Set the time to now"""
+        self.setTime(datetime.now())
+
+    def setTime(self, timestamp: datetime):
+        """
+        Set the time to given datetime
+
+        :param timestamp: datetime object
+        """
+
+        self.calendar_widget.setSelectedDate(timestamp)
+        self.clock_widget.setTime(timestamp)
+
+    def getTime(self) -> datetime:
+        """
+        Get the time of clock widget
+
+        :returns: datetime object
+        """
+
+        calendar = self.calendar_widget.selectedDate()
+        clock = self.clock_widget.getTime()
+
+        return datetime(
+            year=calendar.year(),
+            month=calendar.month(),
+            day=calendar.day(),
+            hour=clock.hour,
+            minute=clock.minute,
+            second=clock.second
+        )
+
+
+class DateTimeDialog(QDialog):
+    """
+    Dialog to select date and time
+
+    :param title: title of widget
+    :param am_pm: select between am and pm OR have a 24 hour clock
+    :param seconds_flag: show seconds
+    :clock_size: size of ClockDial Widget
+    :timestamp: time to be displayed
+    """
+
+    def __init__(
+        self,
+        *args,
+        title: str,
+        am_pm: bool = False,
+        seconds_flag: bool = True,
+        clock_size: int | None = None,
+        timestamp: datetime | None = None,
+        **kwargs
+    ):
+        super().__init__(*args, **kwargs)
+
+        if timestamp is None:
+            timestamp = datetime.now()
+        self.timestamp = timestamp
+
+        self.setWindowTitle(title)
+        self.setWindowFlag(Qt.WindowType.Dialog)
+
+        self.main_layout = QVBoxLayout()
+        self.setLayout(self.main_layout)
+
+        self.date_time_widget = DateTimeWidget(am_pm=am_pm, seconds_flag=seconds_flag, clock_size=clock_size,
+                                               timestamp=timestamp)
+        self.main_layout.addWidget(self.date_time_widget)
+
+        self.button_hbox = QHBoxLayout()
+        self.main_layout.addLayout(self.button_hbox)
+
+        self.cancel_button = QPushButton('Cancel')
+        self.cancel_button.setToolTip('Cancel date-time selection')
+        self.cancel_button.clicked.connect(self.accept)
+        self.button_hbox.addWidget(self.cancel_button)
+        self.ok_button = QPushButton('OK')
+        self.ok_button.setToolTip('Apply changes')
+        self.ok_button.clicked.connect(self._okButton)
+        self.button_hbox.addWidget(self.ok_button)
+
+        self.exec()
+
+    def _okButton(self):
+        self.timestamp = self.date_time_widget.getTime()
+        self.accept()
+
+
+class DateTimeEdit(QWidget):
+    """
+    Select date time, like in QDateTimeEdit, but with time also selectable easily
+
+    :param popup_title: title displayed on popup
+    :param am_pm: select between am and pm OR have a 24 hour clock
+    :param seconds_flag: show seconds
+    :clock_size: size of ClockDial Widget
+    :timestamp: time to be displayed
+    """
+
+    def __init__(
+        self,
+        *args,
+        popup_title: str = 'Select date and time',
+        am_pm: bool = False,
+        seconds_flag: bool = True,
+        clock_size: int | None = None,
+        timestamp: datetime | None = None,
+        **kwargs
+    ):
+        super().__init__(*args, **kwargs)
+
+        self.popup_title = popup_title
+        self.am_pm = am_pm
+        self.seconds_flag = seconds_flag
+        self.clock_size = clock_size
+        if timestamp is None:
+            timestamp = datetime.now()
+
+        self.main_layout = QHBoxLayout()
+        self.setLayout(self.main_layout)
+
+        self.date_time_edit = QDateTimeEdit()
+        self.display_format = 'dd.MM.yyyy HH:mm'
+        if self.seconds_flag:
+            self.display_format += ':ss'
+        self.date_time_edit.setDisplayFormat(self.display_format)
+        self.date_time_edit.setDateTime(timestamp)
+        self.main_layout.addWidget(self.date_time_edit, stretch=1)
+
+        self.calendar_button = QPushButton()
+        self.calendar_button.setIcon(QIcon('icons/calendar.png'))
+        self.calendar_button.setToolTip('Select Date and Time')
+        self.calendar_button.clicked.connect(self._selectionPopup)
+        self.main_layout.addWidget(self.calendar_button, stretch=0)
+
+    def _selectionPopup(self):
+        """Open an easier selection popup"""
+        self.date_time_selection = DateTimeDialog(
+            title=self.popup_title,
+            am_pm=self.am_pm,
+            seconds_flag=self.seconds_flag,
+            clock_size=self.clock_size,
+            timestamp=self.date_time_edit.dateTime().toPyDateTime()
+        )
+        self.date_time_edit.setDateTime(self.date_time_selection.timestamp)
+
+    def setTime(self, timestamp: datetime):
+        """
+        Set the datetime of the widget
+
+        :param timestamp: datetime object
+        """
+
+        self.date_time_edit.setDateTime(timestamp)
+
+    def getTime(self) -> datetime:
+        """
+        Get the datetime of the widget
+
+        :returns: datetime object
+        """
+        return self.date_time_edit.dateTime().toPyDateTime()
 
 
 class IndicatorLed(QWidget):
@@ -1782,6 +2250,8 @@ class DeleteWidgetListItem(QWidget):
 
         self.delete_button = QPushButton(self)
         self.delete_button.setIcon(QIcon('icons/delete.png'))
+        self.delete_button.setIconSize(QSize(10, 10))
+        self.delete_button.setContentsMargins(0, 0, 0, 0)
         self.delete_button.clicked.connect(lambda: self.deleted.emit())
         self.main_layout.addWidget(self.delete_button, alignment=Qt.AlignmentFlag.AlignLeft)
 
@@ -2219,9 +2689,104 @@ class FittingWidget(QWidget):
         self.main_layout.setValues(values)
 
 
-class TOFCanvas(pg.PlotWidget):
+class Canvas(pg.PlotWidget):
     """
     Extends the PlotWidget of pyqtgraph
+
+    :param data: data of plot
+    :param grid: show grid
+    :param legend: show legend
+    """
+
+    def __init__(
+        self,
+        data: list[tuple[np.ndarray, np.ndarray]],
+        grid: bool = False,
+        legend: bool | tuple[int, int] = True,
+        *args,
+        **kwargs
+    ):
+        super().__init__(*args, **kwargs)
+        self.data = data
+        self.grid = grid
+
+        self.plotItem.getViewBox().setMouseMode(pg.ViewBox.RectMode)
+        self.setMouseEnabled(x=True, y=False)
+
+        self.graph_curves: list[pg.PlotDataItem] = []
+        self.graph_colors = CyclicList(Colors.colors)
+
+        if self.grid:
+            '''
+            GRID CAUSES DISPLACEMENT OF SELECTED ZOOM AREA AND IS A KNOWN BUG BY THE DEVELOPERS:
+            https://github.com/pyqtgraph/pyqtgraph/pull/2034
+            (Solution: https://github.com/pyqtgraph/pyqtgraph/pull/2034/commits/530a5913c414bb0217188b7828a768c68e47865f)
+            -> 'pyqtgraph/graphicsItems/ViewBox/ViewBox.py' HAS TO BE UPDATED TO GET RIGHT RESULTS
+            '''
+            self.showGrid(y=True, x=True)
+
+        if legend is True:
+            legend = (-10, 10)
+        if legend is not False:
+            self.addLegend(offset=legend)
+
+    def plot(self, x: np.ndarray, y: np.ndarray, label: str | None = None, plot_params: dict | None = None):
+        """
+        Plots data (x, y) with given label
+
+        :param x: numpy array of x values
+        :param y: numpy array of y values
+        :param label: label of data
+        :param plot_params: additional plot parameters
+        """
+
+        if plot_params is None:
+            plot_params = dict()
+        plot_params.update({
+            'pen': pg.mkPen(color=self.graph_colors[len(self.data)], width=1)
+        })
+        if label is not None:
+            plot_params.update({
+                'name': label
+            })
+        self.data.append((x, y))
+        self.graph_curves.append(self.plotItem.plot(x, y, **plot_params))
+
+    def clean(self):
+        """Clears whole plot"""
+
+        self.data = []
+        for graph_curve in self.graph_curves:
+            graph_curve.clear()
+            self.plotItem.removeItem(graph_curve)
+        self.graph_curves = []
+
+    def setLogX(self, state: bool):
+        """
+        Sets the x-axis to logarithmic or normal
+
+        :param state: True: logarithmic; False: normal
+        """
+
+        view_range: list[list[float, float]] = self.getViewBox().viewRange()
+        self.plotItem.setLogMode(x=state)
+        self.setYRange(view_range[1][0], view_range[1][1], padding=0)
+
+    def setLogY(self, state: bool):
+        """
+        Sets the y-axis to logarithmic or normal
+
+        :param state: True: logarithmic; False: normal
+        """
+
+        view_range: list[list[float, float]] = self.getViewBox().viewRange()
+        self.plotItem.setLogMode(y=state)
+        self.setXRange(view_range[0][0], view_range[0][1], padding=0)
+
+
+class TOFCanvas(Canvas):
+    """
+    Extends the PlotWidget of pyqtgraph for a TOF display
 
     :param data: data of plot
     :param fit_class: fitting method
@@ -2234,39 +2799,26 @@ class TOFCanvas(pg.PlotWidget):
         *args,
         **kwargs
     ):
-        super().__init__(*args, **kwargs)
+        super().__init__(data, *args, **kwargs)
 
-        self.data = data
-        self.fit_class = fit_class
-
-        self.plotItem.getViewBox().setMouseMode(pg.ViewBox.RectMode)
-        self.setMouseEnabled(x=True, y=False)
         self.setLabel('left', 'Counts')
         self.setLabel('bottom', 'TOF [ns]')
+
+        self.fit_class = fit_class
+
         self.sigRangeChanged.connect(self.updateLimits)
 
-        self.graph_colors = CyclicList(Colors.colors)
-
-        self.graph_curves: list[pg.PlotDataItem] = []
         self.graph_curve_fit: pg.PlotDataItem = self.plotItem.plot(pen=pg.mkPen(color=Colors.color_orange, width=2))
         self.setLimits(yMin=0, xMin=0)
 
         self.bars: list[pg.InfiniteLine] = []
-
-        '''
-        GRID CAUSES DISPLACEMENT OF SELECTED ZOOM AREA AND IS A KNOWN BUG BY THE DEVELOPERS:
-        https://github.com/pyqtgraph/pyqtgraph/pull/2034
-        (Solution: https://github.com/pyqtgraph/pyqtgraph/pull/2034/commits/530a5913c414bb0217188b7828a768c68e47865f)
-        -> 'pyqtgraph/graphicsItems/ViewBox/ViewBox.py' HAS TO BE UPDATED TO GET RIGHT RESULTS
-        '''
-        self.showGrid(y=True, x=True)
 
     def updateFitClass(self, fit_class: FitMethod):
         """Updates the fitting method"""
         self.fit_class = fit_class
         self.setBars(self.fit_class.bars)
 
-    def plotData(self, data: list[tuple[np.ndarray, np.ndarray]], view_all: bool = False, fill_histogram: bool = True):
+    def plotTOF(self, data: list[tuple[np.ndarray, np.ndarray]], view_all: bool = False, fill_histogram: bool = True):
         """
         Plots data if available
 
@@ -2276,12 +2828,8 @@ class TOFCanvas(pg.PlotWidget):
         """
 
         view_range: list[list[float, float]] = self.getViewBox().viewRange()
-
+        self.clean()
         self.data = data
-
-        for graph_curve in self.graph_curves:
-            graph_curve.clear()
-        self.graph_curves = []
 
         for i, d in enumerate(data):
             data_dict = {
@@ -2451,16 +2999,49 @@ class TOFCanvas(pg.PlotWidget):
 
         plot_widget.setYRange(selected_ydata_min, selected_ydata_max)
 
-    def setLogY(self, state: bool):
-        """
-        Sets the y-axis to logarithmic or normal
 
-        :param state: True: logarithmic; False: normal
-        """
+class TimeCanvas(Canvas):
+    """
+    Extends the PlotWidget of pyqtgraph for a Time display
 
-        view_range: list[list[float, float]] = self.getViewBox().viewRange()
-        self.plotItem.setLogMode(y=state)
-        self.setXRange(view_range[0][0], view_range[0][1], padding=0)
+    :param data: data of plot
+    :param time_fmt: format of time axis
+    """
+
+    def __init__(
+        self,
+        data: list[tuple[np.ndarray, np.ndarray]],
+        *args,
+        time_fmt: str = '%Y-%m-%d\n%H:%M:%S',
+        **kwargs
+    ):
+        self.time_fmt = time_fmt
+        self.time_axis = TimeAxisItem(fmt=self.time_fmt, orientation='bottom')
+
+        super().__init__(data=data, *args, axisItems={'bottom': self.time_axis}, **kwargs)
+
+
+class TimeAxisItem(pg.AxisItem):
+    """
+    Extension of the AxisItem for the PlotWidget of pyqtgraph to display values as time
+
+    :param fmt: format string
+    """
+
+    def __init__(
+        self,
+        *args,
+        fmt: str = '%H:%M:%S',
+        **kwargs
+    ):
+        super().__init__(*args, **kwargs)
+
+        self.fmt = fmt
+        self.setHeight(self.height() * (self.fmt.count('\n') + 1))
+
+    def tickStrings(self, values, scale, spacing):
+        """Convert UNIX timestamps into given format"""
+        return [datetime.fromtimestamp(value).strftime(self.fmt) for value in values]
 
 
 class FittingBar(pg.InfiniteLine):

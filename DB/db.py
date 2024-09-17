@@ -1,6 +1,5 @@
 from __future__ import annotations
 from sqlite3 import connect, OperationalError, Connection, Cursor
-from time import time
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -84,12 +83,19 @@ class Tables:
 
         return f'''INSERT INTO {self.name} ({','.join(self.variables)}) VALUES ({','.join([str(arg) for arg in args])});'''
 
-    def get(self, last_seconds: int | None = None):
+    def get(self, start_time: int | None, end_time: int | None):
         """SQL query to get last seconds of data"""
 
-        if last_seconds is None:
-            return f'''SELECT * FROM {self.name};'''
-        return f'''SELECT * FROM {self.name} WHERE Time >= {int(time() - last_seconds)};'''
+        conditions = []
+        if start_time is not None:
+            conditions.append(f'Time >= {int(start_time)}')
+        if end_time is not None:
+            conditions.append(f'Time <= {int(end_time)}')
+        condition = ' AND '.join(conditions)
+        if condition:
+            condition = f' WHERE {condition}'
+
+        return f'''SELECT * FROM {self.name}{condition};'''
 
 
 class PressureTable(Tables):
@@ -109,14 +115,14 @@ class PSUTable(Tables):
     name = 'PSU'
     structure = {
         'Time': '''INTEGER DEFAULT (strftime('%s', 'now'))''',
-        'CH0V': 'FLOAT default 0',
-        'CH0I': 'FLOAT default 0',
-        'CH1V': 'FLOAT default 0',
-        'CH1I': 'FLOAT default 0',
-        'CH2V': 'FLOAT default 0',
-        'CH2I': 'FLOAT default 0',
-        'CH3V': 'FLOAT default 0',
-        'CH3I': 'FLOAT default 0',
+        'Channel0_Voltage': 'FLOAT default 0',
+        'Channel0_Current': 'FLOAT default 0',
+        'Channel1_Voltage': 'FLOAT default 0',
+        'Channel1_Current': 'FLOAT default 0',
+        'Channel2_Voltage': 'FLOAT default 0',
+        'Channel2_Current': 'FLOAT default 0',
+        'Channel3_Voltage': 'FLOAT default 0',
+        'Channel3_Current': 'FLOAT default 0',
     }
 
     def __init__(self):
@@ -127,18 +133,18 @@ class LaserTable(Tables):
     name = 'Laser'
     structure = {
         'Time': '''INTEGER DEFAULT (strftime('%s', 'now'))''',
-        'S': 'INTEGER default 0',
-        'PC': 'INTEGER default 0',
-        'L': 'INTEGER default 0',
-        'CHT': 'FLOAT default 0',
-        'CHST': 'FLOAT default 0',
-        'BT': 'FLOAT default 0',
-        'CHF': 'FLOAT default 0',
-        'MRR': 'FLOAT default 0',
-        'PW': 'INTEGER default 0',
-        'RRD': 'INTEGER default 0',
-        'SB': 'INTEGER default 0',
-        'RL': 'FLOAT default 0',
+        'Shutter': 'INTEGER default 0',
+        'Pulsing': 'INTEGER default 0',
+        'Status': 'INTEGER default 0',
+        'Chiller_Temperature': 'FLOAT default 0',
+        'Chiller_Set_Temperature': 'FLOAT default 0',
+        'Baseplate_Temperature': 'FLOAT default 0',
+        'Chiller_Flow': 'FLOAT default 0',
+        'Amplifier_Repetition_Rate': 'FLOAT default 0',
+        'Pulse_Width': 'INTEGER default 0',
+        'Repetition_Rate_Divisor': 'INTEGER default 0',
+        'Seeder_Bursts': 'INTEGER default 0',
+        'RF_Level': 'FLOAT default 0',
     }
 
     def __init__(self):
@@ -153,7 +159,7 @@ class PowerMeterTable(Tables):
         'Power_dBm': 'FLOAT default 0',
         'Current': 'FLOAT default 0',
         'Irradiance': 'FLOAT default 0',
-        'Beam_diameter': 'FLOAT default 0',
+        'Beam_Diameter': 'FLOAT default 0',
         'Attenuation': 'FLOAT default 0',
         'Averaging': 'INTEGER default 0',
         'Wavelength': 'INTEGER default 0',
@@ -243,7 +249,7 @@ class DB:
 
         if self.connection is None or self.cursor is None:
             GlobalConf.logger.error(f'DB: connection or cursor is None')
-            return
+            return []
 
         self._execute(query, force_commit)
         return self.cursor.fetchall()
@@ -334,21 +340,13 @@ class DB:
             if diff_columns:
                 self._execute(table.alter_remove(diff_columns))
 
-    def _getData(self, table_idx: int, last_seconds: int | None) -> bool | list[np.ndarray]:
+    def getData(self, table_idx: int, start_time: int | None = None, end_time: int | None = None) -> bool | np.ndarray:
         """Get values from table with table_idx"""
 
-        results = self._execute_return(self.tables[table_idx].get(last_seconds))
+        results = self._execute_return(self.tables[table_idx].get(start_time, end_time))
         if not results:
             return False
-        lists = []
-        for _ in range(len(results[0])):
-            lists.append([])
-        for result in results:
-            for i, res in enumerate(result):
-                lists[i].append(res)
-        for i in range(len(results[0])):
-            lists[i] = np.array(lists[i])
-        return lists
+        return np.array(results)
 
     def insertPressure(
         self,
@@ -366,7 +364,7 @@ class DB:
 
         self._execute(self.pressure_table.insert(pitbul, lsd, prevac))
 
-    def getPressure(self, last_seconds: int | None = default_last_seconds) -> bool | list[np.ndarray]:
+    def getPressure(self, start_time: int | None = None, end_time: int | None = None) -> bool | np.ndarray:
         """
         Get pressure values
 
@@ -378,7 +376,7 @@ class DB:
         ]
         """
 
-        return self._getData(self.tables.index(self.pressure_table), last_seconds)
+        return self.getData(self.tables.index(self.pressure_table), start_time, end_time)
 
     def insertPSU(
         self,
@@ -406,7 +404,7 @@ class DB:
 
         self._execute(self.psu_table.insert(ch0v, ch0i, ch1v, ch1i, ch2v, ch2i, ch3v, ch3i))
 
-    def getPSU(self, last_seconds: int | None = default_last_seconds) -> bool | list[np.ndarray]:
+    def getPSU(self, start_time: int | None = None, end_time: int | None = None) -> bool | np.ndarray:
         """
         Get PSU values
 
@@ -423,7 +421,7 @@ class DB:
         ]
         """
 
-        return self._getData(self.tables.index(self.psu_table), last_seconds)
+        return self.getData(self.tables.index(self.psu_table), start_time, end_time)
 
     def insertLaser(
         self,
@@ -459,7 +457,7 @@ class DB:
 
         self._execute(self.laser_table.insert(int(s), int(pc), l, cht, chst, bt, chf, mrr, pw, rrd, sb, rl))
 
-    def getLaser(self, last_seconds: int | None = default_last_seconds) -> bool | list[np.ndarray]:
+    def getLaser(self, start_time: int | None = None, end_time: int | None = None) -> bool | np.ndarray:
         """
         Get Laser values
 
@@ -480,7 +478,7 @@ class DB:
         ]
         """
 
-        return self._getData(self.tables.index(self.laser_table), last_seconds)
+        return self.getData(self.tables.index(self.laser_table), start_time, end_time)
 
     def insertPowerMeter(
         self,
@@ -508,7 +506,7 @@ class DB:
 
         self._execute(self.power_meter_table.insert(power, power_dbm, current, irradiance, beam_diameter, attenuation, averaging, wavelength))
 
-    def getPowerMeter(self, last_seconds: int | None = default_last_seconds) -> bool | list[np.ndarray]:
+    def getPowerMeter(self, start_time: int | None = None, end_time: int | None = None) -> bool | np.ndarray:
         """
         Get Power Meter values
 
@@ -525,7 +523,7 @@ class DB:
         ]
         """
 
-        return self._getData(self.tables.index(self.power_meter_table), last_seconds)
+        return self.getData(self.tables.index(self.power_meter_table), start_time, end_time)
 
     def close(self):
         """Must be called on close"""
@@ -537,35 +535,55 @@ class DB:
 
 
 def main():
-    from random import random
+    import logging
+    from time import time
     import matplotlib.pyplot as plt
-    from time import sleep
 
-    db = DB()
+    logging.basicConfig(level=logging.DEBUG)
 
-    d1, d2, d3 = 0, 0, 0
-    for _ in range(100):
-        d1, d2, d3 = d1 + random(), d2 + random(), d3 + random()
-        db.insertPressure(d1, d2, d3)
-        sleep(1)
+    db = DB(debug=True)
 
-    pressure = db.getPressure(300)
-    print(pressure)
-    if pressure:
-        print(len(pressure[0]))
-        plt.plot(pressure[0], pressure[1])
-        plt.plot(pressure[0], pressure[2])
-        plt.plot(pressure[0], pressure[3])
+    start_time = time()
+    pressure = db.getPressure()
+    print(f'getPressure(): took {time() - start_time:.2f} seconds')
+
+    if pressure is not False:
+        plt.plot(pressure[:, 0], pressure[:, 1], label='PITBUL')
+        plt.plot(pressure[:, 0], pressure[:, 2], label='LSD')
+        plt.plot(pressure[:, 0], pressure[:, 3], label='prevac')
+        plt.legend(loc='upper right')
+        plt.yscale('log')
         plt.show()
 
     db.close()
 
 
-def main2():
-    pt = PressureTable()
-    print(pt.create())
-    print(pt.insert(1, 2))
+def test_data():
+    from time import sleep
+    from math import sqrt, log10, pi
+    from random import random
+
+    db = DB(debug=True)
+
+    for i in range(1800):
+        print(f'{i} seconds')
+
+        power = (7.5 + random() * 0.5) * 1E-3
+        power_dbm = 10 * log10(1000 * power)
+        current = (2 + random() * 0.5) * 1E-7
+        beam_diameter = 2.2
+        attenuation = 0
+        averaging = 10
+        wavelength = 276
+        beam_area = (beam_diameter / sqrt(2) / 10) ** 2 / 4 * pi
+        irradiance = power / beam_area
+
+        db.insertPowerMeter(power, power_dbm, current, irradiance, beam_diameter, attenuation, averaging, wavelength)
+
+        sleep(1)
+
+    db.close()
 
 
 if __name__ == '__main__':
-    main()
+    test_data()

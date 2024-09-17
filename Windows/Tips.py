@@ -1,9 +1,12 @@
 from os import listdir
+from os.path import join
 
 
 from PyQt6.QtWidgets import QSplitter, QWidget, QBoxLayout, QVBoxLayout, QPushButton, QLabel
 from PyQt6.QtCore import Qt
 
+
+from Config.GlobalConf import DefaultParams
 
 from Utility.Layouts import TabWidget, VBoxTitleLayout, ButtonGridLayout, TextEdit
 
@@ -21,10 +24,9 @@ class TipsWindow(TabWidget):
         self.main_layout = QBoxLayout(QBoxLayout.Direction.TopToBottom)
         self.setLayout(self.main_layout)
 
-        # TODO: put constants in Config file
-        self.path_tips = 'Tips'
-        self.path_tips_entries = f'{self.path_tips}/entries'
-        self.path_tips_images = f'{self.path_tips}/images'
+        self.path_tips = DefaultParams.tip_folder
+        self.path_tips_entries = join(self.path_tips, DefaultParams.tip_file_folder)
+        self.path_tips_images = join(self.path_tips, 'images')
         self.tips = []
         self.tip_index = -1
 
@@ -109,6 +111,9 @@ class TipsWindow(TabWidget):
 
     def addNewTip(self):
         """Add a new tip"""
+        
+        # TODO: popup dialog window to enter tip name, only non existing names acceptable
+        # TODO: remove open() statement and replace with proper one
 
         new_tip_number = 1
         if self.tips:
