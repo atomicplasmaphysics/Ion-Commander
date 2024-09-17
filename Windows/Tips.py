@@ -6,9 +6,10 @@ from PyQt6.QtWidgets import QSplitter, QWidget, QBoxLayout, QVBoxLayout, QPushBu
 from PyQt6.QtCore import Qt
 
 
-from Config.GlobalConf import DefaultParams
+from Config.GlobalConf import GlobalConf, DefaultParams
 
 from Utility.Layouts import TabWidget, VBoxTitleLayout, ButtonGridLayout, TextEdit
+from Utility.Dialogs import TipNameDialog
 
 
 class TipsWindow(TabWidget):
@@ -25,17 +26,15 @@ class TipsWindow(TabWidget):
         self.setLayout(self.main_layout)
 
         self.path_tips = DefaultParams.tip_folder
-        self.path_tips_entries = join(self.path_tips, DefaultParams.tip_file_folder)
-        self.path_tips_images = join(self.path_tips, 'images')
-        self.tips = []
-        self.tip_index = -1
+        self.tip_extension = f'.{DefaultParams.tip_extension}'
+        self.path_tips_entries = str(join(self.path_tips, DefaultParams.tip_file_folder))
+        self.path_tips_images = str(join(self.path_tips, 'images'))
+        self.tips: list[str] = []
 
         # SPLITTER
         self.splitter = QSplitter()
         self.splitter.setChildrenCollapsible(False)
         self.main_layout.addWidget(self.splitter)
-
-        # TODO: Add tooltips to everything
 
         # TIP SELECTION
         self.tip_selection_vbox = VBoxTitleLayout('Tip Selection', parent=self, add_stretch=True)
@@ -43,13 +42,14 @@ class TipsWindow(TabWidget):
 
         # New tip
         self.tip_new_button = QPushButton('Add new Tip')
+        self.tip_new_button.setToolTip('Add a new tip and description of the tip')
         self.tip_new_button.pressed.connect(self.addNewTip)
         self.tip_selection_group_vbox.addWidget(self.tip_new_button, alignment=Qt.AlignmentFlag.AlignHCenter)
 
         # Button grid
         self.tip_selection_grid = ButtonGridLayout([], max_columns=5, max_rows=20)
         self.tip_selection_group_vbox.addLayout(self.tip_selection_grid)
-        self.tip_selection_grid.buttonPressed.connect(self.editTip)
+        self.tip_selection_grid.buttonPressedName.connect(self.editTip)
 
         # Stretch to bottom
         self.tip_selection_group_vbox.addStretch(1)
@@ -73,8 +73,12 @@ class TipsWindow(TabWidget):
         self.tip_editor = TextEdit(
             image_directory=self.path_tips_images,
             save_button=False,
-            load_button=False
+            load_button=False,
+            encoding=DefaultParams.tip_encoding
         )
+        self.tip_editor_path = ''
+        self.tip_editor.setDisabled(True)
+        self.tip_editor.setToolTip('Select tip first to edit')
         self.tip_editor_group_vbox.addWidget(self.tip_editor)
 
         # Stretch to bottom
@@ -95,55 +99,81 @@ class TipsWindow(TabWidget):
     def updateTips(self):
         """Updates list of tips"""
 
-        # get list of tips "%d.txt"-files
+        # update list of tips
         self.tips = []
         for file in listdir(self.path_tips_entries):
-            if not file.endswith('.txt'):
-                continue
-            try:
-                self.tips.append(int(file[:-4]))
-            except ValueError:
-                continue
+            if not file.endswith(self.tip_extension):
+                GlobalConf.logger.debug(f'Tips: File "{file}" in Tips folder, but has wrong file extension (not {self.tip_extension})')
+            self.tips.append(file[:-len(self.tip_extension)])
         self.tips.sort()
 
         # update buttons grid
-        self.tip_selection_grid.newLabels([f'Tip {tip}' for tip in self.tips])
+        self.tip_selection_grid.newLabels(self.tips)
 
     def addNewTip(self):
         """Add a new tip"""
-        
-        # TODO: popup dialog window to enter tip name, only non existing names acceptable
-        # TODO: remove open() statement and replace with proper one
 
-        new_tip_number = 1
-        if self.tips:
-            new_tip_number = self.tips[-1] + 1
-        open(f'{self.path_tips_entries}/{new_tip_number}.txt', 'w')
         self.updateTips()
 
-    def editTip(self, index: int):
-        """Edit selected tip"""
+        # get new tip name
+        tip_dialog = TipNameDialog(self.tips)
+        tip_dialog.exec()
+        tip_name = tip_dialog.getName()
 
-        if index == self.tip_index:
+        if not tip_name:
             return
 
-        # save tip editor
-        if self.tip_index in range(0, len(self.tips)):
-            self.tip_editor.saveFile(f'{self.path_tips_entries}/{self.tips[self.tip_index]}.txt')
+        check = tip_dialog.checkName(tip_name)
+        if check:
+            self.writeStatusBar(f'Error in adding tip: {check}')
+            return
 
-        # check if we are in bounds
-        if index not in range(0, len(self.tips)):
-            self.tip_editor.clearContents()
-            self.tip_selected_headline.setText('Selected tip: None')
+        # try generating tip file
+        tip_path = str(join(self.path_tips_entries, f'{tip_name}{self.tip_extension}'))
+        try:
+            with open(tip_path, 'w', encoding='utf-8') as _:
+                self.writeStatusBar(f'Tip file "{tip_path}" generated successfully')
+        except FileNotFoundError:
+            self.writeStatusBar(f'Tip file "{tip_path}" could not be generated')
+
+        self.updateTips()
+
+    def editTip(self, name: str):
+        """Edit selected tip"""
+
+        # save tip editor
+        if self.tip_editor_path:
+            if self.tip_editor.saveFile(self.tip_editor_path):
+                self.writeStatusBar(f'File "{self.tip_editor_path}" could not be saved')
+            self.tip_editor_path = ''
+
+        self.tip_editor.clearContents()
+        self.tip_selected_headline.setText('Selected tip: None')
+        self.tip_editor.setDisabled(True)
+        self.tip_editor.setToolTip('Select tip first to edit')
+
+        self.updateTips()
+
+        # check if tip is valid
+        if name not in self.tips:
+            self.writeStatusBar(f'Tip "{name}" does not exist')
             return
 
         # open new tip file
-        self.tip_editor.openFile(f'{self.path_tips_entries}/{self.tips[index]}.txt')
-        self.tip_selected_headline.setText(f'Selected tip: Tip #{self.tips[index]}')
-        self.tip_index = index
+        tip_path = str(join(self.path_tips_entries, f'{name}{self.tip_extension}'))
+        if self.tip_editor.openFile(tip_path):
+            self.writeStatusBar(f'Error while loading tip "{name}"')
+            return
+
+        self.tip_editor_path = tip_path
+        self.tip_selected_headline.setText(f'Selected tip: {name}')
+        self.tip_editor.setDisabled(False)
+        self.tip_editor.setToolTip('')
 
     def closeEvent(self, event):
         """Save current tip editor"""
 
-        if self.tip_index in range(0, len(self.tips)):
-            self.tip_editor.saveFile(f'{self.path_tips_entries}/{self.tips[self.tip_index]}.txt')
+        if self.tip_editor_path:
+            if self.tip_editor.saveFile(self.tip_editor_path):
+                self.writeStatusBar(f'File "{self.tip_editor_path}" could not be saved')
+            self.tip_editor_path = ''

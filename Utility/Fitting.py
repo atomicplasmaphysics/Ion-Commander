@@ -29,15 +29,15 @@ def getTACFileData(filename: str, tac: int, delay: float = 0) -> tuple[np.ndarra
     :param filename: filename of TAC file
     :param tac: total TAC time in ns (50, 100, 200, ...)
     :param delay: delay time before TAC signal in ns
-    :return: x-array (in ns), y-array (counts)
+    :return: x-array (in ns), y-array (counts(int))
     """
 
     x = np.linspace(delay, tac + delay, 8192)
 
-    with open(filename, 'r') as file:
+    with open(filename, 'r', encoding='utf-8') as file:
         y = [float(line) for line in file.readlines()]
 
-    return x, np.array(y)
+    return x, np.array(y).astype(int)
 
 
 def getTDCFileData(filename: str) -> tuple[np.ndarray, np.ndarray]:
@@ -45,19 +45,19 @@ def getTDCFileData(filename: str) -> tuple[np.ndarray, np.ndarray]:
     Converts TDC-file (.cod) into x, y, y_max values
 
     :param filename: filename of TDC file
-    :return: x-array (in ns), y-array (counts)
+    :return: x-array (in ns), y-array (counts(int))
     """
 
     x = []
     y = []
 
-    with open(filename, 'r') as file:
+    with open(filename, 'r', encoding='utf-8') as file:
         for line in file.readlines():
             xi, yi = [float(s) for s in line.strip().split(',')]
             x.append(xi)
             y.append(yi)
 
-    return np.array(x), np.array(y)
+    return np.array(x), np.array(y).astype(int)
 
 
 def getFileData(filename: str, tac: int = -1, delay: float = 0) -> tuple[np.ndarray, np.ndarray]:
@@ -99,6 +99,7 @@ class FitMethod:
         self.parameter: list[float] = []
         self.parameters = 0
         self.bars: list[pg.InfiniteLine] = []
+        self.copy_info = ''
 
     def setBarBounds(self, xrange: tuple[float, float]):
         """
@@ -169,6 +170,8 @@ class FitGaussRange(FitMethod):
             'End'
         ])
 
+        self.copy_info = '(mu, c, fwhm)'
+
     def setBarBounds(self, xrange: tuple[float, float]):
         """
         Sets boundary of bars
@@ -211,9 +214,16 @@ class FitGaussRange(FitMethod):
             return
 
         max_index = np.argmax(y_data_limit)
-        # TODO: better first approximation for sigma
-        p0 = [(x_data_limit[-1] - x_data_limit[0]) / 4, x_data_limit[max_index], y_data_limit[max_index]]
-        bounds = ([0, 0, 0], [np.inf, np.inf, np.inf])
+        mean0 = x_data_limit[max_index]
+        c0 = y_data_limit[max_index]
+        sigma0 = (x_data_limit[-1] - x_data_limit[0]) / 4
+
+        limit0 = np.greater(y_data_limit, c0)
+        if np.any(limit0):
+            sigma0 = np.std(np.repeat(x_data_limit[limit0], y_data_limit[limit0]))
+
+        p0 = [sigma0, mean0, c0]
+        bounds = ([0, bar_values[0], 0], [bar_values[1] - bar_values[0], bar_values[1], c0 * 10])
 
         try:
             popt = curve_fit(self.fitFunction, x_data_limit, y_data_limit, p0=p0, bounds=bounds)
@@ -263,6 +273,8 @@ class FitGaussCenter(FitMethod):
             'Center'
         ])
 
+        self.copy_info = '(mu, c, fwhm)'
+
     def setBarBounds(self, xrange: tuple[float, float]):
         """
         Sets boundary of bars
@@ -296,8 +308,9 @@ class FitGaussCenter(FitMethod):
         """
 
         # TODO: better limiting
-        view_width = view_range[0][1] - view_range[0][0]
-        limit = np.logical_and(data[0] > bar_values[0] - view_width * 0.1, data[0] < bar_values[0] + view_width * 0.1)
+        limit_distance = (view_range[0][1] - view_range[0][0]) * 0.1
+        limit_x = (bar_values[0] - limit_distance, bar_values[0] + limit_distance)
+        limit = np.logical_and(data[0] > limit_x[0], data[0] < limit_x[1])
         x_data_limit = data[0][limit]
         y_data_limit = data[1][limit]
 
@@ -310,10 +323,17 @@ class FitGaussCenter(FitMethod):
             self.parameters = [0, 0, 0]
             return
 
-        max_index = (np.abs(x_data_limit - bar_values[0])).argmin()
-        # TODO: better first approximation for sigma
-        p0 = [(view_range[0][1] - view_range[0][0]) / 16, x_data_limit[max_index], y_data_limit[max_index]]
-        bounds = ([0, 0, 0], [np.inf, np.inf, np.inf])
+        max_index = np.argmax(y_data_limit)
+        mean0 = x_data_limit[max_index]
+        c0 = y_data_limit[max_index]
+        sigma0 = (view_range[0][1] - view_range[0][0]) / 16
+
+        limit0 = np.greater(y_data_limit, c0)
+        if np.any(limit0):
+            sigma0 = np.std(np.repeat(x_data_limit[limit0], y_data_limit[limit0]))
+
+        p0 = [sigma0, mean0, c0]
+        bounds = ([0, limit_x[0], 0], [limit_x[1] - limit_x[0], limit_x[1], c0 * 10])
 
         try:
             popt = curve_fit(self.fitFunction, x_data_limit, y_data_limit, p0=p0, bounds=bounds)
@@ -411,9 +431,18 @@ class FitLogNormRange(FitMethod):
             return
 
         max_index = np.argmax(y_data_limit)
-        # TODO: better first approximation for sigma
-        p0 = [(x_data_limit[-1] - x_data_limit[0]) / 4, 0, x_data_limit[max_index], y_data_limit[max_index]]
-        bounds = ([0, 0, 0, -np.inf], [np.inf, np.inf, np.inf, np.inf])
+        mean0 = 0
+        x0 = x_data_limit[max_index]
+        c0 = y_data_limit[max_index]
+        sigma0 = (x_data_limit[-1] - x_data_limit[0]) / 4
+
+        limit0 = np.greater(y_data_limit, c0)
+        if np.any(limit0):
+            sigma0 = np.std(np.repeat(x_data_limit[limit0], y_data_limit[limit0]))
+
+        p0 = [sigma0, mean0, x0, c0]
+        # TODO: better bounds for x0, mean0
+        bounds = ([0, 0, bar_values[0], 0], [bar_values[1] - bar_values[0], bar_values[1], bar_values[1], c0 * 10])
 
         try:
             popt = curve_fit(self.fitFunction, x_data_limit, y_data_limit, p0=p0, bounds=bounds)
@@ -456,6 +485,8 @@ class FitCountsRange(FitMethod):
             'Start',
             'End'
         ])
+
+        self.copy_info = '(counts)'
 
     def setBarBounds(self, xrange: tuple[float, float]):
         """
@@ -517,6 +548,8 @@ class FitGaussCountsRange(FitMethod):
             'End'
         ])
 
+        self.copy_info = '(mu, c, fwhm, counts)'
+
     def setBarBounds(self, xrange: tuple[float, float]):
         """
         Sets boundary of bars
@@ -562,9 +595,16 @@ class FitGaussCountsRange(FitMethod):
         self.parameter[4] = np.sum(y_data_limit)
 
         max_index = np.argmax(y_data_limit)
-        # TODO: better first approximation for sigma
-        p0 = [(x_data_limit[-1] - x_data_limit[0]) / 4, x_data_limit[max_index], y_data_limit[max_index]]
-        bounds = ([0, 0, 0], [np.inf, np.inf, np.inf])
+        mean0 = x_data_limit[max_index]
+        c0 = y_data_limit[max_index]
+        sigma0 = (x_data_limit[-1] - x_data_limit[0]) / 4
+
+        limit0 = np.greater(y_data_limit, c0)
+        if np.any(limit0):
+            sigma0 = np.std(np.repeat(x_data_limit[limit0], y_data_limit[limit0]))
+
+        p0 = [sigma0, mean0, c0]
+        bounds = ([0, bar_values[0], 0], [bar_values[1] - bar_values[0], bar_values[1], c0 * 10])
 
         try:
             popt = curve_fit(self.fitFunction, x_data_limit, y_data_limit, p0=p0, bounds=bounds)

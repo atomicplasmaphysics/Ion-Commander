@@ -2,6 +2,7 @@ from locale import getpreferredencoding
 from os import path
 from time import time
 from datetime import datetime
+from re import match
 
 
 from PyQt6.QtCore import Qt, QThreadPool, QObject, QRunnable, pyqtSignal, pyqtSlot, QProcess, QDir
@@ -9,7 +10,7 @@ from PyQt6.QtWidgets import QDialog, QVBoxLayout, QLabel, QPushButton, QCheckBox
 from PyQt6.QtGui import QFont
 
 
-from Utility.Layouts import InputHBoxLayout, DoubleSpinBox, SpinBox, SpinBoxRange, FilePath
+from Utility.Layouts import InputHBoxLayout, DoubleSpinBox, SpinBox, SpinBoxRange, FilePath, LineEdit
 from Utility.FileDialogs import selectFileDialog
 from Utility.LMFConvert import LM
 
@@ -222,14 +223,14 @@ class LMFDialog(QDialog):
         # Convert button
         self.convert_button = QPushButton('Convert', self)
         self.convert_button.setToolTip('Convert LMF')
-        self.convert_button.clicked.connect(self.startConverting)
+        self.convert_button.clicked.connect(self._startConverting)
         self.main_layout.addWidget(self.convert_button)
 
         # Process
         self.process = QProcess(self)
-        self.process.readyRead.connect(self.processReadyRead)
-        self.process.errorOccurred.connect(self.processError)
-        self.process.finished.connect(self.processFinished)
+        self.process.readyRead.connect(self._processReadyRead)
+        self.process.errorOccurred.connect(self._processError)
+        self.process.finished.connect(self._processFinished)
 
         # Progress bar
         self.progress_bar = QProgressBar()
@@ -250,9 +251,9 @@ class LMFDialog(QDialog):
         self.cancel_button.clicked.connect(self.close)
         self.main_layout.addWidget(self.cancel_button)
 
-        self.analyzeLMF()
+        self._analyzeLMF()
 
-    def processReadyRead(self):
+    def _processReadyRead(self):
         """Converting process is ready to read"""
 
         process_log = self.process.readLine().data().decode(getpreferredencoding(), 'ignore').rstrip()
@@ -267,7 +268,7 @@ class LMFDialog(QDialog):
         except (ValueError, IndexError):
             pass
 
-    def processError(self, error):
+    def _processError(self, error):
         """Converting process had error"""
 
         if isinstance(error, int):
@@ -282,7 +283,7 @@ class LMFDialog(QDialog):
             error = errors.get(error)
         self.information_label.setText(f'Error occurred while converting LMF: <i>{error}</i>.')
 
-    def processFinished(self, exit_code: int, exit_status: int):
+    def _processFinished(self, exit_code: int, exit_status: int):
         """Converting process has finished"""
 
         self.progress_bar.setValue(100)
@@ -292,7 +293,7 @@ class LMFDialog(QDialog):
             return
         self.information_label.setText(f'Error occurred while converting LMF:<br> Code: {exit_code}<br> Status: {exit_status}')
 
-    def startConverting(self):
+    def _startConverting(self):
         """Start converting the LMF"""
 
         self.time_start_input.setDisabled(True)
@@ -302,15 +303,15 @@ class LMFDialog(QDialog):
         self.process.setProgram(f'"{self.program}" "{self.filename}" -H -v -o "{self.output_filename.path}"')
         self.process.start()
 
-    def analyzeLMF(self):
+    def _analyzeLMF(self):
         """Analyze the LMF"""
 
         worker = self.Worker(self.filename)
-        worker.signals.result.connect(self.updateLMF)
+        worker.signals.result.connect(self._updateLMF)
         threadpool = QThreadPool.globalInstance()
         threadpool.start(worker)
 
-    def updateLMF(self, new_lm: LM):
+    def _updateLMF(self, new_lm: LM):
         """Updates the LMF"""
 
         self.lm = new_lm
@@ -405,3 +406,90 @@ class IPDialog(QDialog):
     def getPort(self) -> int:
         """Get entered port number"""
         return self.port.value()
+
+
+class TipNameDialog(QDialog):
+    """
+    Dialog for entering tip name
+
+    :param blocked_names: list of non available names
+    """
+
+    def __init__(
+        self,
+        blocked_names: list[str],
+        *args,
+        **kwargs
+    ):
+        super().__init__(*args, **kwargs)
+
+        self.blocked_names = blocked_names
+
+        self.setWindowFlags(Qt.WindowType.Dialog | Qt.WindowType.WindowTitleHint)
+        self.setWindowTitle('Choose tip name')
+
+        self.main_layout = QVBoxLayout()
+        self.setLayout(self.main_layout)
+
+        self.warning_label = QLabel('')
+        self.warning_label.setVisible(False)
+        self.main_layout.addWidget(self.warning_label)
+
+        self.name_input = LineEdit(placeholder='1')
+        self.name_input_layout = InputHBoxLayout(
+            'Tip name:',
+            self.name_input,
+            tooltip='Choose name of tip'
+        )
+        self.main_layout.addLayout(self.name_input_layout)
+
+        self.operation_hbox = QHBoxLayout()
+        self.main_layout.addLayout(self.operation_hbox)
+
+        self.cancel_button = QPushButton('Cancel')
+        self.cancel_button.setToolTip('Cancel adding of tip')
+        self.cancel_button.clicked.connect(self._cancel)
+        self.operation_hbox.addWidget(self.cancel_button)
+
+        self.add_button = QPushButton('Add')
+        self.add_button.setToolTip('Add this tip')
+        self.add_button.clicked.connect(self._addTip)
+        self.operation_hbox.addWidget(self.add_button)
+
+    def getName(self) -> str:
+        """Get tip name"""
+
+        return self.name_input.text()
+
+    def checkName(self, name: str) -> str:
+        """
+        Check if the tip name is valid
+
+        :returns: error string
+        """
+
+        if not name:
+            return 'No tip name provided'
+        if not bool(match(r'^[a-zA-Z0-9_-]+$', name)):
+            return 'Tip name can only be [a-Z], [0-9], "-" or "_"'
+        if name in self.blocked_names:
+            return 'Tip name already taken'
+        return ''
+
+    def _cancel(self):
+        """Cancel operation"""
+
+        self.name_input.setText('')
+        self.accept()
+
+    def _addTip(self):
+        """Add the thp"""
+
+        tip_name = self.name_input.text()
+        check = self.checkName(tip_name)
+        if not check:
+            self.accept()
+            return
+
+        self.warning_label.setText(f'INFO: {check}')
+        self.warning_label.setVisible(True)

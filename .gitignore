@@ -4,7 +4,14 @@
 /compile
 !compile/pyinstaller.py
 /Ion Commander*.exe
+
 Log/logs/*
+
+DB/*.db
+DB/*.db-journal
+
+Tips/entries/*
+Tips/images/*
 
 /guis/
 /data/

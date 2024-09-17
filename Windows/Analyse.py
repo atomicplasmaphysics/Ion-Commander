@@ -21,8 +21,6 @@ class AnalyseWindow(TabWidget):
     :param parent: parent widget
     """
 
-    # TODO: shorten names if too long
-
     def __init__(self, parent):
         super().__init__(parent)
 
@@ -119,7 +117,8 @@ class AnalyseWindow(TabWidget):
         self.fitting_parameters_box = QGroupBox('Fitting Parameters')
         self.fitting_parameters_copy_button = QPushButton(self)
         self.fitting_parameters_copy_button.setIcon(QIcon('icons/copy.png'))
-        self.fitting_parameters_copy_button.setToolTip('Copy fitting parameters')
+        self.fitting_parameters_copy_button.setToolTip('Copy fitting parameters (not available)')
+        self.fitting_parameters_copy_button.setDisabled(True)
         self.fitting_parameters_copy_button.clicked.connect(self.copyFittingParameters)
         self.row_fitting_parameters.addWidget(self.fitting_parameters_copy_button)
         self.row_fitting_parameters.addWidget(self.fitting_parameters_box, stretch=1)
@@ -145,7 +144,6 @@ class AnalyseWindow(TabWidget):
         # DISPLAY
         #
 
-        # TODO: check if legend=False is needed
         self.graph = TOFCanvas(parent=self, data=self.data, fit_class=self.fit_function_class, grid=True)
         self.main_layout.addWidget(self.graph)
 
@@ -253,6 +251,13 @@ class AnalyseWindow(TabWidget):
         self.fit_function_class.widget.deleteLater()
         del self.fit_function_class
         self.fit_function_class = self.fitting_functions[index](self)
+        copy_info = self.fit_function_class.copy_info
+        if copy_info:
+            self.fitting_parameters_copy_button.setToolTip(f'Copy fitting parameters {copy_info}')
+            self.fitting_parameters_copy_button.setEnabled(True)
+        else:
+            self.fitting_parameters_copy_button.setToolTip('Copy fitting parameters (not available)')
+            self.fitting_parameters_copy_button.setDisabled(True)
         self.fitting_parameters_box_layout.addWidget(self.fit_function_class.widget)
         self.graph.updateFitClass(self.fit_function_class)
 

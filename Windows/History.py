@@ -229,7 +229,7 @@ class HistoryWindow(TabWidget):
             self.writeStatusBar('No data selected')
         else:
             try:
-                np.savetxt(self.file_path.path, data, delimiter=',', header=','.join(labels))
+                np.savetxt(self.file_path.path, data, delimiter=',', header=','.join(labels), encoding='utf-8')
                 self.writeStatusBar('Exported successfully')
             except FileNotFoundError as error:
                 showMessageBox(

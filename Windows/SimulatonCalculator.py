@@ -30,7 +30,7 @@ class SimulationCalculator:
         self.file_path = file_path
         with warnings.catch_warnings():
             warnings.simplefilter(action='ignore', category=UserWarning)
-            file_data = np.genfromtxt(file_path, skip_header=header_count, delimiter=delimiter)
+            file_data = np.genfromtxt(file_path, skip_header=header_count, delimiter=delimiter, encoding='utf-8')
 
         if not len(file_data.shape) == 2:
             raise ValueError(f'File "{self.file_path}" has wrong data format')

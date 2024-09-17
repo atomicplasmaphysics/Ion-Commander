@@ -184,7 +184,7 @@ class DB:
         self,
         commit_time_interval: int = 300,
         no_setup: bool = False,
-        debug: bool = True  # TODO: change this
+        debug: bool = False
     ):
         self.commit_time_interval = commit_time_interval
         self.debug = debug

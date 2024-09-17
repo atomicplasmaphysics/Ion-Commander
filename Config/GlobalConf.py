@@ -69,7 +69,9 @@ class DefaultParams:
 
     # tip parameters
     tip_folder = 'Tips'
+    tip_extension = 'html'
     tip_file_folder = 'entries'
+    tip_encoding = 'utf-8'
 
 
 class GlobalConf:

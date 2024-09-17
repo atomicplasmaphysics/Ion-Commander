@@ -210,7 +210,6 @@ class LaserVBoxLayout(QVBoxLayout):
         # System faults table
         # TODO: why is this f***ing table not setting its f***ing widths as intended??? F***ing piece of sh**
         # TODO: table does not really update correctly
-        # TODO: set tooltip on error messages if hover over table cells
         self.table_system_faults = ErrorTable()
         self.faults_vbox.addWidget(self.table_system_faults)
 

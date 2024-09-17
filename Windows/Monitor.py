@@ -29,8 +29,6 @@ class MonitorWindow(TabWidget):
         self.splitter.setChildrenCollapsible(False)
         self.main_layout.addWidget(self.splitter)
 
-        # TODO: Add tooltips to everything
-
         # PSU CONTROL
         self.power_meter_vbox = VBoxTitleLayout('Power Meter', parent=self, add_stretch=True, popout_enable=True)
         self.power_meter_group_vbox = PowerMeterVBoxLayout()

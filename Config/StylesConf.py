@@ -66,6 +66,11 @@ class Styles:
             background-color: #666666;
         }}
         
+        QMenuBar::item:selected,
+        QMenuBar::item:pressed {{
+            color: #000000;
+        }}
+        
         QLabel {{
             background: None;
         }}

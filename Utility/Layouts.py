@@ -2368,7 +2368,8 @@ class ButtonGridLayout(QGridLayout):
     :param max_columns: maximum columns (-1 means no limit)
     """
 
-    buttonPressed = pyqtSignal(int)
+    buttonPressedIdx = pyqtSignal(int)
+    buttonPressedName = pyqtSignal(str)
 
     def __init__(
         self,
@@ -2405,7 +2406,8 @@ class ButtonGridLayout(QGridLayout):
             row, column = divmod(index, self.max_columns)
             button = QPushButton(label)
             button.setToolTip(f'Tip #{index}')
-            button.clicked.connect(lambda x, i=index: self.buttonPressed.emit(i))
+            button.clicked.connect(lambda _, i=index: self.buttonPressedIdx.emit(i))
+            button.clicked.connect(lambda _, i=label: self.buttonPressedName.emit(i))
             self.addWidget(button, row, column)
 
     def newLabels(self, labels: list[str]):
@@ -2418,9 +2420,13 @@ class ButtonGridLayout(QGridLayout):
 
 class TextEdit(QWidget):
     """
-    Text editor, which is a QTextEdit with an menu bar
+    Text editor, which is a QTextEdit with a menu bar
 
-    :parm
+    :parm image_directors: directory of images
+    :param save_button: if save button should be displayed
+    :param load_button: if load button should be displayed
+    :param file_extensions: list of possible file extensions
+    :param encoding: encoding of file
     """
 
     def __init__(
@@ -2428,6 +2434,8 @@ class TextEdit(QWidget):
         image_directory: str = None,
         save_button: bool = True,
         load_button: bool = True,
+        file_extensions: list[str] | None = None,
+        encoding: str = 'utf-8',
         **kwargs
     ):
         super().__init__(**kwargs)
@@ -2436,6 +2444,11 @@ class TextEdit(QWidget):
         self.setLayout(self.main_layout)
 
         self.image_directory = image_directory
+        if file_extensions is None or not file_extensions:
+            self.file_filter = 'All Files (*)'
+        else:
+            self.file_filter = 'Text Files (' + ', '.join([f'.{file_extension}' for file_extension in file_extensions]) + ')'
+        self.encoding = encoding
 
         # add menu bar
         self.menu = QMenuBar(self)
@@ -2502,7 +2515,7 @@ class TextEdit(QWidget):
         """Clears contents"""
         self.text_editor.setHtml('')
 
-    def saveFile(self, file_name: str = ''):
+    def saveFile(self, file_name: str = '') -> int:
         """
         Save the file
 
@@ -2510,19 +2523,21 @@ class TextEdit(QWidget):
         """
 
         if not file_name:
-            file_name = selectFileDialog(self, True, 'Save File', '', 'Text Files (*.txt);;All Files (*)')
+            file_name = selectFileDialog(self, True, 'Save File', '', self.file_filter)
 
         if not file_name:
             return 1
 
         try:
-            with open(file_name, 'w') as file:
+            with open(file_name, 'w', encoding=self.encoding, errors='ignore') as file:
                 file.write(self.text_editor.toHtml())
         except (OSError, FileNotFoundError, FileExistsError) as e:
             QMessageBox.warning(self, 'Error', f'Failed to save file: {e}')
             return 2
 
-    def openFile(self, file_name: str = ''):
+        return 0
+
+    def openFile(self, file_name: str = '') -> int:
         """
         Opens a file
 
@@ -2530,17 +2545,19 @@ class TextEdit(QWidget):
         """
 
         if not file_name:
-            file_name = selectFileDialog(self, False, 'Open File', '', 'Text Files (*.txt);;All Files (*)')
+            file_name = selectFileDialog(self, False, 'Open File', '', self.file_filter)
 
         if not file_name:
             return 1
 
         try:
-            with open(file_name, 'r') as file:
+            with open(file_name, 'r', encoding=self.encoding, errors='ignore') as file:
                 self.text_editor.setHtml(file.read())
         except (OSError, FileNotFoundError, FileExistsError) as e:
             QMessageBox.warning(self, 'Error', f'Failed to open file: {e}')
             return 2
+
+        return 0
 
     def insertImage(self):
         """Insert an image"""
