@@ -1,7 +1,6 @@
 from typing import BinaryIO
 from datetime import datetime
 import struct
-from time import time
 
 
 def bits_to_dec(bits: list[bool]) -> int:
@@ -435,11 +434,12 @@ class LM:
 
 
 def main():
+    from time import time
+
     lm = LM()
     lm.readLMF(f'C:/Users/Alex/Uni/TU/Doktorat/Laser/Messungen/240618_Equal_inputs/from_picoTimingDiscriminator_16ns_100s.lmf', ignore_DAN=True, ignore_DAQ=True)
     print(lm)
 
-    '''
     start = time()
     i = 0
     while True:
@@ -450,7 +450,6 @@ def main():
         i += 1
     print(f'Event {i}')
     print(f'Took {time() - start} seconds to read from file')
-    '''
 
 
 if __name__ == '__main__':

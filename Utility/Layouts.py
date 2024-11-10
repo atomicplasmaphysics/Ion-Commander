@@ -20,7 +20,7 @@ from PyQt6.QtWidgets import (
     QHBoxLayout, QLabel, QWidget, QVBoxLayout, QSpinBox, QDoubleSpinBox, QCheckBox, QComboBox, QLineEdit, QPushButton,
     QListWidget, QListWidgetItem, QApplication, QStyleOption, QTableWidget, QTableWidgetItem, QAbstractItemView, QGridLayout,
     QLCDNumber, QFrame, QTextEdit, QMenuBar, QMessageBox, QInputDialog, QMenu, QColorDialog, QDialog, QGroupBox, QDateTimeEdit,
-    QCalendarWidget, QDial
+    QCalendarWidget, QDial, QHeaderView
 )
 from PyQt6.QtSvgWidgets import QSvgWidget
 from PyQt6.QtSvg import QSvgRenderer
@@ -2042,9 +2042,11 @@ class ErrorTable(QTableWidget):
         self.setRowCount(self.default_rows)
         self.verticalHeader().setVisible(False)
         self.setHorizontalHeaderLabels(['#', 'Type', 'Description'])
-        self.setColumnWidth(0, 10)
-        self.setColumnWidth(1, 100)
+        char_width = QFontMetrics(QFont()).boundingRect('0').width()
+        self.setColumnWidth(0, char_width * 3)
+        self.setColumnWidth(1, char_width * 7)
         self.horizontalHeader().setStretchLastSection(True)
+        self.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
         self.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
 

@@ -158,7 +158,7 @@ class GlobalConf:
         psu: str = None,
         ebis: str = None,
         pressure: str = None,
-        laser: tuple[int, int, int, int, int] = None
+        laser: tuple[int, int, int, int, int] | list[int] = None
     ):
         """
         Updates and saves settings object with connection parameters
