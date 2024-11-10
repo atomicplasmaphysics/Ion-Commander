@@ -585,5 +585,51 @@ def test_data():
     db.close()
 
 
+def rename_columns():
+    db = DB(debug=True, no_setup=True)
+
+    '''
+    name = 'PSU'
+    structure = {
+        'CH0V': 'Channel0_Voltage',
+        'CH0I': 'Channel0_Current',
+        'CH1V': 'Channel1_Voltage',
+        'CH1I': 'Channel1_Current',
+        'CH2V': 'Channel2_Voltage',
+        'CH2I': 'Channel2_Current',
+        'CH3V': 'Channel3_Voltage',
+        'CH3I': 'Channel3_Current',
+    }
+    '''
+
+    '''
+    name = 'Laser'
+    structure = {
+        'S': 'Shutter',
+        'PC': 'Pulsing',
+        'L': 'Status',
+        'CHT': 'Chiller_Temperature',
+        'CHST': 'Chiller_Set_Temperature',
+        'BT': 'Baseplate_Temperature',
+        'CHF': 'Chiller_Flow',
+        'MRR': 'Amplifier_Repetition_Rate',
+        'PW': 'Pulse_Width',
+        'RRD': 'Repetition_Rate_Divisor',
+        'SB': 'Seeder_Bursts',
+        'RL': 'RF_Level',
+    }
+    '''
+
+    name = 'PowerMeter'
+    structure = {
+        'Beam_diameter': 'Beam_Diameter',
+    }
+
+    for old, new in structure.items():
+        db._execute(f'ALTER TABLE {name} RENAME COLUMN {old} to {new};')
+
+    db.close()
+
+
 if __name__ == '__main__':
-    test_data()
+    rename_columns()

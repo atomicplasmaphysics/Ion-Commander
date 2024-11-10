@@ -75,11 +75,14 @@ class ConnectionWorker(QRunnable):
         self.connection: ISEGConnection | ThyracontConnection | MonacoConnection | TLPMxConnection = connection
         self.signal = ConnectionWorkerSignals()
         self.running = True
+        self.started = False
         self.work = []
 
     @pyqtSlot()
     def run(self):
         """Called when worker is started"""
+
+        self.started = True
 
         while True:
             if not self.running:
@@ -98,6 +101,10 @@ class ConnectionWorker(QRunnable):
             except (AttributeError, ConnectionError, NameError, TypeError) as error:
                 self.signal.error.emit(error)
 
+            if name == 'close':
+                self.running = False
+                self.work = []
+
     def execute(self, callback_id: int, name, *args, **kwargs):
         """
         Adds function call to connection
@@ -105,6 +112,10 @@ class ConnectionWorker(QRunnable):
         :param callback_id: unique id of callback
         :param name: function name
         """
+
+        if name == 'close':
+            self.work.insert(0, (callback_id, name, args, kwargs))
+            return callback_id
 
         if len(self.work) > self.max_queue:
             self.signal.error.emit(BufferError('Too many tasks in queue'))
@@ -195,9 +206,15 @@ class ThreadedConnection:
     def close(self):
         """Closes the worker"""
 
-        if self.worker.running:
-            self.worker.execute(self.callback_id(), 'close')
-            self.worker.running = False
+        if not self.worker.started or not self.worker.running:
+            return
+
+        self.worker.execute(self.callback_id(), 'close')
+
+        while True:
+            if not self.worker.running:
+                break
+            sleep(0.1)
 
     def __getattr__(self, name):
         """
@@ -285,3 +302,109 @@ class ThreadedDummyConnection(ThreadedConnection):
 
     def __init__(self):
         super().__init__(None)
+
+
+def stresstest_iseg():
+    from serial import SerialException
+    from Connection.USBPorts import getComports
+    from Connection.ISEG import ISEGConnection
+    from PyQt6.QtCore import QTimer
+    from PyQt6.QtWidgets import QApplication, QWidget
+    import sys
+
+    class TestISEG(QWidget):
+        def __init__(self, comport: str = 'COM4', update_time: int = 500, connect_time: int = 1100):
+            super().__init__()
+            self.comport = comport
+            self.connection: None | ISEGConnection = None
+            self.threaded_connection: ThreadedDummyConnection | ThreadedISEGConnection = ThreadedDummyConnection()
+
+            self.counter_global = 1
+
+            self.update_timer = QTimer()
+            self.update_timer.timeout.connect(self.do_update)
+            self.update_timer.setInterval(update_time)
+            self.update_timer.start()
+
+            self.connect_timer = QTimer()
+            self.connect_timer.timeout.connect(self.toggle_connect)
+            self.connect_timer.setInterval(connect_time)
+            self.connect_timer.start()
+
+        def do_update(self):
+            if self.connection is None:
+                return
+
+            def readVoltage0(voltage: float, i_glob: int, i_loc: int):
+                print(f'INFO: {i_glob=}, {i_loc=}: voltage @ channel 0 = {voltage}')
+
+            for i in range(10):
+                print(f'INFO: queuing i_glob={self.counter_global}, i_loc={i}')
+                self.threaded_connection.callback(
+                    lambda x, j_glob=self.counter_global, j_loc=i: readVoltage0(x, j_glob, j_loc),
+                    self.threaded_connection.readVoltage(0)
+                )
+
+            self.counter_global += 1
+
+        def toggle_connect(self):
+            if self.threaded_connection.isDummy():
+                print('INFO: toggling connection -> connect')
+                self.do_connect()
+            else:
+                print('INFO: toggling connection -> disconnect')
+                self.do_unconnect()
+
+        def do_unconnect(self):
+            self.threaded_connection.close()
+            self.threaded_connection = ThreadedDummyConnection()
+
+            if self.connection is not None:
+                self.connection.close()
+                self.connection = None
+            self.do_reset()
+
+        def do_connect(self):
+            connect = self.threaded_connection.isDummy()
+
+            self.do_unconnect()
+
+            if connect:
+                self.connection = ISEGConnection(
+                    self.comport,
+                    echo=ISEGConnection.EchoMode.ECHO_AUTO,
+                    cleaning=True,
+                    strict='iseg Spezialelektronik GmbH,NR040060r4050000200,8200005,1.74'
+                )
+                try:
+                    self.connection.open()
+                    self.threaded_connection = ThreadedISEGConnection(self.connection)
+
+                except (SerialException, ConnectionError) as error:
+                    try:
+                        self.connection.close()
+                    except ConnectionError:
+                        pass
+                    self.connection = None
+                    self.do_reset()
+
+                    print(f'Connection error! Could not connect to ISEG crate power supply on port "{self.comport}", because of: {error}')
+
+        def do_reset(self):
+            self.threaded_connection.close()
+            if self.connection is not None:
+                self.connection.close()
+
+            comports = getComports(not_available_entry=True)
+
+    # do test application
+    app = QApplication(sys.argv)
+    test = TestISEG()
+    test.do_connect()
+    test.do_unconnect()
+    test.show()
+    app.exec()
+
+
+if __name__ == '__main__':
+    stresstest_iseg()

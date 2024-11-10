@@ -47,7 +47,8 @@ class COMConnection:
     :param baudrate: Baudrate
     :param echo: If device has echo. Will be checked
     :param cleaning: If output cache should be cleared when entering and exiting
-    :param auto_ctrl_lnf: If automatic control linefeed character should be inserted ('\r\n')
+    :param tx_term: transmission terminator characters (e.g.: '\r', '\n', '\r\n')
+    :param auto_tx_term: If automatic the tx_term characters will be automatically inserted
     :param init_sleep: time for waiting on connection
     :param debug: If debug is enabled
     """
@@ -60,7 +61,8 @@ class COMConnection:
         baudrate: int = 9600,
         echo: bool = True,
         cleaning: bool = True,
-        auto_ctrl_lnf: bool = True,
+        tx_term = '\r\n',
+        auto_tx_term: bool = True,
         init_sleep: int = 0,
         debug: bool = False
     ):
@@ -70,7 +72,8 @@ class COMConnection:
         self.baudrate = baudrate
         self.echo = echo
         self.cleaning = cleaning
-        self.auto_ctrl_lnf = auto_ctrl_lnf
+        self.tx_term = tx_term
+        self.auto_tx_term = auto_tx_term
         self.init_sleep = init_sleep
         self.debug = debug
 
@@ -99,10 +102,11 @@ class COMConnection:
 
     def close(self):
         """Closes the connection"""
+        if self.serial is None:
+            return
         self.clean()
-        if self.serial is not None:
-            self.serial.close()
-            self.serial = None
+        self.serial.close()
+        self.serial = None
 
     def clean(self):
         """Clean connection"""
@@ -126,8 +130,8 @@ class COMConnection:
         if self.serial is None:
             raise ConnectionError('Connection has not been established')
 
-        if self.auto_ctrl_lnf and not cmd.endswith('\r\n'):
-            cmd += '\r\n'
+        if self.auto_tx_term and not cmd.endswith(self.tx_term):
+            cmd += self.tx_term
 
         cmd_encode = cmd.encode(self.encoding)
         self.writeBytes(cmd_encode)
@@ -175,7 +179,8 @@ class COMConnection:
 
 
 def main():
-    print(getComports())
+    for comport in getComports():
+        print(comport)
 
     with COMConnection('virtual', echo=False, cleaning=False) as com:
         com.write('*IDN?')

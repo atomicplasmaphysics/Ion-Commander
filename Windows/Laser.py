@@ -377,21 +377,22 @@ class LaserVBoxLayout(QVBoxLayout):
                 GlobalConf.logger.error(f'Faults must be <dict>, got {type(faults)}')
                 return
 
-            self.table_system_faults.resetTable()
+            error_list = self.table_system_faults.getErrorList()
 
-            if not len(faults):
-                self.indicator_system_faults.setValue(False)
-                self.status_system_faults.setText('No faults')
-                return
-
-            self.indicator_system_faults.setValue(True)
-            self.status_system_faults.setText('Faults occurred')
             for fault, fault_info in faults.items():
                 if not isinstance(fault, int) and not isinstance(fault_info, tuple) and len(fault_info) == 2:
                     GlobalConf.logger.error(f'Fault key must be <int>, got {type(fault)}, Fault Info must be <tuple> of length 2, got {type(fault_info)} with value "{fault_info}"')
                     return
 
-                self.table_system_faults.insertError(fault, fault_info[0], fault_info[1])
+                if fault not in error_list:
+                    self.table_system_faults.insertError(fault, fault_info[0], fault_info[1])
+
+            if not self.table_system_faults.getErrorList():
+                self.indicator_system_faults.setValue(False)
+                self.status_system_faults.setText('No faults')
+            else:
+                self.indicator_system_faults.setValue(True)
+                self.status_system_faults.setText('Faults occurred')
 
         self.threaded_connection.callback(faultsTable, self.threaded_connection.wGetInfo())
 
@@ -880,11 +881,14 @@ class LaserVBoxLayout(QVBoxLayout):
                 self.button_connection_settings.setEnabled(False)
                 self.button_connection.setText('Disconnect')
 
+                # clear faults to initialize fault table
+                self.threaded_connection.fackSet()
+
             # TODO: probably add some more socket connection errors here
-            except (ConnectionError, TimeoutError, ConnectionAbortedError, UnicodeDecodeError) as error:
+            except (ConnectionError, TimeoutError, ConnectionAbortedError, UnicodeDecodeError, OSError) as error:
                 try:
                     self.connection.close()
-                except (ConnectionError, TimeoutError, ConnectionAbortedError, UnicodeDecodeError):
+                except (ConnectionError, TimeoutError, ConnectionAbortedError, UnicodeDecodeError, OSError):
                     pass
                 self.connection = None
                 self.reset()

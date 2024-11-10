@@ -99,7 +99,8 @@ class HistoryWindow(TabWidget):
         self.export_title_hbox.addWidget(self.end_datetime_label, alignment=Qt.AlignmentFlag.AlignLeft)
         self.end_datetime_widget = DateTimeEdit(
             popup_title='Select date-time for end',
-            timestamp=datetime.now()
+            timestamp=datetime.now(),
+            now_button=True
         )
         self.export_title_hbox.addWidget(self.end_datetime_widget, alignment=Qt.AlignmentFlag.AlignLeft)
 
@@ -139,8 +140,8 @@ class HistoryWindow(TabWidget):
         self.splitter.addWidget(self.preview_export_widget)
 
         # Division between columns
-        self.splitter.setStretchFactor(0, 30)
-        self.splitter.setStretchFactor(0, 70)
+        self.splitter.setStretchFactor(0, 10)
+        self.splitter.setStretchFactor(0, 90)
 
     def selectAll(self, listwidget_index: int, state: Qt.CheckState):
         """

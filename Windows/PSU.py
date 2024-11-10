@@ -399,6 +399,10 @@ class PSUVBoxLayout(QVBoxLayout):
                 GlobalConf.logger.error(f'Measured voltages cannot be set, non matching length: expected len = {len(self.status_voltages)}, got len = {len(voltages)}')
                 return
 
+            if any([0 if isinstance(voltage, float) else 1 for voltage in voltages]):
+                GlobalConf.logger.error(f'Measured voltages cannot be set, types of currents are: {[type(voltage) for voltage in voltages]}, expected only <float>s')
+                return
+
             for status_voltage, voltage in zip(self.status_voltages, voltages):
                 status_voltage.setValue(voltage)
 
@@ -407,6 +411,10 @@ class PSUVBoxLayout(QVBoxLayout):
         def measureCurrent(currents: list[float]):
             if len(currents) != len(self.status_currents) != len(self.indicator_limits) != len(self.spinbox_limit_currents):
                 GlobalConf.logger.error(f'Measured currents cannot be set, non matching length: expected len = {len(self.status_currents)}, got len = {len(currents)}')
+                return
+
+            if any([0 if isinstance(current, float) else 1 for current in currents]):
+                GlobalConf.logger.error(f'Measured currents cannot be set, types of currents are: {[type(current) for current in currents]}, expected only <float>s')
                 return
 
             for status_current, indicator_limit, spinbox_limit_current, current in zip(self.status_currents, self.indicator_limits, self.spinbox_limit_currents, currents):

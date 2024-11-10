@@ -962,7 +962,7 @@ class ClockDial(QDial):
         painter_notches = QPainter(self)
 
         rect = self.rect()
-        # TODO: somehow the center is not really the center of the QDial?
+        # somehow the center is not really the center of the QDial for whyever this might be
         center_x, center_y = rect.center().x() + 2, rect.center().y() + 2
         size = min(rect.width(), rect.height())
         radius = size / 2
@@ -1288,6 +1288,7 @@ class DateTimeEdit(QWidget):
     :param seconds_flag: show seconds
     :clock_size: size of ClockDial Widget
     :timestamp: time to be displayed
+    :now_button: show now button
     """
 
     def __init__(
@@ -1298,6 +1299,7 @@ class DateTimeEdit(QWidget):
         seconds_flag: bool = True,
         clock_size: int | None = None,
         timestamp: datetime | None = None,
+        now_button: bool = False,
         **kwargs
     ):
         super().__init__(*args, **kwargs)
@@ -1308,6 +1310,7 @@ class DateTimeEdit(QWidget):
         self.clock_size = clock_size
         if timestamp is None:
             timestamp = datetime.now()
+        self.now_button = now_button
 
         self.main_layout = QHBoxLayout()
         self.setLayout(self.main_layout)
@@ -1325,6 +1328,12 @@ class DateTimeEdit(QWidget):
         self.calendar_button.setToolTip('Select Date and Time')
         self.calendar_button.clicked.connect(self._selectionPopup)
         self.main_layout.addWidget(self.calendar_button, stretch=0)
+
+        if self.now_button:
+            self.now_button = QPushButton('now')
+            self.now_button.setToolTip('Select Date and Time as now')
+            self.now_button.clicked.connect(lambda: self.setTime(datetime.now()))
+            self.main_layout.addWidget(self.now_button, stretch=0)
 
     def _selectionPopup(self):
         """Open an easier selection popup"""
@@ -1496,17 +1505,18 @@ class PressureWidget(QWidget):
     """
     Widget that extends the QWidget to display the pressure
 
-    :param input_range: input range as tuple of (maximum exponent, minimum exponent)
+    :param input_range: input range as tuple of (maximum, minimum)
     """
 
     def __init__(
         self,
-        input_range: tuple[float, float] = (-2, -10),
+        input_range: tuple[float, float] = (1E3, 5E-10),
         **kwargs
     ):
         super().__init__(**kwargs)
 
         self.input_range = input_range
+        self.input_range_exponents = [int(log10(ir)) for ir in input_range]
 
         self.main_layout = QVBoxLayout()
         self.main_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
@@ -1535,7 +1545,7 @@ class PressureWidget(QWidget):
         self.pressure = pressure
         percentage = 1
         label_text = 'No pressure available'
-        exponent = self.input_range[0] + 1
+        stack_widget_value = -self.input_range_exponents[0] - 1
 
         self.stack_widget.enableDigit(bool(pressure))
         if pressure:
@@ -1543,14 +1553,19 @@ class PressureWidget(QWidget):
             exponent = int(pressure_string_split[1])
             label_text = f'{pressure_string_split[0]} x 10<sup>{exponent}</sup> mbar'
 
-            percentage = 1 - (log10(pressure) - self.input_range[0]) / (self.input_range[1] - self.input_range[0])
+            percentage = 1 - (log10(pressure) - self.input_range_exponents[0]) / (self.input_range_exponents[1] - self.input_range_exponents[0])
             percentage = max(percentage, 0)
             percentage = min(percentage, 1)
 
+            stack_widget_value = -exponent
+            if pressure >= self.input_range[0]:
+                stack_widget_value = 'OR'
+            elif pressure <= self.input_range[1]:
+                stack_widget_value = 'UR'
+
         self.pressure_label.setText(label_text)
         self.stack_widget.changePercentage(percentage)
-
-        self.stack_widget.setValue('OR' if percentage == 1 else -exponent)
+        self.stack_widget.setValue(stack_widget_value)
 
 
 class StackWidget(QLCDNumber):
@@ -2053,8 +2068,8 @@ class ErrorTable(QTableWidget):
         error_type_widget.setToolTip(f'Error type: {error_type}')
         self.setItem(self.actual_row, 1, error_type_widget)
 
-        error_description_widget = QTableWidgetItem(f'Error description: {error_description}')
-        error_description_widget.setToolTip(error_description)
+        error_description_widget = QTableWidgetItem(error_description)
+        error_description_widget.setToolTip(f'Error description: {error_description}')
         self.setItem(self.actual_row, 2, error_description_widget)
 
         self.actual_row += 1
@@ -2321,8 +2336,8 @@ class StackedVBoxLayout(QVBoxLayout):
         self.rows: dict[int, dict[int, tuple[str, int]]] = {}
 
         # add to rows dictionary
-        for pos, ((row, col), label) in enumerate(labels.items()):
-            item = {label: pos}
+        for (row, col), label in labels.items():
+            item = {label: col}
             row_list = self.rows.get(row)
             if row_list is None:
                 self.rows[row] = item
@@ -2336,7 +2351,7 @@ class StackedVBoxLayout(QVBoxLayout):
             hbox.setAlignment(Qt.AlignmentFlag.AlignLeft)
             self.addLayout(hbox)
 
-            for label, pos in sorted(row.items(), reverse=True):
+            for label, pos in sorted(row.items(), key=lambda v: v[1]):
                 hbox.addWidget(QLabel(label))
                 spinbox = DoubleSpinBox(
                     input_range=SpinBoxRange.INF_INF,
@@ -3058,7 +3073,15 @@ class TimeAxisItem(pg.AxisItem):
 
     def tickStrings(self, values, scale, spacing):
         """Convert UNIX timestamps into given format"""
-        return [datetime.fromtimestamp(value).strftime(self.fmt) for value in values]
+        ticks = []
+
+        for value in values:
+            try:
+                ticks.append(datetime.fromtimestamp(value).strftime(self.fmt))
+            except (OverflowError, ValueError, OSError):
+                ticks.append('infinity')
+
+        return ticks
 
 
 class FittingBar(pg.InfiniteLine):

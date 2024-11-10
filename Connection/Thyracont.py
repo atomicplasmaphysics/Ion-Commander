@@ -6,8 +6,15 @@ from Connection.LucidControl import LucidControlConnection
 
 def thyracontVoltageToPressure(voltage: float) -> float:
     """Convert voltage to pressure in mbar"""
-    if not 1.2 < voltage < 8.7:
-        return 0
+
+    # check min range
+    if voltage < 1.2:
+        return 5E-10
+
+    # check max range
+    if voltage > 8.7:
+        return 1000
+
     return pow(10, (voltage - 6.8) / 0.6)
 
 
@@ -52,6 +59,7 @@ class ThyracontConnection(LucidControlConnection):
 
 def main():
     with ThyracontConnection('COM3') as thyracont:
+        print(thyracont.ioGroupGet(tuple([True] * thyracont.channels)))
         print(thyracont.getPressureAll())
 
 

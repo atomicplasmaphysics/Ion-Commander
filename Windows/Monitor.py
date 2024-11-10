@@ -17,6 +17,7 @@ class MonitorWindow(TabWidget):
     """
 
     # TODO: implement camera
+    # TODO: implement Keithley PicoAmp meter
 
     def __init__(self, parent):
         super().__init__(parent)

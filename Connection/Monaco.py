@@ -1370,6 +1370,16 @@ def toggleLaserAndReadStatus():
             sleep(0.1)
 
 
+def readErrorStatus():
+    with MonacoConnection(host='169.254.21.151', port=23) as monaco:
+        print(f'faults: {monaco.fGet() = }')
+        print(f'fault list: {monaco.dafGet() = }')
+        print(f'chiller faults: {monaco.chfaultGet() = }')
+        print(f'warnings: {monaco.wGet() = }')
+        print(f'warnings: {monaco.wGetInfo() = }')
+        print(f'warnings history: {monaco.whGet() = }')
+
+
 def readOutValues():
     with MonacoConnection(host='169.254.21.151', port=23) as monaco:
         for func in dir(monaco):
@@ -1515,4 +1525,4 @@ def readOutValues():
 
 
 if __name__ == '__main__':
-    toggleLaserAndReadStatus()
+    readErrorStatus()

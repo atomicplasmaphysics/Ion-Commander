@@ -88,14 +88,19 @@ class FitMethod:
     General method to fit data
 
     :param parent: parent widget
+    :param no_qt: disable Qt related stuff
     """
 
     title = 'No fit'
     tooltip = 'No fit at all'
 
-    def __init__(self, parent):
+    def __init__(self, parent, no_qt: bool = False):
         self.parent: MainWindow = parent
-        self.widget = FittingWidget({}, parent)
+        self.no_qt = no_qt
+        if self.no_qt:
+            self.widget = None
+        else:
+            self.widget = FittingWidget({}, parent)
         self.parameter: list[float] = []
         self.parameters = 0
         self.bars: list[pg.InfiniteLine] = []
@@ -140,7 +145,8 @@ class FitMethod:
 
     def updateParameters(self):
         """Updates parameters"""
-        self.widget.setValues(self.parameter)
+        if self.widget is not None:
+            self.widget.setValues(self.parameter)
 
 
 class FitGaussRange(FitMethod):
@@ -153,22 +159,24 @@ class FitGaussRange(FitMethod):
     title = 'Gauss (range)'
     tooltip = 'Makes Gaussian fit in given range'
 
-    def __init__(self, parent):
-        super().__init__(parent)
+    def __init__(self, parent, **kwargs):
+        super().__init__(parent, **kwargs)
 
-        self.widget = FittingWidget({
-            (0, 0): 'σ',
-            (0, 1): 'μ',
-            (0, 2): 'c',
-            (0, 3): 'FWHM'
-        }, parent)
+        if not self.no_qt:
+            self.widget = FittingWidget({
+                (0, 0): 'σ',
+                (0, 1): 'μ',
+                (0, 2): 'c',
+                (0, 3): 'FWHM'
+            }, parent)
         self.parameter = [0, 0, 0, 0]
         self.parameters = 3
 
-        self.bars = createFittingBars([
-            'Start',
-            'End'
-        ])
+        if not self.no_qt:
+            self.bars = createFittingBars([
+                'Start',
+                'End'
+            ])
 
         self.copy_info = '(mu, c, fwhm)'
 
@@ -257,21 +265,23 @@ class FitGaussCenter(FitMethod):
     title = 'Gauss (center)'
     tooltip = 'Makes Gaussian fit with provided center'
 
-    def __init__(self, parent):
-        super().__init__(parent)
+    def __init__(self, parent, **kwargs):
+        super().__init__(parent, **kwargs)
 
-        self.widget = FittingWidget({
-            (0, 0): 'σ',
-            (0, 1): 'μ',
-            (0, 2): 'c',
-            (0, 3): 'FWHM'
-        }, parent)
+        if not self.no_qt:
+            self.widget = FittingWidget({
+                (0, 0): 'σ',
+                (0, 1): 'μ',
+                (0, 2): 'c',
+                (0, 3): 'FWHM'
+            }, parent)
         self.parameter = [0, 0, 0, 0]
         self.parameters = 3
 
-        self.bars = createFittingBars([
-            'Center'
-        ])
+        if not self.no_qt:
+            self.bars = createFittingBars([
+                'Center'
+            ])
 
         self.copy_info = '(mu, c, fwhm)'
 
@@ -367,24 +377,26 @@ class FitLogNormRange(FitMethod):
     title = 'LogNorm (range)'
     tooltip = 'Makes LogNorm fit'
 
-    def __init__(self, parent):
-        super().__init__(parent)
+    def __init__(self, parent, **kwargs):
+        super().__init__(parent, **kwargs)
 
-        self.widget = FittingWidget({
-            (0, 0): 'σ',
-            (0, 1): 'μ',
-            (0, 2): 'x0',
-            (0, 3): 'c',
-            (0, 4): 'mode',
-            (0, 5): 'FWHM'
-        }, parent)
+        if not self.no_qt:
+            self.widget = FittingWidget({
+                (0, 0): 'σ',
+                (0, 1): 'μ',
+                (0, 2): 'x0',
+                (0, 3): 'c',
+                (0, 4): 'mode',
+                (0, 5): 'FWHM'
+            }, parent)
         self.parameter = [0, 0, 0, 0, 0, 0]
         self.parameters = 4
 
-        self.bars = createFittingBars([
-            'Start',
-            'End'
-        ])
+        if not self.no_qt:
+            self.bars = createFittingBars([
+                'Start',
+                'End'
+            ])
 
     def setBarBounds(self, xrange: tuple[float, float]):
         """
@@ -472,19 +484,21 @@ class FitCountsRange(FitMethod):
     title = 'Counts (range)'
     tooltip = 'Counts in given range'
 
-    def __init__(self, parent):
-        super().__init__(parent)
+    def __init__(self, parent, **kwargs):
+        super().__init__(parent, **kwargs)
 
-        self.widget = FittingWidget({
-            (0, 0): 'Counts'
-        }, parent)
+        if not self.no_qt:
+            self.widget = FittingWidget({
+                (0, 0): 'Counts'
+            }, parent)
         self.parameter = [0]
         self.parameters = 0
 
-        self.bars = createFittingBars([
-            'Start',
-            'End'
-        ])
+        if not self.no_qt:
+            self.bars = createFittingBars([
+                'Start',
+                'End'
+            ])
 
         self.copy_info = '(counts)'
 
@@ -530,23 +544,25 @@ class FitGaussCountsRange(FitMethod):
     title = 'Gauss & Count (range)'
     tooltip = 'Makes Gaussian fit in given range and also outputs counts'
 
-    def __init__(self, parent):
-        super().__init__(parent)
+    def __init__(self, parent, **kwargs):
+        super().__init__(parent, **kwargs)
 
-        self.widget = FittingWidget({
-            (0, 0): 'σ',
-            (0, 1): 'μ',
-            (0, 2): 'c',
-            (0, 3): 'FWHM',
-            (0, 4): 'Counts'
-        }, parent)
+        if not self.no_qt:
+            self.widget = FittingWidget({
+                (0, 0): 'σ',
+                (0, 1): 'μ',
+                (0, 2): 'c',
+                (0, 3): 'FWHM',
+                (0, 4): 'Counts'
+            }, parent)
         self.parameter = [0.0, 0.0, 0.0, 0.0, 0]
         self.parameters = 3
 
-        self.bars = createFittingBars([
-            'Start',
-            'End'
-        ])
+        if not self.no_qt:
+            self.bars = createFittingBars([
+                'Start',
+                'End'
+            ])
 
         self.copy_info = '(mu, c, fwhm, counts)'
 
@@ -627,5 +643,65 @@ class FitGaussCountsRange(FitMethod):
         return f'({self.parameter[1]}, {self.parameter[2]}, {self.parameter[3]}, {self.parameter[4]})'
 
 
-fittingFunctionsSingle: list[type[FitMethod]] = [FitGaussRange, FitGaussCenter, FitLogNormRange, FitCountsRange, FitGaussCountsRange]
-fittingFunctionsMultiple: list[type[FitMethod]] = []
+class FitBarsX(FitMethod):
+    """
+    Method to get x values of bars
+
+    :param parent: parent widget
+    """
+
+    title = 'Bars (range)'
+    tooltip = 'Get x values of bars'
+
+    def __init__(self, parent, **kwargs):
+        super().__init__(parent, **kwargs)
+
+        if not self.no_qt:
+            self.widget = FittingWidget({
+                (0, 0): 'x1',
+                (0, 1): 'x2'
+            }, parent)
+        self.parameter = [0.0, 0.0]
+        self.parameters = 0
+
+        if not self.no_qt:
+            self.bars = createFittingBars([
+                'x1',
+                'x2'
+            ])
+
+        self.copy_info = '(x1, x2)'
+
+    def setBarBounds(self, xrange: tuple[float, float]):
+        """
+        Sets boundary of bars
+
+        :param xrange: tuple of xmin, xmax
+        """
+
+        self.bars[0].setBounds((xrange[0], self.bars[1].value()))
+        self.bars[1].setBounds((self.bars[0].value(), xrange[1]))
+
+    def fitting(self, bar_values: list[float], data: tuple[np.ndarray, np.ndarray], view_range: list[list[float, float]]):
+        """
+        Fitting function to determine parameters
+
+        :param bar_values: values of bars
+        :param data: x and y data as np.arrays
+        :param view_range: ranges for visible field [[xmin, xmax], [ymin, ymax]]
+        """
+
+        # self.parameter = [x2, x1]
+        self.parameter[0] = bar_values[0]
+        self.parameter[1] = bar_values[1]
+        self.updateParameters()
+
+    def copyParameters(self) -> str:
+        """Returns string that will be copied when copy button is pressed"""
+
+        # (x1, x2)
+        return f'({self.parameter[0]}, {self.parameter[1]})'
+
+
+fittingFunctionsSingle: list[type[FitMethod]] = [FitGaussRange, FitGaussCenter, FitLogNormRange, FitCountsRange, FitGaussCountsRange, FitBarsX]
+fittingFunctionsMultiple: list[type[FitMethod]] = [FitBarsX]
