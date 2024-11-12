@@ -1,6 +1,5 @@
 from threading import Thread
 from socket import socket, AF_INET, SOCK_STREAM
-from typing import Any
 
 
 from PyQt6.QtCore import QObject
@@ -8,7 +7,10 @@ from PyQt6.QtCore import QObject
 
 from Config.GlobalConf import GlobalConf, DefaultParams
 
-from Connection.Threaded import ThreadedConnection
+from Connection.Threaded import (
+    ThreadedISEGConnection, ThreadedThyracontConnection, ThreadedTPG300Connection, ThreadedMixedPressureConnection,
+    ThreadedMonacoConnection, ThreadedTLPMxConnection, ThreadedDummyConnection
+)
 
 
 class DeviceWrapper:
@@ -18,8 +20,77 @@ class DeviceWrapper:
     :param threaded_connection: <ThreadedConnection> object
     """
 
-    def __init__(self, threaded_connection: ThreadedConnection | Any = None):
+    def __init__(self, threaded_connection = None):
+        if threaded_connection is None:
+            threaded_connection = ThreadedDummyConnection()
+
         self.threaded_connection = threaded_connection
+
+
+class DeviceISEGWrapper(DeviceWrapper):
+    """
+    Simple wrapper for <ThreadedISEGConnection>
+
+    :param threaded_connection: ThreadedISEGConnection
+    """
+
+    def __init__(self, threaded_connection: ThreadedISEGConnection | ThreadedDummyConnection = None):
+        super().__init__(threaded_connection)
+
+
+class DeviceThyracontWrapper(DeviceWrapper):
+    """
+    Simple wrapper for <ThreadedThyracontConnection>
+
+    :param threaded_connection: ThreadedThyracontConnection
+    """
+
+    def __init__(self, threaded_connection: ThreadedThyracontConnection | ThreadedDummyConnection = None):
+        super().__init__(threaded_connection)
+
+
+class DeviceTPG300Wrapper(DeviceWrapper):
+    """
+    Simple wrapper for <ThreadedTPG300Connection>
+
+    :param threaded_connection: ThreadedTPG300Connection
+    """
+
+    def __init__(self, threaded_connection: ThreadedTPG300Connection | ThreadedDummyConnection = None):
+        super().__init__(threaded_connection)
+
+
+class DeviceMixedPressureWrapper(DeviceWrapper):
+    """
+    Simple wrapper for <ThreadedMixedPressureConnection>
+
+    :param threaded_connection: ThreadedMixedPressureConnection
+    """
+
+    def __init__(self, threaded_connection: ThreadedMixedPressureConnection | ThreadedDummyConnection = None):
+        super().__init__(threaded_connection)
+
+
+class DeviceMonacoWrapper(DeviceWrapper):
+    """
+    Simple wrapper for <ThreadedMonacoConnection>
+
+    :param threaded_connection: ThreadedMonacoConnection
+    """
+
+    def __init__(self, threaded_connection: ThreadedMonacoConnection | ThreadedDummyConnection = None):
+        super().__init__(threaded_connection)
+
+
+class DeviceTLPMxWrapper(DeviceWrapper):
+    """
+    Simple wrapper for <ThreadedTLPMxConnection>
+
+    :param threaded_connection: ThreadedTLPMxConnection
+    """
+
+    def __init__(self, threaded_connection: ThreadedTLPMxConnection | ThreadedDummyConnection = None):
+        super().__init__(threaded_connection)
 
 
 class CommandServer(QObject):
@@ -44,7 +115,7 @@ class CommandServer(QObject):
         encoding: str = DefaultParams.cs_encoding,
         max_connections: int = DefaultParams.cs_max_connections,
         max_packet: int = 1024,
-        debug: bool = False,
+        debug: bool = True,
         daemonic: bool = False
     ):
         super().__init__()
@@ -98,7 +169,7 @@ class CommandServer(QObject):
                 break
 
             if self.debug:
-                GlobalConf.logger.debug(f'CommandServer received connection from "{client_address}"')
+                GlobalConf.logger.debug(f'CommandServer received connection from {client_address}')
 
             Thread(
                 target=self.handleClient,
@@ -117,22 +188,27 @@ class CommandServer(QObject):
                         break
 
                     if self.debug:
-                        GlobalConf.logger.debug(f'CommandServer received message from "{client_address}": {cmd}')
+                        GlobalConf.logger.debug(f'CommandServer received message from {client_address}: "{cmd}"')
 
                     result = self.evaluateCmd(cmd, client_socket)
                     if result:
                         if self.debug:
-                            GlobalConf.logger.debug(f'CommandServer answers to "{client_address}": {result}')
+                            GlobalConf.logger.debug(f'CommandServer instantly answers to {client_address}: "{result}"')
                         self.answerCmd(result, client_socket)
                 except ConnectionResetError:
                     break
             if self.debug:
-                GlobalConf.logger.debug(f'CommandServer closed connection from "{client_address}"')
+                GlobalConf.logger.debug(f'CommandServer closed connection from {client_address}')
 
     def answerCmd(self, answer, client_socket: socket):
         """Answer client"""
 
-        client_socket.sendall(str(answer).encode(self.encoding))
+        answer = f'{int(isinstance(answer, Exception))}-{answer}'
+
+        if self.debug:
+            GlobalConf.logger.debug(f'CommandServer delayed answers to {client_socket.getsockname()}: "{answer}"')
+
+        client_socket.sendall(answer.encode(self.encoding))
 
     def evaluateCmd(self, cmd: str, client_socket: socket) -> str:
         """Evaluate sent commands"""
@@ -144,7 +220,7 @@ class CommandServer(QObject):
 
         if device is None:
             return f'1-Device {device_name} not in device list {self.devices.keys()}'
-        if device.threaded_connection.isDummy():
+        if device.threaded_connection is None or device.threaded_connection.isDummy():
             return '2-Device connection is not established'
         # TODO: maybe more checks needed
 
@@ -169,7 +245,7 @@ class CommandServer(QObject):
         try:
             device.threaded_connection.callback(
                 lambda x, cs=client_socket: self.answerCmd(x, cs),
-                device.threaded_connection.__getattr__(func_name)(*args, **kwargs)
+                getattr(device.threaded_connection, func_name)(*args, **kwargs)
             )
 
         except (AttributeError, ConnectionError, NameError, TypeError, ValueError) as error:

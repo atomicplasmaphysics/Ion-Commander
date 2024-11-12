@@ -57,7 +57,7 @@ class ConnectionWorkerSignals(QObject):
     result: callback_id, result
     """
 
-    error = pyqtSignal(Exception)
+    error = pyqtSignal(int, Exception)
     result = pyqtSignal(int, object)
 
 
@@ -99,7 +99,7 @@ class ConnectionWorker(QRunnable):
                 result = obj_func(*args, **kwargs)
                 self.signal.result.emit(callback_id, result)
             except (AttributeError, ConnectionError, NameError, TypeError, ValueError) as error:
-                self.signal.error.emit(error)
+                self.signal.error.emit(callback_id, error)
 
             if name == 'close':
                 self.running = False
@@ -118,11 +118,11 @@ class ConnectionWorker(QRunnable):
             return callback_id
 
         if len(self.work) > self.max_queue:
-            self.signal.error.emit(BufferError('Too many tasks in queue'))
+            self.signal.error.emit(-1, BufferError('Too many tasks in queue'))
             return -1
 
         if not self.running:
-            self.signal.error.emit(ChildProcessError('Not running'))
+            self.signal.error.emit(-1, ChildProcessError('Not running'))
             return -1
 
         self.work.append((callback_id, name, args, kwargs))
@@ -158,15 +158,27 @@ class ThreadedConnection:
 
         return self.connection is None
 
-    @staticmethod
-    def error(error):
+    def error(self, callback_id: int, error: Exception):
         """
         Called when an exception in the worker thread occurs
 
+        :param callback_id: unique id for which the callback will be performed on
         :param error: exception that occurred
         """
 
+        # TODO: maybe just close connection on ConnectionError (e.g. Laser: [WinError 10054] Eine vorhandene Verbindung wurde vom Remotehost geschlossen)
         GlobalConf.logger.exception(error)
+
+        function = self.callbacks.get(callback_id)
+        if function is None:
+            return
+
+        try:
+            function(error)
+        except (ValueError, AttributeError):
+            pass
+
+        del self.callbacks[callback_id]
 
     def callback(self, function, callback_id):
         """
@@ -186,7 +198,7 @@ class ThreadedConnection:
 
         self.callbacks[callback_id] = function
 
-    def executeCallback(self, callback_id, result):
+    def executeCallback(self, callback_id: int, result):
         """
         Executes callback function with given result
 
@@ -222,6 +234,11 @@ class ThreadedConnection:
 
         :param name: name of function
         """
+
+        if self.connection is None:
+            raise ConnectionError('No connection established')
+
+        getattr(self.connection, name)
 
         def func(*args, **kwargs):
             return self.worker.execute(self.callback_id(), name, *args, **kwargs)

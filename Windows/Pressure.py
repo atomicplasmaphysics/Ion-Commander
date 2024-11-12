@@ -11,7 +11,7 @@ from Config.StylesConf import Colors
 
 from DB.db import DB
 
-from Socket.CommandServer import DeviceWrapper
+from Socket.CommandServer import DeviceMixedPressureWrapper
 
 from Utility.Layouts import PressureWidget, IndicatorLed, ComboBox
 from Utility.Dialogs import showMessageBox
@@ -33,10 +33,8 @@ class PressureVBoxLayout(QVBoxLayout):
         self.update_timer.setInterval(DefaultParams.update_timer_time)
         self.update_timer.start()
 
-        self.connection_wrapper = DeviceWrapper()
+        self.device_wrapper = DeviceMixedPressureWrapper()
         self.connection: None | MixedPressureConnection = None
-        self.threaded_connection: ThreadedDummyConnection | ThreadedMixedPressureConnection = self.connection_wrapper.threaded_connection
-        self.threaded_connection = ThreadedDummyConnection()
 
         # Connection
         self.connection_group_box = QGroupBox('Connection')
@@ -113,7 +111,7 @@ class PressureVBoxLayout(QVBoxLayout):
     def updatePressure(self):
         """Updates the pressure variables"""
 
-        if self.threaded_connection.isDummy():
+        if self.device_wrapper.threaded_connection.isDummy():
             return
 
         def setPressures(pressures: list[float]):
@@ -125,7 +123,7 @@ class PressureVBoxLayout(QVBoxLayout):
                     continue
                 pressure_widget.setPressure(pressure)
 
-        self.threaded_connection.callback(setPressures, self.threaded_connection.getPressureAll())
+        self.device_wrapper.threaded_connection.callback(setPressures, self.device_wrapper.threaded_connection.getPressureAll())
 
     def connect(self, comport: str = '', messagebox: bool = True):
         """
@@ -139,7 +137,7 @@ class PressureVBoxLayout(QVBoxLayout):
             comport = self.combobox_connection.getValue(text=True)
         self.setComport(comport)
 
-        connect = self.threaded_connection.isDummy()
+        connect = self.device_wrapper.threaded_connection.isDummy()
 
         self.unconnect()
 
@@ -152,7 +150,7 @@ class PressureVBoxLayout(QVBoxLayout):
             ])
             try:
                 self.connection.open()
-                self.threaded_connection = ThreadedMixedPressureConnection(self.connection)
+                self.device_wrapper.threaded_connection = ThreadedMixedPressureConnection(self.connection)
                 self.indicator_connection.setValue(True)
                 self.status_connection.setText('Connected')
                 self.combobox_connection.setEnabled(False)
@@ -186,8 +184,8 @@ class PressureVBoxLayout(QVBoxLayout):
     def unconnect(self):
         """Disconnect from any port"""
 
-        self.threaded_connection.close()
-        self.threaded_connection = ThreadedDummyConnection()
+        self.device_wrapper.threaded_connection.close()
+        self.device_wrapper.threaded_connection = ThreadedDummyConnection()
         if self.connection is not None:
             self.connection.close()
             self.connection = None
@@ -212,7 +210,7 @@ class PressureVBoxLayout(QVBoxLayout):
     def reset(self):
         """Resets everything to default"""
 
-        self.threaded_connection.close()
+        self.device_wrapper.threaded_connection.close()
         if self.connection is not None:
             self.connection.close()
 
@@ -244,7 +242,7 @@ class PressureVBoxLayout(QVBoxLayout):
     def closeEvent(self):
         """Must be called when application is closed"""
 
-        self.threaded_connection.close()
+        self.device_wrapper.threaded_connection.close()
         last_connection = ''
         if self.connection is not None:
             last_connection = self.combobox_connection.getValue(text=True)
