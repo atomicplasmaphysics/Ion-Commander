@@ -11,6 +11,8 @@ from Config.StylesConf import Colors
 
 from DB.db import DB
 
+from Socket.CommandServer import DeviceWrapper
+
 from Utility.Layouts import PressureWidget, IndicatorLed, ComboBox
 from Utility.Dialogs import showMessageBox
 
@@ -31,8 +33,10 @@ class PressureVBoxLayout(QVBoxLayout):
         self.update_timer.setInterval(DefaultParams.update_timer_time)
         self.update_timer.start()
 
+        self.connection_wrapper = DeviceWrapper()
         self.connection: None | MixedPressureConnection = None
-        self.threaded_connection: ThreadedDummyConnection | ThreadedMixedPressureConnection = ThreadedDummyConnection()
+        self.threaded_connection: ThreadedDummyConnection | ThreadedMixedPressureConnection = self.connection_wrapper.threaded_connection
+        self.threaded_connection = ThreadedDummyConnection()
 
         # Connection
         self.connection_group_box = QGroupBox('Connection')

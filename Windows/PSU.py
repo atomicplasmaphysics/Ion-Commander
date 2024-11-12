@@ -14,6 +14,8 @@ from Config.StylesConf import Colors
 
 from DB.db import DB
 
+from Socket.CommandServer import DeviceWrapper
+
 from Utility.Layouts import InsertingGridLayout, IndicatorLed, DoubleSpinBox, DisplayLabel, PolarityButton, SpinBox, ComboBox
 from Utility.Dialogs import showMessageBox
 
@@ -41,8 +43,10 @@ class PSUVBoxLayout(QVBoxLayout):
 
         self.active_message_box = False
 
+        self.connection_wrapper = DeviceWrapper()
         self.connection: None | ISEGConnection = None
-        self.threaded_connection: ThreadedDummyConnection | ThreadedISEGConnection = ThreadedDummyConnection()
+        self.threaded_connection: ThreadedDummyConnection | ThreadedISEGConnection = self.connection_wrapper.threaded_connection
+        self.threaded_connection = ThreadedDummyConnection()
 
         self.voltage_deviation = DefaultParams.psu_voltage_deviation
         self.voltage_maximum = DefaultParams.psu_voltage_maximum

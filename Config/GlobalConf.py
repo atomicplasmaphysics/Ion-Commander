@@ -73,6 +73,12 @@ class DefaultParams:
     tip_file_folder = 'entries'
     tip_encoding = 'utf-8'
 
+    # CommandServer parameters
+    cs_host = 'localhost'
+    cs_port = 6969
+    cs_encoding = 'utf-8'
+    cs_max_connections = 10
+
 
 class GlobalConf:
     """

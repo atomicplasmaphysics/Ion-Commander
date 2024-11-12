@@ -8,6 +8,8 @@ from Config.StylesConf import Colors
 
 from DB.db import DB
 
+from Socket.CommandServer import DeviceWrapper
+
 from Utility.Layouts import InsertingGridLayout, IndicatorLed, ErrorTable, DoubleSpinBox, SpinBox, ComboBox, DisplayLabel
 from Utility.Dialogs import IPDialog, showMessageBox
 from Utility.Functions import getPrefix, getSignificantDigits, getIntIfInt
@@ -33,8 +35,10 @@ class LaserVBoxLayout(QVBoxLayout):
         self.combobox_message_box_warning = True
         self.update_frequency_output = False
 
+        self.connection_wrapper = DeviceWrapper()
         self.connection: None | MonacoConnection = None
-        self.threaded_connection: ThreadedDummyConnection | ThreadedMonacoConnection = ThreadedDummyConnection()
+        self.threaded_connection: ThreadedDummyConnection | ThreadedMonacoConnection = self.connection_wrapper.threaded_connection
+        self.threaded_connection = ThreadedDummyConnection()
 
         self.chiller_temperature_low = DefaultParams.laser_chiller_temperature_low
         self.chiller_temperature_high = DefaultParams.laser_chiller_temperature_high
@@ -208,8 +212,7 @@ class LaserVBoxLayout(QVBoxLayout):
         )
 
         # System faults table
-        # TODO: why is this f***ing table not setting its f***ing widths as intended??? F***ing piece of sh**
-        # TODO: table does not really update correctly
+        # TODO: table does not really update correctly - might be a fundamental Laser issue
         self.table_system_faults = ErrorTable()
         self.faults_vbox.addWidget(self.table_system_faults)
 

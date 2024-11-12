@@ -98,7 +98,7 @@ class ConnectionWorker(QRunnable):
                 obj_func = getattr(self.connection, name)
                 result = obj_func(*args, **kwargs)
                 self.signal.result.emit(callback_id, result)
-            except (AttributeError, ConnectionError, NameError, TypeError) as error:
+            except (AttributeError, ConnectionError, NameError, TypeError, ValueError) as error:
                 self.signal.error.emit(error)
 
             if name == 'close':
@@ -182,7 +182,7 @@ class ThreadedConnection:
         if not isinstance(callback_id, int):
             raise ValueError(f'Callback id must be <int>, received {type(callback_id)}')
         elif callback_id < 0:
-            raise ValueError(f'Callback id is invalid')
+            raise ValueError(f'Callback id "{callback_id}" is invalid')
 
         self.callbacks[callback_id] = function
 

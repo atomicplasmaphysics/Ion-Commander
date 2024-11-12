@@ -7,6 +7,8 @@ from Config.GlobalConf import GlobalConf, DefaultParams
 
 from DB.db import DB
 
+from Socket.CommandServer import CommandServer
+
 from Utility.Layouts import TabWidget
 
 from Windows.Control import ControlWindow
@@ -77,6 +79,15 @@ class MainWindow(QMainWindow):
         # Add simulation tab
         self.simulation_window = SimulationWindow(self)
         self.addTab(self.simulation_window, 'Simulation')
+
+        # TODO: PowerMeter not implemented yet
+        # TODO: EBIS not implemented yet
+        self.server = CommandServer({
+            'PSU': self.control_window.psu_group_vbox.connection_wrapper,
+            'LASER': self.control_window.laser_group_vbox.connection_wrapper,
+            'PRESSURE': self.control_window.pressure_group_vbox.connection_wrapper,
+        })
+        self.server.startServer()
 
         #
         # STATUS BAR
@@ -180,6 +191,7 @@ class MainWindow(QMainWindow):
         GlobalConf.updateWindowSizeCenter(*dimensions, *center)
 
         self.database.close()
+        self.server.stopServer()
 
         splash.close()
         event.accept()

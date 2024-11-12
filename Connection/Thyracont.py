@@ -39,18 +39,18 @@ class ThyracontConnection(LucidControlConnection):
         )
 
     @staticmethod
-    def voltageToPressure(voltage: float) -> float:
+    def voltageToPressure(voltage: float | str) -> float:
         """Convert voltage to pressure in mbar"""
-        return thyracontVoltageToPressure(voltage)
+        return thyracontVoltageToPressure(float(voltage))
 
     @staticmethod
-    def pressureToVoltage(pressure: float) -> float:
+    def pressureToVoltage(pressure: float | str) -> float:
         """Convert pressure in mbar to voltage"""
-        return thyracontPressureToVoltage(pressure)
+        return thyracontPressureToVoltage(float(pressure))
 
-    def getPressure(self, channel: int) -> float:
+    def getPressure(self, channel: int | str) -> float:
         """Return pressure in mbar off one channel"""
-        return self.voltageToPressure(self.ioGet(channel))
+        return self.voltageToPressure(self.ioGet(int(channel)))
 
     def getPressureAll(self) -> tuple[float, ...]:
         """Return pressure in mbar off all channels"""

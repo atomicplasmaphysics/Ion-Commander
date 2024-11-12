@@ -33,6 +33,7 @@ def convertInChannelString(channels: int | str | list, sort: bool = False) -> tu
         '0-2' -> '0,1,2'
         '0-2, 5 -7' -> '0,1,2,5,6,7'
     """
+    
     channels_out = []
 
     # in int form
@@ -74,8 +75,12 @@ def convertInChannelString(channels: int | str | list, sort: bool = False) -> tu
     return ','.join([str(channel_out) for channel_out in channels_out]), len(channels_out)
 
 
-def convertToString(inp: float | int, precision: int = 6):
+def convertToString(inp: float | int | str, precision: int = 6):
     """Converts a float or integer to a scientific notation with given precision"""
+    
+    if isinstance(inp, str):
+        return inp
+    
     return f'{float(inp):.{precision}E}'
 
 
@@ -215,7 +220,7 @@ class ISEGConnection(COMConnection):
         """Query which slots are available and returns a comma separated list."""
         return self._queryAndReturnList(':READ:MOD:LIST?')
 
-    def readModuleIdentification(self, slot: int) -> str:
+    def readModuleIdentification(self, slot: int | str) -> str:
         """Read the module identification for a specific slot"""
         return self._queryAndReturn(f':READ:MOD:IDENT? (#{slot})')
 
@@ -223,7 +228,7 @@ class ISEGConnection(COMConnection):
         """Returns 0 if the crate backplane is powered off, or 1 if the backplane is powered on"""
         return self._queryAndReturnInt(':CRATE:POWER?')
 
-    def cratePowerSet(self, on: bool | int):
+    def cratePowerSet(self, on: bool | int | str):
         """CC24: Turn the crate backplane off (0) resp. on (1)"""
         self._queryAndReturn(f':CRATE:POWER {int(on)}')
 
@@ -235,7 +240,7 @@ class ISEGConnection(COMConnection):
         """Clears the Crate Controller Event Status register"""
         self._queryAndReturn(':CRATE:EVENT CLEAR')
 
-    def crateEventResetMask(self, reset_mask: int):
+    def crateEventResetMask(self, reset_mask: int | str):
         """Clears the given bits in the ResetMask"""
         self._queryAndReturn(f':CRATE:EVENT {reset_mask}')
 
@@ -247,11 +252,11 @@ class ISEGConnection(COMConnection):
         """Queries the Crate Controller Event Mask register"""
         return self._queryAndReturnInt(':CRATE:EVENT:MASK?')
 
-    def crateEventMaskSet(self, mask: int):
+    def crateEventMaskSet(self, mask: int | str):
         """Sets the Crate Controllers Event Mask register"""
         return self._queryAndReturnInt(f':CRATE:EVENT:MASK {mask}')
 
-    def crateSupply(self, x: int) -> int:
+    def crateSupply(self, x: int | str) -> int:
         """
         Query the crate controller supply voltage x, for x =
             0: +24 V High voltage backplane
@@ -264,7 +269,7 @@ class ISEGConnection(COMConnection):
         """
         return self._queryAndReturnInt(f':CRATE:SUPPLY? (@{x})', 'V')
 
-    def crateTemperature(self, y: int) -> float:
+    def crateTemperature(self, y: int | str) -> float:
         """
         Queries the crate controllers temperatures that effect fan regulation.
             y = 0, y = 1: CC24 internal temperature sensors,
@@ -276,7 +281,7 @@ class ISEGConnection(COMConnection):
         """Returns the crates fan speed in percent"""
         return self._queryAndReturnFloat(':CRATE:FAN?', '%')
 
-    def voltageSet(self, channel: int, voltage: float):
+    def voltageSet(self, channel: int | str, voltage: float | str):
         """
         Set the channel voltage set Vset in Volt.
         MICC: If the channel is configured with EPU, the voltage sign defines the polarity of the output voltage.
@@ -303,15 +308,15 @@ class ISEGConnection(COMConnection):
         channel, _ = convertInChannelString(channel)
         self._queryAndReturn(f':VOLT EMCY CLR,(@{channel})')
 
-    def voltageBoundarySet(self, channel: int, voltage: float):
+    def voltageBoundarySet(self, channel: int | str, voltage: float | str):
         """Set the channel voltage bounds Vbounds in Volt"""
         self._queryAndReturn(f':VOLT:BOUNDS {convertToString(voltage)},(@{channel})')
 
-    def currentSet(self, channel: int, current: float):
+    def currentSet(self, channel: int | str, current: float | str):
         """Set the channel current set Iset in Ampere"""
         self._queryAndReturn(f':CURR {convertToString(current)},(@{channel})')
 
-    def currentBoundarySet(self, channel: int, current: float):
+    def currentBoundarySet(self, channel: int | str, current: float | str):
         """Set the channel current bounds Ibounds in Ampere"""
         self._queryAndReturn(f':CURR:BOUNDS {convertToString(current)},(@{channel})')
 
@@ -320,24 +325,24 @@ class ISEGConnection(COMConnection):
         channel, _ = convertInChannelString(channel)
         self._queryAndReturn(f':EVENT CLEAR,(@{channel})')
 
-    def eventResetMask(self, channel: int,  word: int):
+    def eventResetMask(self, channel: int | str,  word: int | str):
         """Clears single bits or bit combinations in the Channel Event Status register by writing a one to the corresponding bit position"""
         self._queryAndReturn(f':EVENT {word},(@{channel})')
 
-    def eventMask(self, channel: int,  word: int):
+    def eventMask(self, channel: int | str,  word: int | str):
         """Set the Channel Event Mask register"""
         self._queryAndReturn(f':EVENT:MASK {word},(@{channel})')
 
-    def configureTripTimeSet(self, channel: int, time: int):
+    def configureTripTimeSet(self, channel: int | str, time: int | str):
         """Set the trip timeout with one millisecond resolution"""
         self._queryAndReturn(f':CONF:TRIP:TIME {time},(@{channel})')
 
     def configureTripTimeGet(self, channel: int | str | list) -> float | list[float]:
         """Query the programmed trip timeout in milliseconds"""
-        channel, nunber_channels = convertInChannelString(channel)
-        return self._queryAndReturnFloatOrList(f':CONF:TRIP:TIME? (@{channel})', nunber_channels, 'ms')
+        channel, number_channels = convertInChannelString(channel)
+        return self._queryAndReturnFloatOrList(f':CONF:TRIP:TIME? (@{channel})', number_channels, 'ms')
 
-    def configureTripActionSet(self, channel: int, action: int):
+    def configureTripActionSet(self, channel: int | str, action: int | str):
         """
         Set the action that should happen when a current trip for the channel occurs
         Action:
@@ -351,10 +356,10 @@ class ISEGConnection(COMConnection):
 
     def configureTripActionGet(self, channel: int | str | list) -> float | list[float]:
         """Query the action that should happen when a current trip for the channel occurs"""
-        channel, nunber_channels = convertInChannelString(channel)
-        return self._queryAndReturnFloatOrList(f':CONF:TRIP:ACTION? (@{channel})', nunber_channels)
+        channel, number_channels = convertInChannelString(channel)
+        return self._queryAndReturnFloatOrList(f':CONF:TRIP:ACTION? (@{channel})', number_channels)
 
-    def configureInhibitActionSet(self, channel: int, action: int):
+    def configureInhibitActionSet(self, channel: int | str, action: int | str):
         """
         Set the action that should happen when an External Inhibit for the channel occurs
         Action:
@@ -367,168 +372,168 @@ class ISEGConnection(COMConnection):
 
     def configureInhibitActionGet(self, channel: int | str | list) -> float | list[float]:
         """Query the action that should happen when an External Inhibit for the channel occurs"""
-        channel, nunber_channels = convertInChannelString(channel)
-        return self._queryAndReturnFloatOrList(f':CONF:INHP:ACTION? (@{channel})', nunber_channels)
+        channel, number_channels = convertInChannelString(channel)
+        return self._queryAndReturnFloatOrList(f':CONF:INHP:ACTION? (@{channel})', number_channels)
 
-    def configureOutputModeSet(self, channel: int, mode: int):
+    def configureOutputModeSet(self, channel: int | str, mode: int | str):
         """Set the channel output mode. Only values that are contained in output mode list are allowed."""
         self._queryAndReturn(f':CONF:OUTPUT:MODE {mode},(@{channel})')
 
     def configureOutputModeGet(self, channel: int | str | list) -> float | list[float]:
         """Query the configured channel output mode"""
-        channel, nunber_channels = convertInChannelString(channel)
-        return self._queryAndReturnFloatOrList(f':CONF:OUTPUT:MODE? (@{channel})', nunber_channels)
+        channel, number_channels = convertInChannelString(channel)
+        return self._queryAndReturnFloatOrList(f':CONF:OUTPUT:MODE? (@{channel})', number_channels)
 
-    def configureOutputModeList(self, channel: int) -> list[float]:
+    def configureOutputModeList(self, channel: int | str) -> list[float]:
         """Query the available channel output modes as list"""
         return self._queryAndReturnList(f':CONF:OUTPUT:MODE:LIST? (@{channel})')
 
-    def configureOutputPolaritySet(self, channel: int, positive: bool):
+    def configureOutputPolaritySet(self, channel: int | str, positive: bool | str):
         """Set output polarity (positive = p, negative = n)"""
         positive = 'p' if positive else 'n'
         self._queryAndReturn(f':CONF:OUTPUT:POL {positive},(@{channel})')
 
     def configureOutputPolarityGet(self, channel: int | str | list) -> bool | list[bool]:
         """Query the current output polarity"""
-        channel, nunber_channels = convertInChannelString(channel)
+        channel, number_channels = convertInChannelString(channel)
         result = [True if r.lower() == 'p' else False for r in self._queryAndReturnList(f':CONF:OUTPUT:POL? (@{channel})')]
-        return result[0] if nunber_channels == 1 else result
+        return result[0] if number_channels == 1 else result
 
-    def configureOutputPolarityList(self, channel: int) -> list[bool]:
+    def configureOutputPolarityList(self, channel: int | str) -> list[bool]:
         """Query the available channel output polarities"""
         return [True if r.lower() == 'p' else False for r in self._queryAndReturnList(f':CONF:OUTPUT:POL:LIST? (@{channel})')]
 
     def readVoltage(self, channel: int | str | list) -> float | list[float]:
         """Query the voltage set Vset in Volt"""
-        channel, nunber_channels = convertInChannelString(channel)
-        return self._queryAndReturnFloatOrList(f':READ:VOLT? (@{channel})', nunber_channels, 'V')
+        channel, number_channels = convertInChannelString(channel)
+        return self._queryAndReturnFloatOrList(f':READ:VOLT? (@{channel})', number_channels, 'V')
 
     def readVoltageLimit(self, channel: int | str | list) -> float | list[float]:
         """Query the voltage limit Vlim in Volt"""
-        channel, nunber_channels = convertInChannelString(channel)
-        return self._queryAndReturnFloatOrList(f':READ:VOLT:LIM? (@{channel})', nunber_channels, 'V')
+        channel, number_channels = convertInChannelString(channel)
+        return self._queryAndReturnFloatOrList(f':READ:VOLT:LIM? (@{channel})', number_channels, 'V')
 
     def readVoltageNominal(self, channel: int | str | list) -> float | list[float]:
         """Query the channel voltage nominal Vnom in Volt"""
-        channel, nunber_channels = convertInChannelString(channel)
-        return self._queryAndReturnFloatOrList(f':READ:VOLT:NOM? (@{channel})', nunber_channels, 'V')
+        channel, number_channels = convertInChannelString(channel)
+        return self._queryAndReturnFloatOrList(f':READ:VOLT:NOM? (@{channel})', number_channels, 'V')
 
     def readVoltageMode(self, channel: int | str | list) -> float | list[float]:
         """Query the configured channel voltage mode with polarity sign in Volt"""
-        channel, nunber_channels = convertInChannelString(channel)
-        return self._queryAndReturnFloatOrList(f':READ:VOLT:MODE? (@{channel})', nunber_channels, 'V')
+        channel, number_channels = convertInChannelString(channel)
+        return self._queryAndReturnFloatOrList(f':READ:VOLT:MODE? (@{channel})', number_channels, 'V')
 
     def readVoltageModeList(self, channel: int | str | list) -> float | list[float]:
         """Query the available channel voltage modes as list which corresponds to the request configureOutputModeList()"""
-        channel, nunber_channels = convertInChannelString(channel)
-        return self._queryAndReturnFloatOrList(f':READ:VOLT:MODE:LIST? (@{channel})', nunber_channels, 'V')
+        channel, number_channels = convertInChannelString(channel)
+        return self._queryAndReturnFloatOrList(f':READ:VOLT:MODE:LIST? (@{channel})', number_channels, 'V')
 
     def readVoltageBoundaries(self, channel: int | str | list) -> float | list[float]:
         """Query the channel voltage bounds Vbounds in Volt"""
-        channel, nunber_channels = convertInChannelString(channel)
-        return self._queryAndReturnFloatOrList(f':READ:VOLT:BOUNDS? (@{channel})', nunber_channels, 'V')
+        channel, number_channels = convertInChannelString(channel)
+        return self._queryAndReturnFloatOrList(f':READ:VOLT:BOUNDS? (@{channel})', number_channels, 'V')
 
     def readVoltageOn(self, channel: int | str | list) -> float | list[float]:
         """Query the channel control bit Set On"""
-        channel, nunber_channels = convertInChannelString(channel)
-        return self._queryAndReturnFloatOrList(f':READ:VOLT:ON? (@{channel})', nunber_channels, 'V')
+        channel, number_channels = convertInChannelString(channel)
+        return self._queryAndReturnFloatOrList(f':READ:VOLT:ON? (@{channel})', number_channels, 'V')
 
     def readVoltageEmergency(self, channel: int | str | list) -> float | list[float]:
         """Query the channel control bit Set Emergency Off"""
-        channel, nunber_channels = convertInChannelString(channel)
-        return self._queryAndReturnFloatOrList(f':READ:VOLT:EMCY? (@{channel})', nunber_channels, 'V')
+        channel, number_channels = convertInChannelString(channel)
+        return self._queryAndReturnFloatOrList(f':READ:VOLT:EMCY? (@{channel})', number_channels, 'V')
 
     def readCurrent(self, channel: int | str | list) -> float | list[float]:
         """Query the current set Iset in Ampere"""
-        channel, nunber_channels = convertInChannelString(channel)
-        return self._queryAndReturnFloatOrList(f':READ:CURR? (@{channel})', nunber_channels, 'A')
+        channel, number_channels = convertInChannelString(channel)
+        return self._queryAndReturnFloatOrList(f':READ:CURR? (@{channel})', number_channels, 'A')
 
     def readCurrentLimit(self, channel: int | str | list) -> float | list[float]:
         """Query the current limit Ilim in Ampere"""
-        channel, nunber_channels = convertInChannelString(channel)
-        return self._queryAndReturnFloatOrList(f':READ:CURR:LIM? (@{channel})', nunber_channels, 'A')
+        channel, number_channels = convertInChannelString(channel)
+        return self._queryAndReturnFloatOrList(f':READ:CURR:LIM? (@{channel})', number_channels, 'A')
 
     def readCurrentNominal(self, channel: int | str | list) -> float | list[float]:
         """Query the channel current nominal in Ampere, answer is absolute value"""
-        channel, nunber_channels = convertInChannelString(channel)
-        return self._queryAndReturnFloatOrList(f':READ:CURR:NOM? (@{channel})', nunber_channels, 'A')
+        channel, number_channels = convertInChannelString(channel)
+        return self._queryAndReturnFloatOrList(f':READ:CURR:NOM? (@{channel})', number_channels, 'A')
 
     def readCurrentMode(self, channel: int | str | list) -> float | list[float]:
         """Query the configured channel current mode in Ampere"""
-        channel, nunber_channels = convertInChannelString(channel)
-        return self._queryAndReturnFloatOrList(f':READ:CURR:MODE? (@{channel})', nunber_channels, 'A')
+        channel, number_channels = convertInChannelString(channel)
+        return self._queryAndReturnFloatOrList(f':READ:CURR:MODE? (@{channel})', number_channels, 'A')
 
     def readCurrentModeList(self, channel: int | str | list) -> float | list[float]:
         """Query the available channel current modes as list which corresponds to the request configureOutputModeList()"""
-        channel, nunber_channels = convertInChannelString(channel)
-        return self._queryAndReturnFloatOrList(f':READ:CURR:MODE:LIST? (@{channel})', nunber_channels, 'A')
+        channel, number_channels = convertInChannelString(channel)
+        return self._queryAndReturnFloatOrList(f':READ:CURR:MODE:LIST? (@{channel})', number_channels, 'A')
 
     def readCurrentBoundaries(self, channel: int | str | list) -> float | list[float]:
         """Query the channel current bounds Ibounds in Ampere"""
-        channel, nunber_channels = convertInChannelString(channel)
-        return self._queryAndReturnFloatOrList(f':READ:CURR:BOUNDS? (@{channel})', nunber_channels, 'A')
+        channel, number_channels = convertInChannelString(channel)
+        return self._queryAndReturnFloatOrList(f':READ:CURR:BOUNDS? (@{channel})', number_channels, 'A')
 
     def readRampVoltage(self, channel: int | str | list) -> float | list[float]:
         """Query the channel voltage ramp speed in Volt/second"""
-        channel, nunber_channels = convertInChannelString(channel)
-        return self._queryAndReturnFloatOrList(f':READ:RAMP:VOLT? (@{channel})', nunber_channels, 'V/s')
+        channel, number_channels = convertInChannelString(channel)
+        return self._queryAndReturnFloatOrList(f':READ:RAMP:VOLT? (@{channel})', number_channels, 'V/s')
 
     def readRampVoltageMin(self, channel: int | str | list) -> float | list[float]:
         """Query channel voltage ramp speed minimum in Volt/second"""
-        channel, nunber_channels = convertInChannelString(channel)
-        return self._queryAndReturnFloatOrList(f':READ:RAMP:VOLT:MIN? (@{channel})', nunber_channels, 'V/s')
+        channel, number_channels = convertInChannelString(channel)
+        return self._queryAndReturnFloatOrList(f':READ:RAMP:VOLT:MIN? (@{channel})', number_channels, 'V/s')
 
     def readRampVoltageMax(self, channel: int | str | list) -> float | list[float]:
         """Query channel voltage ramp speed maximum in Volt/second"""
-        channel, nunber_channels = convertInChannelString(channel)
-        return self._queryAndReturnFloatOrList(f':READ:RAMP:VOLT:MAX? (@{channel})', nunber_channels, 'V/s')
+        channel, number_channels = convertInChannelString(channel)
+        return self._queryAndReturnFloatOrList(f':READ:RAMP:VOLT:MAX? (@{channel})', number_channels, 'V/s')
 
     def readRampCurrent(self, channel: int | str | list) -> float | list[float]:
         """Query channel current ramp speed in Ampere/second"""
-        channel, nunber_channels = convertInChannelString(channel)
-        return self._queryAndReturnFloatOrList(f':READ:RAMP:CURR? (@{channel})', nunber_channels, 'A/s')
+        channel, number_channels = convertInChannelString(channel)
+        return self._queryAndReturnFloatOrList(f':READ:RAMP:CURR? (@{channel})', number_channels, 'A/s')
 
     def readRampCurrentMin(self, channel: int | str | list) -> float | list[float]:
         """Query channel current ramp speed minimum in Ampere/second"""
-        channel, nunber_channels = convertInChannelString(channel)
-        return self._queryAndReturnFloatOrList(f':READ:RAMP:CURR:MIN? (@{channel})', nunber_channels, 'A/s')
+        channel, number_channels = convertInChannelString(channel)
+        return self._queryAndReturnFloatOrList(f':READ:RAMP:CURR:MIN? (@{channel})', number_channels, 'A/s')
 
     def readRampCurrentMax(self, channel: int | str | list) -> float | list[float]:
         """Query channel current ramp speed maximum in Ampere/second"""
-        channel, nunber_channels = convertInChannelString(channel)
-        return self._queryAndReturnFloatOrList(f':READ:RAMP:CURR:MAX? (@{channel})', nunber_channels, 'A/s')
+        channel, number_channels = convertInChannelString(channel)
+        return self._queryAndReturnFloatOrList(f':READ:RAMP:CURR:MAX? (@{channel})', number_channels, 'A/s')
 
     def readChannelControl(self, channel: int | str | list) -> float | list[float]:
         """Query the Channel Control register"""
-        channel, nunber_channels = convertInChannelString(channel)
-        return self._queryAndReturnFloatOrList(f':READ:CHAN:CONTROL? (@{channel})', nunber_channels)
+        channel, number_channels = convertInChannelString(channel)
+        return self._queryAndReturnFloatOrList(f':READ:CHAN:CONTROL? (@{channel})', number_channels)
 
     def readChannelStatus(self, channel: int | str | list) -> float | list[float]:
         """Query the Channel Status register"""
-        channel, nunber_channels = convertInChannelString(channel)
-        return self._queryAndReturnFloatOrList(f':READ:CHAN:STATUS? (@{channel})', nunber_channels)
+        channel, number_channels = convertInChannelString(channel)
+        return self._queryAndReturnFloatOrList(f':READ:CHAN:STATUS? (@{channel})', number_channels)
 
     def readChannelEventStatus(self, channel: int | str | list) -> float | list[float]:
         """Query the Channel Event Status register"""
-        channel, nunber_channels = convertInChannelString(channel)
-        return self._queryAndReturnFloatOrList(f':READ:CHAN:EVENT:STATUS? (@{channel})', nunber_channels)
+        channel, number_channels = convertInChannelString(channel)
+        return self._queryAndReturnFloatOrList(f':READ:CHAN:EVENT:STATUS? (@{channel})', number_channels)
 
     def readChannelEventMask(self, channel: int | str | list) -> float | list[float]:
         """Query the Channel Event Mask register"""
-        channel, nunber_channels = convertInChannelString(channel)
-        return self._queryAndReturnFloatOrList(f':READ:CHAN:EVENT:MASK? (@{channel})', nunber_channels)
+        channel, number_channels = convertInChannelString(channel)
+        return self._queryAndReturnFloatOrList(f':READ:CHAN:EVENT:MASK? (@{channel})', number_channels)
 
     def measureVoltage(self, channel: int | str | list) -> float | list[float]:
         """Query the measured channel voltage in Volt"""
-        channel, nunber_channels = convertInChannelString(channel)
-        return self._queryAndReturnFloatOrList(f':MEAS:VOLT? (@{channel})', nunber_channels, 'V')
+        channel, number_channels = convertInChannelString(channel)
+        return self._queryAndReturnFloatOrList(f':MEAS:VOLT? (@{channel})', number_channels, 'V')
 
     def measureCurrent(self, channel: int | str | list) -> float | list[float]:
         """Query the measured channel current in Ampere"""
-        channel, nunber_channels = convertInChannelString(channel)
-        return self._queryAndReturnFloatOrList(f':MEAS:CURR? (@{channel})', nunber_channels, 'A')
+        channel, number_channels = convertInChannelString(channel)
+        return self._queryAndReturnFloatOrList(f':MEAS:CURR? (@{channel})', number_channels, 'A')
 
-    def configureRampVoltageSet(self, speed: float):
+    def configureRampVoltageSet(self, speed: float | str):
         """Set the module voltage ramp speed in percent/second"""
         self._queryAndReturn(f':CONF:RAMP:VOLT {convertToString(speed)}')
 
@@ -536,29 +541,29 @@ class ISEGConnection(COMConnection):
         """Query the module voltage ramp speed in percent/second"""
         return self._queryAndReturnFloat(':CONF:RAMP:VOLT?', '%/s')
 
-    def configureRampVoltageSetChannel(self, channel: int, speed: float):
+    def configureRampVoltageSetChannel(self, channel: int | str, speed: float | str):
         """Set the channel voltage ramp up speed in Volt/second"""
         self._queryAndReturn(f':CONF:RAMP:VOLT {convertToString(speed)},(@{channel})')
 
-    def configureRampVoltageUpSet(self, channel: int, speed: float):
+    def configureRampVoltageUpSet(self, channel: int | str, speed: float | str):
         """Set the channel voltage ramp up speed in Volt/second"""
         self._queryAndReturn(f':CONF:RAMP:VOLT:UP {convertToString(speed)},(@{channel})')
 
     def configureRampVoltageUpGet(self, channel: int | str | list) -> float | list[float]:
         """Set the channel voltage ramp up speed in Volt/second"""
-        channel, nunber_channels = convertInChannelString(channel)
-        return self._queryAndReturnFloatOrList(f':CONF:RAMP:VOLT:UP? (@{channel})', nunber_channels, 'V/s')
+        channel, number_channels = convertInChannelString(channel)
+        return self._queryAndReturnFloatOrList(f':CONF:RAMP:VOLT:UP? (@{channel})', number_channels, 'V/s')
 
-    def configureRampVoltageDownSet(self, channel: int, speed: float):
+    def configureRampVoltageDownSet(self, channel: int | str, speed: float | str):
         """Set the channel voltage ramp down speed in Volt/second"""
         self._queryAndReturn(f':CONF:RAMP:VOLT:DOWN {convertToString(speed)},(@{channel})')
 
     def configureRampVoltageDownGet(self, channel: int | str | list) -> float | list[float]:
         """Query the channel voltage ramp down speed in Volt/second"""
-        channel, nunber_channels = convertInChannelString(channel)
-        return self._queryAndReturnFloatOrList(f':CONF:RAMP:VOLT:DOWN? (@{channel})', nunber_channels, 'V/s')
+        channel, number_channels = convertInChannelString(channel)
+        return self._queryAndReturnFloatOrList(f':CONF:RAMP:VOLT:DOWN? (@{channel})', number_channels, 'V/s')
 
-    def configureRampCurrentSet(self, speed: float):
+    def configureRampCurrentSet(self, speed: float | str):
         """Set the module current ramp speed in percent/second"""
         self._queryAndReturn(f':CONF:RAMP:CURR {convertToString(speed)}')
 
@@ -566,29 +571,29 @@ class ISEGConnection(COMConnection):
         """Query the module current ramp speed in percent/second"""
         return self._queryAndReturnFloat(':CONF:RAMP:CURR?', '%/s')
 
-    def configureRampCurrentSetChannel(self, channel: int, speed: float):
+    def configureRampCurrentSetChannel(self, channel: int | str, speed: float | str):
         """Set the channel current ramp speed for up and down direction in Ampere/second"""
         self._queryAndReturn(f':CONF:RAMP:CURR {convertToString(speed)},(@{channel})')
 
-    def configureRampCurrentUpSet(self, channel: int, speed: float):
+    def configureRampCurrentUpSet(self, channel: int | str, speed: float | str):
         """Set the channel current ramp up speed in Ampere/second"""
         self._queryAndReturn(f':CONF:RAMP:CURR:UP {convertToString(speed)},(@{channel})')
 
     def configureRampCurrentUpGet(self, channel: int | str | list) -> float | list[float]:
         """Set the channel current ramp up speed in Ampere/second"""
-        channel, nunber_channels = convertInChannelString(channel)
-        return self._queryAndReturnFloatOrList(f':CONF:RAMP:CURR:UP? (@{channel})', nunber_channels, 'A/s')
+        channel, number_channels = convertInChannelString(channel)
+        return self._queryAndReturnFloatOrList(f':CONF:RAMP:CURR:UP? (@{channel})', number_channels, 'A/s')
 
-    def configureRampCurrentDownSet(self, channel: int, speed: float):
+    def configureRampCurrentDownSet(self, channel: int | str, speed: float | str):
         """Set the channel current ramp down speed in Ampere/second"""
         self._queryAndReturn(f':CONF:RAMP:CURR:DOWN {convertToString(speed)},(@{channel})')
 
     def configureRampCurrentDownGet(self, channel: int | str | list) -> float | list[float]:
         """Query the channel current ramp down speed in Ampere/second"""
-        channel, nunber_channels = convertInChannelString(channel)
-        return self._queryAndReturnFloatOrList(f':CONF:RAMP:CURR:DOWN? (@{channel})', nunber_channels, 'A/s')
+        channel, number_channels = convertInChannelString(channel)
+        return self._queryAndReturnFloatOrList(f':CONF:RAMP:CURR:DOWN? (@{channel})', number_channels, 'A/s')
 
-    def configureAverageSet(self, average: int):
+    def configureAverageSet(self, average: int | str):
         """Set the number of digital filter averaging steps. Factory default is 64."""
         self._queryAndReturn(f':CONF:AVER {average}')
 
@@ -596,7 +601,7 @@ class ISEGConnection(COMConnection):
         """Query the digital filter averaging steps"""
         return self._queryAndReturnInt(':CONF:AVER?')
 
-    def configureKillSet(self, kill: bool | int):
+    def configureKillSet(self, kill: bool | int | str):
         """Set function kill enable (1) or kill disable (0). Factory default is Kill Disable."""
         self._queryAndReturn(f':CONF:KILL {int(kill)}')
 
@@ -604,7 +609,7 @@ class ISEGConnection(COMConnection):
         """Query the current value for the kill enable function"""
         return self._queryAndReturnInt(':CONF:KILL?')
 
-    def configureAdjustSet(self, adjust: bool | int):
+    def configureAdjustSet(self, adjust: bool | int | str):
         """Set the fine adjustment function on (1) or off (0). Factory default is adjustment on."""
         self._queryAndReturn(f':CONF:ADJUST {int(adjust)}')
 
@@ -616,11 +621,11 @@ class ISEGConnection(COMConnection):
         """Reset the Module Event Status register"""
         self._queryAndReturn(':CONF:EVENT CLEAR')
 
-    def configureEventResetMask(self, event: int):
+    def configureEventResetMask(self, event: int | str):
         """Clears single bits or bit combinations in the Module Event Status register by writing a one to the corresponding bit position."""
         self._queryAndReturn(f':CONF:EVENT {event}')
 
-    def configureEventMaskSet(self, word: int):
+    def configureEventMaskSet(self, word: int | str):
         """Set the Module Event Mask register"""
         self._queryAndReturn(f':CONF:EVENT:MASK {word}')
 
@@ -628,7 +633,7 @@ class ISEGConnection(COMConnection):
         """Query the Module Event Mask register"""
         return self._queryAndReturnInt(':CONF:EVENT:MASK?')
 
-    def configureEventChannelMaskSet(self, word: int):
+    def configureEventChannelMaskSet(self, word: int | str):
         """Set the Module Event Channel Mask register"""
         self._queryAndReturn(f':CONF:EVENT:CHANMASK {word}')
 
@@ -636,7 +641,7 @@ class ISEGConnection(COMConnection):
         """Query the Module Event Channel Mask register"""
         return self._queryAndReturnInt(':CONF:EVENT:CHANMASK?')
 
-    def configureCanAddressSet(self, address: int):
+    def configureCanAddressSet(self, address: int | str):
         """Set the modules CAN bus address (0…63). Can only be set in configuration mode."""
         self._queryAndReturn(f':CONF:CAN:ADDR {address}')
 
@@ -644,7 +649,7 @@ class ISEGConnection(COMConnection):
         """Query the modules CAN bus address"""
         return self._queryAndReturnInt(':CONF:CAN:ADDR?')
 
-    def configureCanBitrateSet(self, bitrate: int):
+    def configureCanBitrateSet(self, bitrate: int | str):
         """Set the CAN bus bit rate to 125 kBit/s or 250 kBit/s. Can only be set in configuration mode."""
         self._queryAndReturn(f':CONF:CAN:BITRATE {bitrate}')
 
@@ -652,7 +657,7 @@ class ISEGConnection(COMConnection):
         """Query the modules CAN bus bit rate"""
         return self._queryAndReturnInt(':CONF:CAN:BITRATE?')
 
-    def configureSerialBaudrateSet(self, word: int):
+    def configureSerialBaudrateSet(self, word: int | str):
         """
         Dynamically switches the serial connection to 115200 Baud.
         If the devices supports baud rate switches, it answers with 115200 and uses this new baudrate afterwards.
@@ -665,7 +670,7 @@ class ISEGConnection(COMConnection):
         """Query the devices serial baud rate"""
         return self._queryAndReturnInt(':CONF:SERIAL:BAUD?')
 
-    def configureSerialEchoSet(self, echo: bool | int):
+    def configureSerialEchoSet(self, echo: bool | int | str):
         """
         Sets the serial echo:
         1: The device echos all characters received on the serial interface (factory default)
@@ -720,7 +725,7 @@ class ISEGConnection(COMConnection):
         """Query the Module Event Channel Mask register"""
         return self._queryAndReturnInt(':READ:MODULE:EVENT:CHANMASK?')
 
-    def readModuleSupply(self, index: int) -> float:
+    def readModuleSupply(self, index: int | str) -> float:
         """
         Query one of the module supplies specified by Index:
             0: +24 V external supply
@@ -780,7 +785,7 @@ class ISEGConnection(COMConnection):
         """Query the firmware release version"""
         return self._queryAndReturn(':READ:FIRMWARE:RELEASE?')
 
-    def systemUserConfigurationSet(self, serial_number: int):
+    def systemUserConfigurationSet(self, serial_number: int | str):
         """
         Set the device to configuration mode to change the CAN bitrate or address.
         Only possible if all channels are off. As parameter, the device serial number must be given.
@@ -809,7 +814,7 @@ class ISEGConnection(COMConnection):
             return 0
         return -1
 
-    def configureMiccSet(self, state: bool | int):
+    def configureMiccSet(self, state: bool | int | str):
         """Set the current state of the user calibration confirmation"""
         state_str = 'HV_OK' if state else 'HV_NOT_OK'
         self._queryAndReturn(f':CONF:HVMICC {state_str}')

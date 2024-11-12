@@ -70,6 +70,7 @@ class TLPMxValues:
         Peak = 1
 
 
+# TODO: not input string compatible
 class TLPMxConnection:
     """
     Class for communication with the TLPMx driver, which is responsible for communication with the Thorlabs Powermeters
