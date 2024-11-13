@@ -151,7 +151,7 @@ class CommandServer(QObject):
         encoding: str = DefaultParams.cs_encoding,
         max_connections: int = DefaultParams.cs_max_connections,
         max_packet: int = 1024,
-        debug: bool = True,
+        debug: bool = False,
         daemonic: bool = False
     ):
         super().__init__()
@@ -223,30 +223,42 @@ class CommandServer(QObject):
                     if not cmd:
                         break
 
+                    if cmd.lower() in ['help', '?', 'h', '-help', '--help', '-?', '--?', '-h']:
+                        self.answerHelp(client_socket)
+                        continue
+
                     if self.debug:
                         GlobalConf.logger.debug(f'CommandServer received message from {client_address}: "{cmd}"')
 
-                    result = self.evaluateCmd(cmd, client_socket)
-                    if result:
+                    result_state, result_str = self.evaluateCmd(cmd, client_socket)
+                    if result_str:
                         if self.debug:
-                            GlobalConf.logger.debug(f'CommandServer instantly answers to {client_address}: "{result}"')
-                        self.answerCmd(result, client_socket)
+                            GlobalConf.logger.debug(f'CommandServer instantly answers')
+                        self.answerCmd(result_str, client_socket, state=result_state)
                 except ConnectionResetError:
                     break
             if self.debug:
                 GlobalConf.logger.debug(f'CommandServer closed connection from {client_address}')
 
-    def answerCmd(self, answer, client_socket: socket):
+    def answerHelp(self, client_socket: socket):
+        """Answer help message to client"""
+
+        help_msg = 'Call Server via DEVICE:func(args), where the function and its arguments match the Classes in the Connection-folder\nCall DEVICE to see if device is connected\nReturns STATE:answer where STATE is a single digit (0=no error, all else=error)'
+        self.answerCmd(help_msg, client_socket)
+
+    def answerCmd(self, answer, client_socket: socket, state: int = None):
         """Answer client"""
 
-        answer = f'{int(isinstance(answer, Exception))}-{answer}'
+        if state is None:
+            state = int(isinstance(answer, Exception))
+        answer = f'{state}:{answer}'
 
         if self.debug:
             GlobalConf.logger.debug(f'CommandServer delayed answers to {client_socket.getsockname()}: "{answer}"')
 
         client_socket.sendall(answer.encode(self.encoding))
 
-    def evaluateCmd(self, cmd: str, client_socket: socket) -> str:
+    def evaluateCmd(self, cmd: str, client_socket: socket) -> tuple[int, str]:
         """Evaluate sent commands"""
 
         cmd_split = cmd.split(':')
@@ -255,19 +267,19 @@ class CommandServer(QObject):
         device = self.devices.get(device_name)
 
         if device is None:
-            return f'1-Device {device_name} not in device list {self.devices.keys()}'
+            return 1, f'Device {device_name} not in device list {self.devices.keys()}'
         if device.threaded_connection is None or device.threaded_connection.isDummy():
-            return '2-Device connection is not established'
+            return 2, 'Device connection is not established'
 
         if len(cmd_split) == 1:
-            return '0-Ok'
+            return 0, 'Ok'
 
         function_call = ':'.join(cmd_split[1:])
         try:
             func_name, args, kwargs = parseFunctionCall(function_call)
 
         except (NameError, ValueError) as error:
-            return f'3-Got error while parsing function call "function_call" with error: {error}'
+            return 3, f'Got error while parsing function call "function_call" with error: {error}'
 
         try:
             device.threaded_connection.callback(
@@ -276,9 +288,9 @@ class CommandServer(QObject):
             )
 
         except (AttributeError, ConnectionError, NameError, TypeError, ValueError) as error:
-            return f'4-Got error while calling function "{func_name}({args}, {kwargs})" for device "{device_name}" with error: {error}'
+            return 4, f'Got error while calling function "{func_name}({args}, {kwargs})" for device "{device_name}" with error: {error}'
 
-        return ''
+        return 0, ''
 
     def stopServer(self):
         """Stop the server and close all connections"""

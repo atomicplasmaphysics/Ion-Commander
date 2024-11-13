@@ -8,7 +8,7 @@ from Config.StylesConf import Colors
 
 from DB.db import DB
 
-from Socket.CommandServer import DeviceWrapper
+from Socket.CommandServer import DeviceMonacoWrapper
 
 from Utility.Layouts import InsertingGridLayout, IndicatorLed, ErrorTable, DoubleSpinBox, SpinBox, ComboBox, DisplayLabel
 from Utility.Dialogs import IPDialog, showMessageBox
@@ -35,10 +35,9 @@ class LaserVBoxLayout(QVBoxLayout):
         self.combobox_message_box_warning = True
         self.update_frequency_output = False
 
-        self.connection_wrapper = DeviceWrapper()
+        self.device_wrapper = DeviceMonacoWrapper()
         self.connection: None | MonacoConnection = None
-        self.threaded_connection: ThreadedDummyConnection | ThreadedMonacoConnection = self.connection_wrapper.threaded_connection
-        self.threaded_connection = ThreadedDummyConnection()
+        self.device_wrapper.threaded_connection = ThreadedDummyConnection()
 
         self.chiller_temperature_low = DefaultParams.laser_chiller_temperature_low
         self.chiller_temperature_high = DefaultParams.laser_chiller_temperature_high
@@ -297,7 +296,10 @@ class LaserVBoxLayout(QVBoxLayout):
             self.indicator_key_switch.setValue(state)
             self.status_key_switch.setText('Key on' if state else 'Key off')
 
-        self.threaded_connection.callback(keyOn, self.threaded_connection.kGet())
+        self.device_wrapper.threaded_connection.callback(
+            keyOn,
+            self.device_wrapper.threaded_connection.kGet()
+        )
 
         def shutterOn(state: int):
             if not isinstance(state, int) or state == -1:
@@ -309,7 +311,10 @@ class LaserVBoxLayout(QVBoxLayout):
             self.status_shutter.setText('Open' if state else 'Closed')
             self.button_shutter.setText('Close' if state else 'Open')
 
-        self.threaded_connection.callback(shutterOn, self.threaded_connection.sGet())
+        self.device_wrapper.threaded_connection.callback(
+            shutterOn,
+            self.device_wrapper.threaded_connection.sGet()
+        )
 
         def pulsingOn(state: int):
             if not isinstance(state, int) or state == -1:
@@ -321,7 +326,10 @@ class LaserVBoxLayout(QVBoxLayout):
             self.status_pulsing.setText('On' if state else 'Off')
             self.button_pulsing.setText('Off' if state else 'On')
 
-        self.threaded_connection.callback(pulsingOn, self.threaded_connection.pcGet())
+        self.device_wrapper.threaded_connection.callback(
+            pulsingOn,
+            self.device_wrapper.threaded_connection.pcGet()
+        )
 
         def systemStatus(l_info: tuple[str, bool, int]):
             if not isinstance(l_info, tuple) or len(l_info) != 3:
@@ -334,7 +342,10 @@ class LaserVBoxLayout(QVBoxLayout):
             self.status_baseplate_temperature.setTargetValue(self.baseplate_temperature_on if l_info[1] else self.baseplate_temperature_off)
             self.state_system_status = l_info[2]
 
-        self.threaded_connection.callback(systemStatus, self.threaded_connection.lGetInfo())
+        self.device_wrapper.threaded_connection.callback(
+            systemStatus,
+            self.device_wrapper.threaded_connection.lGetInfo()
+        )
 
         def chillerTemperature(temperature: float):
             if (not isinstance(temperature, float) and not isinstance(temperature, int)) or temperature == -1:
@@ -344,7 +355,10 @@ class LaserVBoxLayout(QVBoxLayout):
             self.status_chiller_temperature.setValue(temperature)
             self.indicator_chiller_temperature.setValue(self.chiller_temperature_low <= temperature <= self.chiller_temperature_high)
 
-        self.threaded_connection.callback(chillerTemperature, self.threaded_connection.chtGet())
+        self.device_wrapper.threaded_connection.callback(
+            chillerTemperature,
+            self.device_wrapper.threaded_connection.chtGet()
+        )
 
         def chillerSetPoint(temperature: float):
             if (not isinstance(temperature, float) and not isinstance(temperature, int)) or temperature == -1:
@@ -353,7 +367,10 @@ class LaserVBoxLayout(QVBoxLayout):
 
             self.status_chiller_temperature.setTargetValue(temperature)
 
-        self.threaded_connection.callback(chillerSetPoint, self.threaded_connection.chstGet())
+        self.device_wrapper.threaded_connection.callback(
+            chillerSetPoint,
+            self.device_wrapper.threaded_connection.chstGet()
+        )
 
         def baseplateTemperature(temperature: float):
             if (not isinstance(temperature, float) and not isinstance(temperature, int)) or temperature == -1:
@@ -362,7 +379,10 @@ class LaserVBoxLayout(QVBoxLayout):
 
             self.status_baseplate_temperature.setValue(temperature)
 
-        self.threaded_connection.callback(baseplateTemperature, self.threaded_connection.btGet())
+        self.device_wrapper.threaded_connection.callback(
+            baseplateTemperature,
+            self.device_wrapper.threaded_connection.btGet()
+        )
 
         def chillerFlow(flow: float):
             if (not isinstance(flow, float) and not isinstance(flow, int)) or flow == -1:
@@ -373,7 +393,10 @@ class LaserVBoxLayout(QVBoxLayout):
             self.status_chiller_flow.setTargetValue((self.chiller_flow_high + self.chiller_flow_low) / 2)
             self.indicator_chiller_flow.setValue(self.chiller_flow_low <= flow <= self.chiller_flow_high)
 
-        self.threaded_connection.callback(chillerFlow, self.threaded_connection.chfGet())
+        self.device_wrapper.threaded_connection.callback(
+            chillerFlow,
+            self.device_wrapper.threaded_connection.chfGet()
+        )
 
         def faultsTable(faults: dict[int, tuple[str, str]]):
             if not isinstance(faults, dict):
@@ -397,7 +420,10 @@ class LaserVBoxLayout(QVBoxLayout):
                 self.indicator_system_faults.setValue(True)
                 self.status_system_faults.setText('Faults occurred')
 
-        self.threaded_connection.callback(faultsTable, self.threaded_connection.wGetInfo())
+        self.device_wrapper.threaded_connection.callback(
+            faultsTable,
+            self.device_wrapper.threaded_connection.wGetInfo()
+        )
 
         def settings(params: tuple[float, int, int, int]):
             # params:
@@ -418,7 +444,10 @@ class LaserVBoxLayout(QVBoxLayout):
                 self.setComboboxOutput(params[2])
             self.status_settings_pulsewidth.setValue(int(params[1]))
 
-        self.threaded_connection.callback(settings, self.threaded_connection.setGet())
+        self.device_wrapper.threaded_connection.callback(
+            settings,
+            self.device_wrapper.threaded_connection.setGet()
+        )
 
         def outputFrequency(frequency: float):
             if (not isinstance(frequency, float) and not isinstance(frequency, int)) or frequency == -1:
@@ -427,7 +456,10 @@ class LaserVBoxLayout(QVBoxLayout):
 
             self.status_settings_output.setValue(frequency)
 
-        self.threaded_connection.callback(outputFrequency, self.threaded_connection.crrGet())
+        self.device_wrapper.threaded_connection.callback(
+            outputFrequency,
+            self.device_wrapper.threaded_connection.crrGet()
+        )
 
         def rfLevel(level: float):
             if (not isinstance(level, float) and not isinstance(level, int)) or level == -1:
@@ -436,7 +468,10 @@ class LaserVBoxLayout(QVBoxLayout):
 
             self.status_settings_rflevel.setValue(level)
 
-        self.threaded_connection.callback(rfLevel, self.threaded_connection.rlGet())
+        self.device_wrapper.threaded_connection.callback(
+            rfLevel,
+            self.device_wrapper.threaded_connection.rlGet()
+        )
 
     def updateAllValues(self):
         """Updates all values"""
@@ -451,7 +486,10 @@ class LaserVBoxLayout(QVBoxLayout):
 
             self.chiller_temperature_low = temperature
 
-        self.threaded_connection.callback(setChillerTemperatureLow, self.threaded_connection.chtlGet())
+        self.device_wrapper.threaded_connection.callback(
+            setChillerTemperatureLow,
+            self.device_wrapper.threaded_connection.chtlGet()
+        )
 
         def setChillerTemperatureHigh(temperature: float):
             if (not isinstance(temperature, float) and not isinstance(temperature, int)) or temperature == -1:
@@ -460,7 +498,10 @@ class LaserVBoxLayout(QVBoxLayout):
 
             self.chiller_temperature_high = temperature
 
-        self.threaded_connection.callback(setChillerTemperatureHigh, self.threaded_connection.chthGet())
+        self.device_wrapper.threaded_connection.callback(
+            setChillerTemperatureHigh,
+            self.device_wrapper.threaded_connection.chthGet()
+        )
 
         def setChillerFlowLow(flow: float):
             if (not isinstance(flow, float) and not isinstance(flow, int)) or flow == -1:
@@ -469,7 +510,10 @@ class LaserVBoxLayout(QVBoxLayout):
 
             self.chiller_flow_low = flow
 
-        self.threaded_connection.callback(setChillerFlowLow, self.threaded_connection.chflGet())
+        self.device_wrapper.threaded_connection.callback(
+            setChillerFlowLow,
+            self.device_wrapper.threaded_connection.chflGet()
+        )
 
         def setChillerFlowHigh(flow: float):
             if (not isinstance(flow, float) and not isinstance(flow, int)) or flow == -1:
@@ -478,7 +522,10 @@ class LaserVBoxLayout(QVBoxLayout):
 
             self.chiller_flow_high = flow
 
-        self.threaded_connection.callback(setChillerFlowHigh, self.threaded_connection.chfhGet())
+        self.device_wrapper.threaded_connection.callback(
+            setChillerFlowHigh,
+            self.device_wrapper.threaded_connection.chfhGet()
+        )
 
         def rfLevel(level: float):
             if (not isinstance(level, float) and not isinstance(level, int)) or level == -1:
@@ -489,7 +536,10 @@ class LaserVBoxLayout(QVBoxLayout):
             self.status_settings_rflevel.setTargetValue(level)
             self.spinbox_settings_rflevel.setValue(level)
 
-        self.threaded_connection.callback(rfLevel, self.threaded_connection.rlGet())
+        self.device_wrapper.threaded_connection.callback(
+            rfLevel,
+            self.device_wrapper.threaded_connection.rlGet()
+        )
 
         def settings(params: tuple[float, int, int, int]):
             # params:
@@ -516,7 +566,10 @@ class LaserVBoxLayout(QVBoxLayout):
             self.state_rdd_setting = params[2]
             self.state_sb_setting = params[3]
 
-        self.threaded_connection.callback(settings, self.threaded_connection.setGet())
+        self.device_wrapper.threaded_connection.callback(
+            settings,
+            self.device_wrapper.threaded_connection.setGet()
+        )
 
         self.updateLoop()
 
@@ -545,7 +598,7 @@ class LaserVBoxLayout(QVBoxLayout):
             if result == QMessageBox.StandardButton.Cancel:
                 return
 
-        self.threaded_connection.sSet(state)
+        self.device_wrapper.threaded_connection.sSet(state)
 
     def setPulsing(self, state: bool):
         """
@@ -557,7 +610,7 @@ class LaserVBoxLayout(QVBoxLayout):
         if not self.checkConnection() or not self.checkKeySwitch():
             return
 
-        self.threaded_connection.pcSet(state)
+        self.device_wrapper.threaded_connection.pcSet(state)
 
     def setSystem(self, start: bool):
         """
@@ -571,7 +624,7 @@ class LaserVBoxLayout(QVBoxLayout):
         if not self.checkConnection() or not self.checkKeySwitch():
             return
 
-        self.threaded_connection.lSet(start)
+        self.device_wrapper.threaded_connection.lSet(start)
 
     def setChillerServiced(self):
         """Sets the chiller state such that it was serviced now"""
@@ -595,7 +648,7 @@ class LaserVBoxLayout(QVBoxLayout):
         if result == QMessageBox.StandardButton.No:
             return
 
-        self.threaded_connection.chservicedSet()
+        self.device_wrapper.threaded_connection.chservicedSet()
 
     def clearFaults(self):
         """Clears all faults"""
@@ -603,7 +656,7 @@ class LaserVBoxLayout(QVBoxLayout):
         if not self.checkConnection() or not self.checkKeySwitch():
             return
 
-        self.threaded_connection.fackSet()
+        self.device_wrapper.threaded_connection.fackSet()
 
     def setAmplifier(self):
         """Sets amplifier"""
@@ -615,7 +668,7 @@ class LaserVBoxLayout(QVBoxLayout):
         if not isinstance(item_data, tuple) and len(item_data) != 3:
             raise ValueError(f'Expected userData of Amplifier combobox to be a <tuple> of size 3, got {type(item_data)}')
 
-        self.threaded_connection.setSet(mrr=item_data[0], pulses=item_data[1])
+        self.device_wrapper.threaded_connection.setSet(mrr=item_data[0], pulses=item_data[1])
 
     def setOutputFrequency(self):
         """Sets output frequency"""
@@ -630,7 +683,7 @@ class LaserVBoxLayout(QVBoxLayout):
         if not isinstance(item_data, int):
             raise ValueError(f'Expected userData of Output combobox to be a <int>, got {type(item_data)}')
 
-        self.threaded_connection.setSet(rrd=item_data)
+        self.device_wrapper.threaded_connection.setSet(rrd=item_data)
 
     def setRFLevel(self):
         """Sets RF level"""
@@ -638,7 +691,7 @@ class LaserVBoxLayout(QVBoxLayout):
         if not self.checkConnection() or not self.checkKeySwitch():
             return
 
-        self.threaded_connection.rlSet(self.spinbox_settings_rflevel.value())
+        self.device_wrapper.threaded_connection.rlSet(self.spinbox_settings_rflevel.value())
         self.status_settings_rflevel.setTargetValue(self.spinbox_settings_rflevel.value())
 
     def setPulseLength(self):
@@ -647,7 +700,7 @@ class LaserVBoxLayout(QVBoxLayout):
         if not self.checkConnection() or not self.checkKeySwitch():
             return
 
-        self.threaded_connection.setSet(pw=self.spinbox_settings_pulsewidth.value())
+        self.device_wrapper.threaded_connection.setSet(pw=self.spinbox_settings_pulsewidth.value())
         self.status_settings_pulsewidth.setTargetValue(self.spinbox_settings_pulsewidth.value())
 
     def fillComboboxAmplifierItem(self, mrr: float, sb: int, energy: float = 0, select: bool = False):
@@ -866,7 +919,7 @@ class LaserVBoxLayout(QVBoxLayout):
             ip = self.ip
             port = self.port
 
-        connect = self.threaded_connection.isDummy()
+        connect = self.device_wrapper.threaded_connection.isDummy()
 
         self.unconnect()
 
@@ -878,14 +931,14 @@ class LaserVBoxLayout(QVBoxLayout):
             )
             try:
                 self.connection.open()
-                self.threaded_connection = ThreadedConnection(self.connection)
+                self.device_wrapper.threaded_connection = ThreadedConnection(self.connection)
                 self.indicator_connection.setValue(True)
                 self.status_connection.setText('Connected')
                 self.button_connection_settings.setEnabled(False)
                 self.button_connection.setText('Disconnect')
 
                 # clear faults to initialize fault table
-                self.threaded_connection.fackSet()
+                self.device_wrapper.threaded_connection.fackSet()
 
             # TODO: probably add some more socket connection errors here
             except (ConnectionError, TimeoutError, ConnectionAbortedError, UnicodeDecodeError, OSError) as error:
@@ -917,8 +970,8 @@ class LaserVBoxLayout(QVBoxLayout):
     def unconnect(self):
         """Disconnect from any port"""
 
-        self.threaded_connection.close()
-        self.threaded_connection = ThreadedDummyConnection()
+        self.device_wrapper.threaded_connection.close()
+        self.device_wrapper.threaded_connection = ThreadedDummyConnection()
         if self.connection is not None:
             self.connection.close()
             self.connection = None
@@ -928,7 +981,7 @@ class LaserVBoxLayout(QVBoxLayout):
     def reset(self):
         """Resets everything to default"""
 
-        self.threaded_connection.close()
+        self.device_wrapper.threaded_connection.close()
         if self.connection is not None:
             self.connection.close()
 
@@ -985,7 +1038,7 @@ class LaserVBoxLayout(QVBoxLayout):
     def closeEvent(self):
         """Must be called when application is closed"""
 
-        self.threaded_connection.close()
+        self.device_wrapper.threaded_connection.close()
         last_connection = [-1, -1, -1, -1, -1]
         if self.connection is not None:
             last_connection[0] = self.ip[0]

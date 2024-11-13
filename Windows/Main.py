@@ -83,8 +83,8 @@ class MainWindow(QMainWindow):
         # TODO: PowerMeter not implemented yet
         # TODO: EBIS not implemented yet
         self.server = CommandServer({
-            #'PSU': self.control_window.psu_group_vbox.device_wrapper,
-            #'LASER': self.control_window.laser_group_vbox.device_wrapper,
+            'PSU': self.control_window.psu_group_vbox.device_wrapper,
+            'LASER': self.control_window.laser_group_vbox.device_wrapper,
             'PRESSURE': self.control_window.pressure_group_vbox.device_wrapper,
         })
         self.server.startServer()

@@ -14,7 +14,7 @@ from Config.StylesConf import Colors
 
 from DB.db import DB
 
-from Socket.CommandServer import DeviceWrapper
+from Socket.CommandServer import DeviceISEGWrapper
 
 from Utility.Layouts import InsertingGridLayout, IndicatorLed, DoubleSpinBox, DisplayLabel, PolarityButton, SpinBox, ComboBox
 from Utility.Dialogs import showMessageBox
@@ -43,10 +43,9 @@ class PSUVBoxLayout(QVBoxLayout):
 
         self.active_message_box = False
 
-        self.connection_wrapper = DeviceWrapper()
+        self.device_wrapper = DeviceISEGWrapper()
         self.connection: None | ISEGConnection = None
-        self.threaded_connection: ThreadedDummyConnection | ThreadedISEGConnection = self.connection_wrapper.threaded_connection
-        self.threaded_connection = ThreadedDummyConnection()
+        self.device_wrapper.threaded_connection = ThreadedDummyConnection()
 
         self.voltage_deviation = DefaultParams.psu_voltage_deviation
         self.voltage_maximum = DefaultParams.psu_voltage_maximum
@@ -396,7 +395,10 @@ class PSUVBoxLayout(QVBoxLayout):
                 if not state:
                     status_voltage.setTargetValue(0)
 
-        self.threaded_connection.callback(checkVoltageOn, self.threaded_connection.readVoltageOn(self.all_channels_selector))
+        self.device_wrapper.threaded_connection.callback(
+            checkVoltageOn,
+            self.device_wrapper.threaded_connection.readVoltageOn(self.all_channels_selector)
+        )
 
         def measureVoltage(voltages: list[float]):
             if len(voltages) != len(self.status_voltages):
@@ -410,7 +412,10 @@ class PSUVBoxLayout(QVBoxLayout):
             for status_voltage, voltage in zip(self.status_voltages, voltages):
                 status_voltage.setValue(voltage)
 
-        self.threaded_connection.callback(measureVoltage, self.threaded_connection.measureVoltage(self.all_channels_selector))
+        self.device_wrapper.threaded_connection.callback(
+            measureVoltage,
+            self.device_wrapper.threaded_connection.measureVoltage(self.all_channels_selector)
+        )
 
         def measureCurrent(currents: list[float]):
             if len(currents) != len(self.status_currents) != len(self.indicator_limits) != len(self.spinbox_limit_currents):
@@ -425,7 +430,10 @@ class PSUVBoxLayout(QVBoxLayout):
                 status_current.setValue(current)
                 indicator_limit.setValue(current >= spinbox_limit_current.value() / 1000)
 
-        self.threaded_connection.callback(measureCurrent, self.threaded_connection.measureCurrent(self.all_channels_selector))
+        self.device_wrapper.threaded_connection.callback(
+            measureCurrent,
+            self.device_wrapper.threaded_connection.measureCurrent(self.all_channels_selector)
+        )
 
         def checkPolarity(polarities: list[bool]):
             if len(polarities) != len(self.button_polarities):
@@ -435,7 +443,10 @@ class PSUVBoxLayout(QVBoxLayout):
             for button_polarity, polarity in zip(self.button_polarities, polarities):
                 button_polarity.polarityChange(polarity)
 
-        self.threaded_connection.callback(checkPolarity, self.threaded_connection.configureOutputPolarityGet(self.all_channels_selector))
+        self.device_wrapper.threaded_connection.callback(
+            checkPolarity,
+            self.device_wrapper.threaded_connection.configureOutputPolarityGet(self.all_channels_selector)
+        )
 
     def updateAllValues(self):
         """Updates all values"""
@@ -455,7 +466,10 @@ class PSUVBoxLayout(QVBoxLayout):
                 spinbox_voltage.setValue(voltage)
                 status_voltage.setTargetValue(voltage)
 
-        self.threaded_connection.callback(readVoltage, self.threaded_connection.readVoltage(self.all_channels_selector))
+        self.device_wrapper.threaded_connection.callback(
+            readVoltage,
+            self.device_wrapper.threaded_connection.readVoltage(self.all_channels_selector)
+        )
 
         def readCurrentLimit(currents: list[float]):
             if len(currents) != len(self.spinbox_limit_currents):
@@ -465,9 +479,15 @@ class PSUVBoxLayout(QVBoxLayout):
             for (spinbox_limit_current, current) in zip(self.spinbox_limit_currents, currents):
                 spinbox_limit_current.setValue(current * 1000)
 
-        self.threaded_connection.callback(readCurrentLimit, self.threaded_connection.readCurrent(self.all_channels_selector))
+        self.device_wrapper.threaded_connection.callback(
+            readCurrentLimit,
+            self.device_wrapper.threaded_connection.readCurrent(self.all_channels_selector)
+        )
 
-        self.threaded_connection.callback(self.spinbox_advanced_settings_ramp.setValue, self.threaded_connection.configureRampVoltageGet())
+        self.device_wrapper.threaded_connection.callback(
+            self.spinbox_advanced_settings_ramp.setValue,
+            self.device_wrapper.threaded_connection.configureRampVoltageGet()
+        )
 
     def setVoltage(self, channel: int, voltage: float):
         """
@@ -481,7 +501,7 @@ class PSUVBoxLayout(QVBoxLayout):
             return
 
         self.status_voltages[channel].setTargetValue(voltage)
-        self.threaded_connection.voltageSet(channel, voltage)
+        self.device_wrapper.threaded_connection.voltageSet(channel, voltage)
 
     def setCurrentLimit(self, channel: int, current: float):
         """
@@ -494,7 +514,7 @@ class PSUVBoxLayout(QVBoxLayout):
         if not self.checkConnection():
             return
 
-        self.threaded_connection.currentSet(channel, current / 1000)
+        self.device_wrapper.threaded_connection.currentSet(channel, current / 1000)
 
     def setOutput(self, channel: int, state: bool):
         """
@@ -508,9 +528,9 @@ class PSUVBoxLayout(QVBoxLayout):
             return
 
         if state:
-            self.threaded_connection.voltageOn(channel)
+            self.device_wrapper.threaded_connection.voltageOn(channel)
         else:
-            self.threaded_connection.voltageOff(channel)
+            self.device_wrapper.threaded_connection.voltageOff(channel)
 
     def setRampSpeed(self, speed: float):
         """
@@ -522,7 +542,7 @@ class PSUVBoxLayout(QVBoxLayout):
         if not self.checkConnection():
             return
 
-        self.threaded_connection.configureRampVoltageSet(speed)
+        self.device_wrapper.threaded_connection.configureRampVoltageSet(speed)
 
     def setPolarity(self, channel: int, polarity: bool):
         """
@@ -549,7 +569,7 @@ class PSUVBoxLayout(QVBoxLayout):
             self.active_message_box = False
             return
 
-        self.threaded_connection.configureOutputPolaritySet(channel, polarity)
+        self.device_wrapper.threaded_connection.configureOutputPolaritySet(channel, polarity)
 
         # TODO: set all other channels on again - do we need to do this??
 
@@ -587,7 +607,7 @@ class PSUVBoxLayout(QVBoxLayout):
             comport = self.combobox_connection.getValue(text=True)
         self.setComport(comport)
 
-        connect = self.threaded_connection.isDummy()
+        connect = self.device_wrapper.threaded_connection.isDummy()
 
         self.unconnect()
 
@@ -600,7 +620,7 @@ class PSUVBoxLayout(QVBoxLayout):
             )
             try:
                 self.connection.open()
-                self.threaded_connection = ThreadedISEGConnection(self.connection)
+                self.device_wrapper.threaded_connection = ThreadedISEGConnection(self.connection)
                 self.indicator_connection.setValue(True)
                 self.status_connection.setText('Connected')
                 self.combobox_connection.setEnabled(False)
@@ -636,8 +656,8 @@ class PSUVBoxLayout(QVBoxLayout):
     def unconnect(self):
         """Disconnect from any port"""
 
-        self.threaded_connection.close()
-        self.threaded_connection = ThreadedDummyConnection()
+        self.device_wrapper.threaded_connection.close()
+        self.device_wrapper.threaded_connection = ThreadedDummyConnection()
         if self.connection is not None:
             self.connection.close()
             self.connection = None
@@ -721,7 +741,7 @@ class PSUVBoxLayout(QVBoxLayout):
     def reset(self):
         """Resets everything to default"""
 
-        self.threaded_connection.close()
+        self.device_wrapper.threaded_connection.close()
         if self.connection is not None:
             self.connection.close()
 
@@ -777,7 +797,7 @@ class PSUVBoxLayout(QVBoxLayout):
     def closeEvent(self):
         """Must be called when application is closed"""
 
-        self.threaded_connection.close()
+        self.device_wrapper.threaded_connection.close()
 
         last_connection = ''
         if self.connection is not None:
