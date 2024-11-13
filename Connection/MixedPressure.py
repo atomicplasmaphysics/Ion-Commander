@@ -25,9 +25,8 @@ class MixedPressureConnection(LucidControlConnection):
 
         self.voltage_to_pressure_fct = voltage_to_pressure_fct
 
-    def getPressure(self, channel: int | str) -> float:
+    def getPressure(self, channel: int) -> float:
         """Return pressure in mbar off one channel"""
-        channel = int(channel)
         return self.voltage_to_pressure_fct[channel](self.ioGet(channel))
 
     def getPressureAll(self) -> tuple[float, ...]:

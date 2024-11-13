@@ -1,5 +1,6 @@
 from threading import Thread
 from socket import socket, AF_INET, SOCK_STREAM
+from ast import parse, Module, Expr, Call, Name, literal_eval
 
 
 from PyQt6.QtCore import QObject
@@ -11,6 +12,41 @@ from Connection.Threaded import (
     ThreadedISEGConnection, ThreadedThyracontConnection, ThreadedTPG300Connection, ThreadedMixedPressureConnection,
     ThreadedMonacoConnection, ThreadedTLPMxConnection, ThreadedDummyConnection
 )
+
+
+def parseFunctionCall(func_str: str) -> tuple[str, list, dict]:
+    """
+    Parses a function call - provided as string
+
+    Raises ValueError for invalid function calls or malformed arguments
+    Raises NameError is function has no name
+
+    :param func_str: function call as string
+    :returns: tuple of [
+        name: name of function to be called
+        args: list of called arguments
+        kwargs: dictionary of called keyword arguments
+    ]
+    """
+
+    tree = parse(func_str)
+
+    if not isinstance(tree, Module) or not tree.body or not isinstance(tree.body[0], Expr):
+        raise ValueError('Invalid function call string')
+
+    node = tree.body[0].value
+
+    if not isinstance(node, Call):
+        raise ValueError('The provided string is not a function call')
+
+    if not isinstance(node.func, Name):
+        raise NameError('Function does not have a name')
+
+    func_name = node.func.id
+    args = [literal_eval(arg) for arg in node.args]
+    kwargs = {kw.arg: literal_eval(kw.value) for kw in node.keywords}
+
+    return func_name, args, kwargs
 
 
 class DeviceWrapper:
@@ -222,25 +258,16 @@ class CommandServer(QObject):
             return f'1-Device {device_name} not in device list {self.devices.keys()}'
         if device.threaded_connection is None or device.threaded_connection.isDummy():
             return '2-Device connection is not established'
-        # TODO: maybe more checks needed
 
         if len(cmd_split) == 1:
             return '0-Ok'
 
-        func_name = cmd_split[1]
-        args = []
-        kwargs = dict()
-        if len(cmd_split) == 3:
-            for arg in cmd_split[2].split(','):
-                if '=' not in arg:
-                    args.append(arg)
+        function_call = ':'.join(cmd_split[1:])
+        try:
+            func_name, args, kwargs = parseFunctionCall(function_call)
 
-                arg_split = arg.split('=')
-                if len(arg_split) != 2:
-                    return f'3-Key word arguments must be of "name=value", provided was "{arg}"'
-                kwargs.update({
-                    arg_split[0]: arg_split[1]
-                })
+        except (NameError, ValueError) as error:
+            return f'3-Got error while parsing function call "function_call" with error: {error}'
 
         try:
             device.threaded_connection.callback(
@@ -249,7 +276,7 @@ class CommandServer(QObject):
             )
 
         except (AttributeError, ConnectionError, NameError, TypeError, ValueError) as error:
-            return f'4-Got error while calling function "{func_name}({args}, {kwargs})" for device "{device_name}": {error}'
+            return f'4-Got error while calling function "{func_name}({args}, {kwargs})" for device "{device_name}" with error: {error}'
 
         return ''
 

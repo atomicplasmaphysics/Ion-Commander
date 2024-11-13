@@ -187,17 +187,17 @@ class TPG300Connection(LucidControlConnection):
         )
         self.sensor_type = sensor_type
 
-    def voltageToPressure(self, voltage: float | str) -> float:
+    def voltageToPressure(self, voltage: float) -> float:
         """Convert voltage to pressure in mbar"""
-        return tpg300VoltageToPressure(float(voltage), self.sensor_type)
+        return tpg300VoltageToPressure(voltage, self.sensor_type)
 
-    def pressureToVoltage(self, pressure: float | str) -> float:
+    def pressureToVoltage(self, pressure: float) -> float:
         """Returns an interpolated pressure based on the given voltage input."""
-        return tpg300PressureToVoltage(float(pressure), self.sensor_type)
+        return tpg300PressureToVoltage(pressure, self.sensor_type)
 
-    def getPressure(self, channel: int | str) -> float:
+    def getPressure(self, channel: int) -> float:
         """Return pressure in mbar off one channel"""
-        return self.voltageToPressure(self.ioGet(int(channel)))
+        return self.voltageToPressure(self.ioGet(channel))
 
     def getPressureAll(self) -> tuple[float, ...]:
         """Return pressure in mbar off all channels"""

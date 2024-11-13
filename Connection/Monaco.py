@@ -288,7 +288,7 @@ class MonacoConnection(TelnetConnection):
         """Gets the pulse energy modulation mode"""
         return self._queryAndReturnInt(f'?ALTMOD')
 
-    def altmodSet(self, mode: int | bool | str):
+    def altmodSet(self, mode: int | bool):
         """
         Sets the pulse energy modulation mode:
             n=0 sets control to Extended Interface pin 15
@@ -304,7 +304,7 @@ class MonacoConnection(TelnetConnection):
         """Returns the laser amplifier serial number"""
         return self._queryAndReturn('?AMP3SN')
 
-    def autoipSet(self, mode: int | bool | str):
+    def autoipSet(self, mode: int | bool):
         """
         Sets Enable flag to scan for an available IP address:
             n = 0 disabled
@@ -324,7 +324,7 @@ class MonacoConnection(TelnetConnection):
         """Entering this command will reboot the firmware"""
         self._queryAndReturn('BOOT=1')
 
-    def bpSet(self, burst: int | str):
+    def bpSet(self, burst: int):
         """Sets the number of pulses in a burst. Allowed range is 1 to 4,294,967,295 pulses."""
         self._queryAndReturn(f'BP={burst}')
 
@@ -336,7 +336,7 @@ class MonacoConnection(TelnetConnection):
         """Returns laser head baseplate measured temperature in °C"""
         return self._queryAndReturnFloat('?BT')
 
-    def chenSet(self, mode: int | bool | str):
+    def chenSet(self, mode: int | bool):
         """
         Set chiller enable:
             n = 0 turns off the chiller
@@ -497,7 +497,7 @@ class MonacoConnection(TelnetConnection):
         """Returns serial number of the diode 3"""
         return self._queryAndReturn('?D3SN')
 
-    def dhcpSet(self, mode: int | bool | str):
+    def dhcpSet(self, mode: int | bool):
         """
         Enables or disables the dynamic host configuration protocol (DHCP):
             n = 0 DHCP is disabled
@@ -533,7 +533,7 @@ class MonacoConnection(TelnetConnection):
         """Returns the serial number for DS"""
         return self._queryAndReturn('?DSSN')
 
-    def echoSet(self, mode: int | bool | str):
+    def echoSet(self, mode: int | bool):
         """
         Turns the Characters transmitted to the laser (echoed) on or off
             n = 0 turns off echo
@@ -545,7 +545,7 @@ class MonacoConnection(TelnetConnection):
         """Returns echo mode"""
         return self._queryAndReturnInt('?ECHO')
 
-    def egSet(self, mode: int | bool | str):
+    def egSet(self, mode: int | bool):
         """
         Enable the external gate:
             n = 0 disables PulseEQ external gate (default)
@@ -557,7 +557,7 @@ class MonacoConnection(TelnetConnection):
         """Returns the status of DHCP"""
         return self._queryAndReturnInt('?EG')
 
-    def emSet(self, mode: int | bool | str):
+    def emSet(self, mode: int | bool):
         """Sets external modulation"""
         self._queryAndReturn(f'EM={int(mode)}')
 
@@ -565,7 +565,7 @@ class MonacoConnection(TelnetConnection):
         """Returns external modulation status"""
         return self._queryAndReturnInt('?EM')
 
-    def enSet(self, mode: int | bool | str):
+    def enSet(self, mode: int | bool):
         """Enable enhanced notifications"""
         self._queryAndReturn(f'EN={int(mode)}')
 
@@ -573,7 +573,7 @@ class MonacoConnection(TelnetConnection):
         """Returns enhanced notifications status"""
         return self._queryAndReturnInt('?EN')
 
-    def epSet(self, mode: int | str):
+    def epSet(self, mode: int):
         """Enhanced serial protocol"""
         self._queryAndReturn(f'EP={mode}')
 
@@ -616,7 +616,7 @@ class MonacoConnection(TelnetConnection):
         """Clears the fault history"""
         self._queryAndReturn('FHC')
 
-    def fnameGet(self, code: int | str) -> str:
+    def fnameGet(self, code: int) -> str:
         """Returns the description of fault code or warning code nn"""
         return self._queryAndReturn(f'?FNAME:{code}')
 
@@ -632,7 +632,7 @@ class MonacoConnection(TelnetConnection):
         """Returns the Ethernet gateway"""
         return self._queryAndReturn('?GATEWAY')
 
-    def grrSet(self, rate: float | str):
+    def grrSet(self, rate: float):
         """Sets the PulseEQ internal repetition rate to {rate}kHz"""
         self._queryAndReturn(f'GRR={rate}')
 
@@ -640,7 +640,7 @@ class MonacoConnection(TelnetConnection):
         """Returns the Ethernet gateway"""
         return self._queryAndReturnFloat('?GRR')
 
-    def grrenSet(self, mode: int | bool | str):
+    def grrenSet(self, mode: int | bool):
         """
         Enables the internal repetition rate gate:
             n = 0 disables PulseEQ Internal triggering
@@ -656,7 +656,7 @@ class MonacoConnection(TelnetConnection):
         """Returns the status of the internal repetition rate gate"""
         return self._queryAndReturn('?GUI')
 
-    def hbSet(self, time: int | str):
+    def hbSet(self, time: int):
         """Sets the heartbeat timeout in secs, 0 or 5-300 (0=disabled)"""
         self._queryAndReturn(f'HB={time}')
 
@@ -732,11 +732,11 @@ class MonacoConnection(TelnetConnection):
         """Returns the IR count"""
         return self._queryAndReturnInt('?IREC')
 
-    def irep1Set(self, value: float | str):
+    def irep1Set(self, value: float):
         """Sets the IR point 1 calibration"""
         self._queryAndReturn(f'IREP1={value}')
 
-    def irep2Set(self, value: float | str):
+    def irep2Set(self, value: float):
         """Sets the IR point 2 calibration"""
         self._queryAndReturn(f'IREP2={value}')
 
@@ -748,7 +748,7 @@ class MonacoConnection(TelnetConnection):
         """
         return self._queryAndReturnInt('?K')
 
-    def lSet(self, state: int | bool | str):
+    def lSet(self, state: int | bool):
         """
         Sets the laser state:
             0 = turns off laser
@@ -808,7 +808,7 @@ class MonacoConnection(TelnetConnection):
         """Returns the laser model"""
         return self._queryAndReturn('?LM')
 
-    def lnameGet(self, state: int | str) -> str:
+    def lnameGet(self, state: int) -> str:
         """Returns name of the specified laser state"""
         return self._queryAndReturn(f'?LNAME={state}')
 
@@ -816,7 +816,7 @@ class MonacoConnection(TelnetConnection):
         """Returns locked commands"""
         return self._queryAndReturn('?LOCK')
 
-    def lockoutSet(self, mode: int | bool | str):
+    def lockoutSet(self, mode: int | bool):
         """
         Sets laser LOCKOUT control state (only one connection can have exclusive control of laser at any given time):
             n = 0 unlocks laser to release control to other remote control device. The next remote device issuing a command will have exclusive
@@ -875,7 +875,7 @@ class MonacoConnection(TelnetConnection):
         """Sets up or changes the user password"""
         self._queryAndReturn(f'PASSWORD={password}')
 
-    def pcSet(self, mode: int | bool | str):
+    def pcSet(self, mode: int | bool):
         """
         Sets pulse control:
             n = 0 is pulse control off
@@ -907,7 +907,7 @@ class MonacoConnection(TelnetConnection):
         """Returns the external pulse energy control voltage"""
         return self._queryAndReturnFloat('?PENRGV')
 
-    def pepSet(self, percentage: float | str):
+    def pepSet(self, percentage: float):
         """Sets the output pulse energy as percentage of maximum, 0 to 100"""
         self._queryAndReturn(f'PEP={percentage}')
 
@@ -915,7 +915,7 @@ class MonacoConnection(TelnetConnection):
         """Returns the current pulse energy percentage"""
         return self._queryAndReturnFloat('?PEP')
 
-    def periodSet(self, period: float | str):
+    def periodSet(self, period: float):
         """Set how often to report new data"""
         self._queryAndReturn(f'PERIOD={period}')
 
@@ -923,7 +923,7 @@ class MonacoConnection(TelnetConnection):
         """Return how often to report new data"""
         return self._queryAndReturnFloat('?PERIOD')
 
-    def pmSet(self, mode: int | str):
+    def pmSet(self, mode: int):
         """
         Sets the pulse mode:
             n = 0 for Continuous pulsing
@@ -939,7 +939,7 @@ class MonacoConnection(TelnetConnection):
         """Returns the pulse mode"""
         return self._queryAndReturnInt('?PM')
 
-    def promptSet(self, mode: int | bool | str):
+    def promptSet(self, mode: int | bool):
         """
         Sets the mode of prompt:
             n = 0 turns off “Monaco Laser >” prompt
@@ -963,7 +963,7 @@ class MonacoConnection(TelnetConnection):
         """Returns the power supply serial number"""
         return self._queryAndReturn('?PSSN')
 
-    def pwSet(self, width: float | str):
+    def pwSet(self, width: float):
         """Sets the pulse width in femtoseconds"""
         self._queryAndReturn(f'PW={width}')
 
@@ -971,7 +971,7 @@ class MonacoConnection(TelnetConnection):
         """Return the pulse width in femtoseconds"""
         return self._queryAndReturnFloat('?PW')
 
-    def pwfineSet(self, tuning: float | str):
+    def pwfineSet(self, tuning: float):
         """
         Sets the pulse width fine tuning in %, range of -100 to 100.
         This works in conjunction with the Peak Power Optimizer.
@@ -1002,7 +1002,7 @@ class MonacoConnection(TelnetConnection):
         """Returns the relative humidity offset"""
         return self._queryAndReturnFloat('?RELHO')
 
-    def renSet(self, mode: int | bool | str):
+    def renSet(self, mode: int | bool):
         """
         Enables or disables the air recirculator inside the laser head:
             n = 0 disables the recirculator
@@ -1014,7 +1014,7 @@ class MonacoConnection(TelnetConnection):
         """Returns recirculator control status"""
         return self._queryAndReturnInt('?REN')
 
-    def rlSet(self, percentage: float | str):
+    def rlSet(self, percentage: float):
         """Sets the Output AOM voltage as percentage of maximum, from 0 to 100"""
         self._queryAndReturn(f'RL={percentage}')
 
@@ -1026,7 +1026,7 @@ class MonacoConnection(TelnetConnection):
         """Returns the laser pulse or seeder burst output repetition rate in Hz"""
         return self._queryAndReturnFloat('?RR')
 
-    def rrdSet(self, divisor: int | str):
+    def rrdSet(self, divisor: int):
         """Allows the amplifier laser pulse repetition rate to be divided by an integer"""
         self._queryAndReturn(f'RRD={divisor}')
 
@@ -1034,7 +1034,7 @@ class MonacoConnection(TelnetConnection):
         """Returns the laser pulse repetition rate divisor"""
         return self._queryAndReturnInt('?RRD')
 
-    def sSet(self, mode: int | bool | str):
+    def sSet(self, mode: int | bool):
         """
         Sets the shutter state:
             n = 0 closes external shutter
@@ -1050,7 +1050,7 @@ class MonacoConnection(TelnetConnection):
         """Returns the shutter cycle counter value"""
         return self._queryAndReturnInt('?SC')
 
-    def sciSet(self, mode: int | bool | str):
+    def sciSet(self, mode: int | bool):
         """
         Shutter control inversion:
             n = 0 disables inversion (default)
@@ -1062,7 +1062,7 @@ class MonacoConnection(TelnetConnection):
         """Returns inversion of shutter control input value"""
         return self._queryAndReturnInt('?SCI')
 
-    def scoiSet(self, mode: int | bool | str):
+    def scoiSet(self, mode: int | bool):
         """
         Shutter control output inversion:
             n = 0 disables output inversion (default)
@@ -1091,13 +1091,13 @@ class MonacoConnection(TelnetConnection):
 
     def setSet(
         self,
-        mrr: float | str = -1,
-        pw: float | str = -1,
-        rrd: int | str = -1,
-        pulses: int | str = -1,
+        mrr: float = -1,
+        pw: float = -1,
+        rrd: int = -1,
+        pulses: int = -1,
         name: str = '',
-        grr: float | str = -1,
-        eg: int | bool | str = -1
+        grr: float = -1,
+        eg: int | bool = -1
     ):
         """
         Sets several laser parameters simultaneously including:
@@ -1112,19 +1112,19 @@ class MonacoConnection(TelnetConnection):
         """
 
         cmd = 'SET'
-        if float(mrr) != -1:
+        if mrr != -1:
             cmd += f' MRR={mrr}'
-        if float(pw) != -1:
+        if pw != -1:
             cmd += f' PW={pw}'
-        if float(rrd) != -1:
+        if rrd != -1:
             cmd += f' RRD={rrd}'
-        if float(pulses) != -1:
+        if pulses != -1:
             cmd += f' PULSES={pulses}'
-        if float(name):
+        if name:
             cmd += f' NAME={name}'
-        if float(grr) != -1:
+        if grr != -1:
             cmd += f' GRR={grr}'
-        if float(eg) != -1:
+        if eg != -1:
             cmd += f' EG={eg}'
 
         self._queryAndReturn(cmd)
@@ -1207,7 +1207,7 @@ class MonacoConnection(TelnetConnection):
         """Displays the revision level of major software components"""
         return self._queryAndReturn('?SV')
 
-    def sync1Set(self, mode: int | bool | str):
+    def sync1Set(self, mode: int | bool):
         """
         Sets the output from the Sync 1 HD-BNC connector on the back of the laser head:
             n = 0 provides a representation of the drive signal for AOM1
@@ -1220,7 +1220,7 @@ class MonacoConnection(TelnetConnection):
         """Returns the output setting from the Sync 1 HD-BNC connector"""
         return self._queryAndReturnInt('?SYNC1')
 
-    def sync2Set(self, mode: int | bool | str):
+    def sync2Set(self, mode: int | bool):
         """
         Sets the output from the Sync 2 HD-BNC connector on the back of the laser head:
             n = 0 provides a representation of the drive signal for AOM2
@@ -1233,14 +1233,12 @@ class MonacoConnection(TelnetConnection):
         """Returns the output setting from the Sync 2 HD-BNC connector"""
         return self._queryAndReturnInt('?SYNC2')
 
-    # TODO: input not string compatible
     def timeSet(self, date_time: datetime | None):
         """Sets local time on the laser clock. If left empty the current time will be used."""
         if date_time is None:
             date_time = datetime.now()
         self._queryAndReturn(f'TIME={date_time.strftime("%Y-%m-%d %H:%M")}')
 
-    # TODO: output not string compatible
     def timeGet(self) -> datetime:
         """Returns local time on the laser clock"""
         query = self._queryAndReturn('?TIME')
@@ -1312,7 +1310,7 @@ class MonacoConnection(TelnetConnection):
         """Clears the warning history"""
         self._queryAndReturn('WHC')
 
-    def wnameGet(self, code: int | str) -> str:
+    def wnameGet(self, code: int) -> str:
         """Returns the description of a warning code"""
         return self._queryAndReturn(f'?WNAME={code}')
 
