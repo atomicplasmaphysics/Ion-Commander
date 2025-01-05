@@ -1,5 +1,5 @@
-from os import listdir
-from os.path import join
+from os import listdir, makedirs
+from os.path import join, abspath
 
 
 from PyQt6.QtWidgets import QSplitter, QWidget, QBoxLayout, QVBoxLayout, QPushButton, QLabel
@@ -29,6 +29,7 @@ class TipsWindow(TabWidget):
         self.tip_extension = f'.{DefaultParams.tip_extension}'
         self.path_tips_entries = str(join(self.path_tips, DefaultParams.tip_file_folder))
         self.path_tips_images = str(join(self.path_tips, 'images'))
+        self.checkTipsPath()
         self.tips: list[str] = []
 
         # SPLITTER
@@ -95,6 +96,18 @@ class TipsWindow(TabWidget):
         self.splitter.setStretchFactor(1, 95)
 
         self.updateTips()
+
+    def checkTipsPath(self):
+        """Checks if path of tips exists and creates it if not"""
+
+        for p in [
+            self.path_tips_entries,
+            self.path_tips_images
+        ]:
+            try:
+                makedirs(abspath(p))
+            except FileExistsError:
+                pass
 
     def updateTips(self):
         """Updates list of tips"""
