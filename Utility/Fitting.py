@@ -658,19 +658,20 @@ class FitBarsX(FitMethod):
 
         if not self.no_qt:
             self.widget = FittingWidget({
-                (0, 0): 'x1',
-                (0, 1): 'x2'
+                (0, 0): 'x₁',
+                (0, 1): 'x₂',
+                (0, 2): '∆x'
             }, parent)
-        self.parameter = [0.0, 0.0]
+        self.parameter = [0.0, 0.0, 0.0]
         self.parameters = 0
 
         if not self.no_qt:
             self.bars = createFittingBars([
-                'x1',
-                'x2'
+                'x₁',
+                'x₂'
             ])
 
-        self.copy_info = '(x1, x2)'
+        self.copy_info = '(x₁, x₂, ∆x)'
 
     def setBarBounds(self, xrange: tuple[float, float]):
         """
@@ -694,13 +695,14 @@ class FitBarsX(FitMethod):
         # self.parameter = [x2, x1]
         self.parameter[0] = bar_values[0]
         self.parameter[1] = bar_values[1]
+        self.parameter[2] = abs(bar_values[1] - bar_values[0])
         self.updateParameters()
 
     def copyParameters(self) -> str:
         """Returns string that will be copied when copy button is pressed"""
 
-        # (x1, x2)
-        return f'({self.parameter[0]}, {self.parameter[1]})'
+        # (x₁, x₂, ∆x)
+        return f'({self.parameter[0]}, {self.parameter[1]}, {self.parameter[2]})'
 
 
 fittingFunctionsSingle: list[type[FitMethod]] = [FitGaussRange, FitGaussCenter, FitLogNormRange, FitCountsRange, FitGaussCountsRange, FitBarsX]

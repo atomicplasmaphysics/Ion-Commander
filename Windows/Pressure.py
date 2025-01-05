@@ -88,7 +88,7 @@ class PressureVBoxLayout(QVBoxLayout):
 
         # Pre-vacuum
         self.group_box_prevac = QGroupBox('Pre-Vacuum')
-        self.pressure_widget_prevac = PressureWidget(input_range=(1E3, 1E-3))
+        self.pressure_widget_prevac = PressureWidget(input_range=(1E3, 5E-3))
         self.layout_prevac = QVBoxLayout()
         self.layout_prevac.addWidget(self.pressure_widget_prevac)
         self.group_box_prevac.setLayout(self.layout_prevac)

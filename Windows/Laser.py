@@ -211,7 +211,6 @@ class LaserVBoxLayout(QVBoxLayout):
         )
 
         # System faults table
-        # TODO: table does not really update correctly - might be a fundamental Laser issue
         self.table_system_faults = ErrorTable()
         self.faults_vbox.addWidget(self.table_system_faults)
 
@@ -398,22 +397,26 @@ class LaserVBoxLayout(QVBoxLayout):
             self.device_wrapper.threaded_connection.chfGet()
         )
 
-        def faultsTable(faults: dict[int, tuple[str, str]]):
-            if not isinstance(faults, dict):
-                GlobalConf.logger.error(f'Faults must be <dict>, got {type(faults)}')
+        def faultsTable(faults: tuple[dict[int, tuple[str, str]], dict[int, tuple[str, str]]]):
+            if not isinstance(faults, tuple) or not len(faults) == 2:
+                GlobalConf.logger.error(f'Faults must be tuple of two <dict>, got {type(faults)}')
                 return
 
-            error_list = self.table_system_faults.getErrorList()
+            if not isinstance(faults[0], dict) or not isinstance(faults[1], dict):
+                GlobalConf.logger.error(f'Faults must be tuple of two <dict>, got ({type(faults[0])}, {type(faults[1])})')
+                return
 
-            for fault, fault_info in faults.items():
-                if not isinstance(fault, int) and not isinstance(fault_info, tuple) and len(fault_info) == 2:
-                    GlobalConf.logger.error(f'Fault key must be <int>, got {type(fault)}, Fault Info must be <tuple> of length 2, got {type(fault_info)} with value "{fault_info}"')
-                    return
+            self.table_system_faults.resetTable()
 
-                if fault not in error_list:
+            for faults_i in faults:
+                for fault, fault_info in faults_i.items():
+                    if not isinstance(fault, int) and not isinstance(fault_info, tuple) and len(fault_info) == 2:
+                        GlobalConf.logger.error(f'Fault key must be <int>, got {type(fault)}, Fault Info must be <tuple> of length 2, got {type(fault_info)} with value "{fault_info}"')
+                        return
+
                     self.table_system_faults.insertError(fault, fault_info[0], fault_info[1])
 
-            if not self.table_system_faults.getErrorList():
+            if len(faults[0]) == 0:
                 self.indicator_system_faults.setValue(False)
                 self.status_system_faults.setText('No faults')
             else:
@@ -422,7 +425,7 @@ class LaserVBoxLayout(QVBoxLayout):
 
         self.device_wrapper.threaded_connection.callback(
             faultsTable,
-            self.device_wrapper.threaded_connection.wGetInfo()
+            self.device_wrapper.threaded_connection.fwGetInfo()
         )
 
         def settings(params: tuple[float, int, int, int]):

@@ -81,7 +81,7 @@ class MainWindow(QMainWindow):
         self.addTab(self.simulation_window, 'Simulation')
 
         # TODO: PowerMeter not implemented yet
-        # TODO: EBIS not implemented yet
+        # TODO: EBIS not implemented yet - probably not needed anyways
         self.server = CommandServer({
             'PSU': self.control_window.psu_group_vbox.device_wrapper,
             'LASER': self.control_window.laser_group_vbox.device_wrapper,

@@ -174,15 +174,21 @@ class HistoryWindow(TabWidget):
 
         for i, table in enumerate(self.database.tables):
             checked = []
+            table_labels = []
             for row, attribute in enumerate(list(table.structure.keys())[1:]):
                 if self.selection_listwidgets[i].item(row).checkState() == Qt.CheckState.Checked:
-                    labels.append(f'{table.name}_{attribute}')
+                    table_labels.append(f'{table.name}_{attribute}')
                     checked.append(row + 1)
             if not checked:
                 continue
             data = self.database.getData(self.database.tables.index(table), start_time, end_time)
 
+            if data is False:
+                continue
+
             checked.insert(0, 0)
+
+            labels.extend(table_labels)
             datas.append(data[:, checked])
 
         if not labels:
@@ -200,7 +206,7 @@ class HistoryWindow(TabWidget):
         data, labels = self.getData()
 
         if len(labels) < 2:
-            self.writeStatusBar('No data selected')
+            self.writeStatusBar('No data selected or no datapoints available')
         else:
             for i in range(1, len(labels)):
                 self.time_canvas.plot(data[:, 0], data[:, i], label=labels[i])

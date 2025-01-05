@@ -182,7 +182,7 @@ class ThreadedConnection:
 
         try:
             function(error)
-        except (ValueError, AttributeError):
+        except (ValueError, AttributeError, TypeError):
             pass
 
         del self.callbacks[callback_id]

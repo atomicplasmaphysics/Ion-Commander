@@ -586,13 +586,34 @@ class MonacoConnection(TelnetConnection):
         self._queryAndReturn('EXIT')
 
     # TODO: better faults
-    def fGet(self) -> str:
+    def fGet(self) -> list[int]:
         """
         Displays a list of faults, if present.
         Use ?FNAME command to show a description of a particular fault.
         If a fault is present, it will turn off the laser.
         """
-        return self._queryAndReturn('?F')
+        res = self._queryAndReturn('?F')
+        ret = []
+        try:
+            ret = [int(s) for s in res.split('&')]
+        except ValueError:
+            pass
+        return ret
+
+    def fGetInfo(self) -> dict[int, tuple[str, str]]:
+        """Displays a list of fault ids and their type and description"""
+        ret = {}
+        for f in self.fGet():
+            res = []
+            try:
+                res = self.fnameGet(f).split(':')
+            except ConnectionError:
+                pass
+
+            if len(res) < 2:
+                res = ['', '']
+            ret[f] = (res[0].strip(), str(':'.join(res[1:]).strip()))
+        return ret
 
     def fackSet(self):
         """Acknowledge faults and return the laser to a ready state if the fault condition is lifted"""
@@ -1281,7 +1302,7 @@ class MonacoConnection(TelnetConnection):
         res = self._queryAndReturn('?W')
         ret = []
         try:
-            ret = [int(s) for s in res.split(',')]
+            ret = [int(s) for s in res.split('&')]
         except ValueError:
             pass
         return ret
@@ -1317,6 +1338,14 @@ class MonacoConnection(TelnetConnection):
     def identification(self) -> str:
         """Get the laser identification"""
         return f'{self.lmGet()} with S/N {self.hsnGet()}'
+
+    def fwGetInfo(self) -> tuple[dict[int, tuple[str, str]], dict[int, tuple[str, str]]]:
+        """Displays a list of faults and warning ids and their type and description"""
+        fres = dict()
+        fres.update(self.fGetInfo())
+        wres = dict()
+        wres.update(self.wGetInfo())
+        return fres, wres
 
 
 def main():
