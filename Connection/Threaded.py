@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Callable
 from time import sleep
 
 
@@ -134,13 +134,16 @@ class ThreadedConnection:
     Baseclass for threaded connections
 
     :param connection: Connection class
+    :param connection_aborted_function: function to be called on aborted or lost connection
     """
 
     def __init__(
         self,
-        connection: ISEGConnection | ThyracontConnection | TPG300Connection | MixedPressureConnection | MonacoConnection | TLPMxConnection | None
+        connection: ISEGConnection | ThyracontConnection | TPG300Connection | MixedPressureConnection | MonacoConnection | TLPMxConnection | None,
+        connection_aborted_function: Callable = None
     ):
         self.connection = connection
+        self.connection_aborted_function = connection_aborted_function
 
         self.worker = ConnectionWorker(connection)
         self.worker.signal.error.connect(self.error)
@@ -166,8 +169,12 @@ class ThreadedConnection:
         :param error: exception that occurred
         """
 
-        # TODO: maybe just close connection on ConnectionError (e.g. Laser: [WinError 10054] Eine vorhandene Verbindung wurde vom Remotehost geschlossen)
         GlobalConf.logger.exception(error)
+
+        if isinstance(error, ConnectionAbortedError):
+            if self.connection_aborted_function is not None:
+                self.connection_aborted_function()
+            return
 
         function = self.callbacks.get(callback_id)
         if function is None:
@@ -253,8 +260,8 @@ class ThreadedISEGConnection(ThreadedConnection, base_iseg):
     :param connection: ISEGConnection
     """
 
-    def __init__(self, connection: ISEGConnection):
-        super().__init__(connection)
+    def __init__(self, connection: ISEGConnection, *args, **kwargs):
+        super().__init__(connection, *args, **kwargs)
 
 
 class ThreadedThyracontConnection(ThreadedConnection, base_thyracont):
@@ -264,8 +271,8 @@ class ThreadedThyracontConnection(ThreadedConnection, base_thyracont):
     :param connection: ThyracontConnection
     """
 
-    def __init__(self, connection: ThyracontConnection):
-        super().__init__(connection)
+    def __init__(self, connection: ThyracontConnection, *args, **kwargs):
+        super().__init__(connection, *args, **kwargs)
 
 
 class ThreadedTPG300Connection(ThreadedConnection, base_tpg300):
@@ -275,8 +282,8 @@ class ThreadedTPG300Connection(ThreadedConnection, base_tpg300):
     :param connection: TPG300Connection
     """
 
-    def __init__(self, connection: TPG300Connection):
-        super().__init__(connection)
+    def __init__(self, connection: TPG300Connection, *args, **kwargs):
+        super().__init__(connection, *args, **kwargs)
 
 
 class ThreadedMixedPressureConnection(ThreadedConnection, base_mixedpressure):
@@ -286,8 +293,8 @@ class ThreadedMixedPressureConnection(ThreadedConnection, base_mixedpressure):
     :param connection: MixedPressureConnection
     """
 
-    def __init__(self, connection: MixedPressureConnection):
-        super().__init__(connection)
+    def __init__(self, connection: MixedPressureConnection, *args, **kwargs):
+        super().__init__(connection, *args, **kwargs)
 
 
 class ThreadedMonacoConnection(ThreadedConnection, base_monaco):
@@ -297,8 +304,8 @@ class ThreadedMonacoConnection(ThreadedConnection, base_monaco):
     :param connection: MonacoConnection
     """
 
-    def __init__(self, connection: MonacoConnection):
-        super().__init__(connection)
+    def __init__(self, connection: MonacoConnection, *args, **kwargs):
+        super().__init__(connection, *args, **kwargs)
 
 
 class ThreadedTLPMxConnection(ThreadedConnection, base_tlpmx):
@@ -308,8 +315,8 @@ class ThreadedTLPMxConnection(ThreadedConnection, base_tlpmx):
     :param connection: TLPMxConnection
     """
 
-    def __init__(self, connection: TLPMxConnection):
-        super().__init__(connection)
+    def __init__(self, connection: TLPMxConnection, *args, **kwargs):
+        super().__init__(connection, *args, **kwargs)
 
 
 class ThreadedDummyConnection(ThreadedConnection):

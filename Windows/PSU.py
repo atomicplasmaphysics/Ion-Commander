@@ -620,7 +620,10 @@ class PSUVBoxLayout(QVBoxLayout):
             )
             try:
                 self.connection.open()
-                self.device_wrapper.threaded_connection = ThreadedISEGConnection(self.connection)
+                self.device_wrapper.threaded_connection = ThreadedISEGConnection(
+                    self.connection,
+                    self.unconnect
+                )
                 self.indicator_connection.setValue(True)
                 self.status_connection.setText('Connected')
                 self.combobox_connection.setEnabled(False)

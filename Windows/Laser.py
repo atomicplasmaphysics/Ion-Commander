@@ -931,7 +931,10 @@ class LaserVBoxLayout(QVBoxLayout):
             )
             try:
                 self.connection.open()
-                self.device_wrapper.threaded_connection = ThreadedConnection(self.connection)
+                self.device_wrapper.threaded_connection = ThreadedConnection(
+                    self.connection,
+                    self.unconnect
+                )
                 self.indicator_connection.setValue(True)
                 self.status_connection.setText('Connected')
                 self.button_connection_settings.setEnabled(False)
