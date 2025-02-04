@@ -976,7 +976,9 @@ class LaserVBoxLayout(QVBoxLayout):
     def unconnect(self):
         """Disconnect from any port"""
 
-        self.device_wrapper.threaded_connection.close()
+        if not self.device_wrapper.threaded_connection.isDummy():
+            self.device_wrapper.threaded_connection.close()
+
         self.device_wrapper.threaded_connection = ThreadedDummyConnection()
         if self.connection is not None:
             self.connection.close()

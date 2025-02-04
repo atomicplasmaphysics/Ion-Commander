@@ -44,19 +44,21 @@ class ControlWindow(TabWidget):
         self.psu_vbox_parent.setLayout(self.psu_vbox)
         self.splitter.addWidget(self.psu_vbox_parent)
 
-        # EBIS CONTROL
-        self.ebis_vbox = VBoxTitleLayout('EBIS', parent=self, add_stretch=True, popout_enable=True)
-        self.ebis_group_vbox = EBISVBoxLayout()
+        self.ebis_enabled = False
+        if self.ebis_enabled:
+            # EBIS CONTROL
+            self.ebis_vbox = VBoxTitleLayout('EBIS', parent=self, add_stretch=True, popout_enable=True)
+            self.ebis_group_vbox = EBISVBoxLayout()
 
-        # Stretch to bottom
-        self.ebis_group_vbox.addStretch(1)
-        self.ebis_group_vbox.setAlignment(Qt.AlignmentFlag.AlignTop)
+            # Stretch to bottom
+            self.ebis_group_vbox.addStretch(1)
+            self.ebis_group_vbox.setAlignment(Qt.AlignmentFlag.AlignTop)
 
-        # Add a parent to the simulationConfigurationListLayout and add that to the splitter
-        self.ebis_parent = QWidget(self)
-        self.ebis_vbox.setBodyLayout(self.ebis_group_vbox)
-        self.ebis_parent.setLayout(self.ebis_vbox)
-        self.splitter.addWidget(self.ebis_parent)
+            # Add a parent to the simulationConfigurationListLayout and add that to the splitter
+            self.ebis_parent = QWidget(self)
+            self.ebis_vbox.setBodyLayout(self.ebis_group_vbox)
+            self.ebis_parent.setLayout(self.ebis_vbox)
+            self.splitter.addWidget(self.ebis_parent)
 
         # LASER CONTROL
         self.laser_vbox = VBoxTitleLayout('LASER', parent=self, add_stretch=True, popout_enable=True)
@@ -87,15 +89,18 @@ class ControlWindow(TabWidget):
         self.splitter.addWidget(self.pressure_parent)
 
         # Division between columns
-        self.splitter.setStretchFactor(0, 30)
-        self.splitter.setStretchFactor(1, 30)
-        self.splitter.setStretchFactor(2, 30)
-        self.splitter.setStretchFactor(3, 10)
+        splitter_count = self.splitter.count() - 1
+        splitter_width_last = 10
+        splitter_width = int((100 - splitter_width_last) / splitter_count)
+        for c in range(splitter_count):
+            self.splitter.setStretchFactor(c, splitter_width)
+        self.splitter.setStretchFactor(splitter_count, int(100 - splitter_width * splitter_count))
 
     def closeEvent(self, event):
         """Closes all connections"""
         self.psu_group_vbox.closeEvent()
-        self.ebis_group_vbox.closeEvent()
+        if self.ebis_enabled:
+            self.ebis_group_vbox.closeEvent()
         self.laser_group_vbox.closeEvent()
         self.pressure_group_vbox.closeEvent()
 

@@ -529,8 +529,10 @@ class PSUVBoxLayout(QVBoxLayout):
 
         if state:
             self.device_wrapper.threaded_connection.voltageOn(channel)
+            self.status_voltages[channel].setTargetValue(self.spinbox_voltages[channel].value())
         else:
             self.device_wrapper.threaded_connection.voltageOff(channel)
+            self.status_voltages[channel].setTargetValue(0)
 
     def setRampSpeed(self, speed: float):
         """
