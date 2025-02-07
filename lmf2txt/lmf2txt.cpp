@@ -86,6 +86,7 @@ void printUsage(char** argv) {
     printf("  -h        Display this information.\n");
     printf("  -t        Include trigger channel.\n");
     printf("  -r        Include rising edges.\n");
+    printf("  -m        Output amplitude.\n");
 }
 
 void writeHeader(FILE* outfile, double tdcresolution, unsigned int number_of_channels, double group_range_start, double group_range_end, int number_of_bins, __int32 trigger_channel, time_t starttime, time_t stoptime) {
@@ -98,7 +99,7 @@ void writeHeader(FILE* outfile, double tdcresolution, unsigned int number_of_cha
     fprintf(outfile, "Start time = %s", ctime(&starttime));
     fprintf(outfile, "Stop time =  %s", ctime(&stoptime));
     fprintf(outfile, "\n");
-    fprintf(outfile, "Eventnumber\tChannelnumber\tStarttime[ms]\tTOF[ns]\tIsFalling\n");
+    fprintf(outfile, "Eventnumber\tChannelnumber\tStarttime[ms]\tTOF[ns]\tIsFalling\tAmplitude[ns]\n");
 }
 
 
@@ -136,6 +137,8 @@ int main(int argc, char* argv[]) {
 
     char rising_edge_flag = 0;
 
+    char amplitude_flag = 0;
+
     if (argc < 2) {
         printf("ERROR: Invalid arguments\n");
         printUsage(argv);
@@ -147,7 +150,7 @@ int main(int argc, char* argv[]) {
     // Parse input parameters using getopt
     int opt;
     optind = 2;
-    while ((opt = custom_getopt(argc, argv, "o:Ha:b:s:S:vh")) != -1) {
+    while ((opt = custom_getopt(argc, argv, "o:Ha:b:s:S:vhrm")) != -1) {
         switch (opt) {
         case 'o':
             output_flag = 1;
@@ -185,6 +188,9 @@ int main(int argc, char* argv[]) {
             break;
         case 'r':
             rising_edge_flag = 1;
+            break;
+        case 'm':
+            amplitude_flag = 1;
             break;
         default:
             return 1;
@@ -280,6 +286,10 @@ int main(int argc, char* argv[]) {
     bIsFallingTDC = LMF->bIsFallingTDC;
     bool bIsFalling;
 
+    bool bLastIsFalling;
+    __int32 iLastiTDCij;
+    double amplitude = -1;
+
     unsigned int i, j;
     unsigned int split_counter = 0;
 
@@ -326,6 +336,9 @@ int main(int argc, char* argv[]) {
         // data
         while (1) {
             if (LMF->ReadNextEvent()) {
+                bLastIsFalling = false;
+                iLastiTDCij = 0;
+
                 // check error flag
                 if (LMF->errorflag) {
                     LMF->GetErrorText(LMF->errorflag, error_text);
@@ -380,6 +393,8 @@ int main(int argc, char* argv[]) {
                     for (j = 0; j < number_of_hits[i]; j++) {
                         iTDCij = i32TDC[i * NUM_IONS + j];
                         bIsFalling = bIsFallingTDC[i * NUM_IONS + j];
+
+                        // add to histogram
                         if (histogram_flag) {
                             // check if rising edge
                             if (!bIsFalling && !rising_edge_flag) { continue; }
@@ -392,9 +407,25 @@ int main(int argc, char* argv[]) {
                             }
                             histogram[number_of_bin]++;
                         }
+
+                        // print directly to file
                         else {
-                            // print directly to file
-                            fprintf(outfile, "%lld\t%d\t%.3lf\t%.3lf\t%d\n", event_counter, i + 1, new_timestamp * 1.e3, iTDCij * tdcresolution, bIsFalling);
+                            // check if we need amplitude calculated
+                            if (amplitude_flag) {
+                                // do fallig falag magic
+                                if (bIsFalling) { amplitude = -1; }
+                                else {
+                                    if (!bLastIsFalling) { amplitude = -1; }
+                                    else { amplitude = (iTDCij - iLastiTDCij) * tdcresolution; }
+                                }
+
+                                bLastIsFalling = bIsFalling;
+                                iLastiTDCij = iTDCij;
+                            }
+
+                            // write to output file
+                            fprintf(outfile, "%lld\t%d\t%.3lf\t%.3lf\t%d\t%.3lf\n",
+                                event_counter, i + 1, new_timestamp * 1.e3, iTDCij * tdcresolution, bIsFalling, amplitude);
                         }
                     }
                 }
