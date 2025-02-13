@@ -14,6 +14,7 @@ from Utility.Layouts import TabWidget
 from Windows.Control import ControlWindow
 from Windows.Monitor import MonitorWindow
 from Windows.History import HistoryWindow
+from Windows.Scripts import ScriptsWindow
 from Windows.Tips import TipsWindow
 from Windows.Analyse import AnalyseWindow
 from Windows.Simulation import SimulationWindow
@@ -67,6 +68,10 @@ class MainWindow(QMainWindow):
         # Add history tab
         self.history_window = HistoryWindow(self, self.database)
         self.addTab(self.history_window, 'History')
+
+        # Add script tab
+        self.scripts_window = ScriptsWindow(self)
+        self.addTab(self.scripts_window, 'Scripts')
 
         # Add tips tab
         self.tips_window = TipsWindow(self)

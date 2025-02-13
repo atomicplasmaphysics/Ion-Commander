@@ -1,5 +1,5 @@
 from typing import TYPE_CHECKING, Callable
-from time import sleep
+from time import time, sleep
 
 
 from PyQt6.QtCore import QObject, pyqtSignal, QRunnable, pyqtSlot, QThreadPool
@@ -66,16 +66,18 @@ class ConnectionWorker(QRunnable):
     Threaded worker for handling a connection without lagging the input panel
 
     :param connection: any connection class
+    :param auto_delete: auto delete after x time has passed
     """
 
     max_queue = 100
 
-    def __init__(self, connection):
+    def __init__(self, connection, auto_delete: int | None = max_queue // 2):
         super().__init__()
         self.connection: ISEGConnection | ThyracontConnection | MonacoConnection | TLPMxConnection = connection
         self.signal = ConnectionWorkerSignals()
         self.running = True
         self.started = False
+        self.auto_delete = auto_delete
         self.work = []
 
     @pyqtSlot()
@@ -92,7 +94,7 @@ class ConnectionWorker(QRunnable):
                 sleep(0.1)
                 continue
 
-            callback_id, name, args, kwargs = self.work.pop(0)
+            callback_id, _, name, args, kwargs = self.work.pop(0)
 
             try:
                 obj_func = getattr(self.connection, name)
@@ -114,18 +116,32 @@ class ConnectionWorker(QRunnable):
         """
 
         if name == 'close':
-            self.work.insert(0, (callback_id, name, args, kwargs))
+            self.work.insert(0, (callback_id, time(), name, args, kwargs))
             return callback_id
 
         if len(self.work) > self.max_queue:
-            self.signal.error.emit(-1, BufferError('Too many tasks in queue'))
-            return -1
+            if self.auto_delete is None:
+                self.signal.error.emit(-1, BufferError('Too many tasks in queue'))
+                return -1
+            self.signal.error.emit(-1, BufferError('Too many tasks in queue, will delete possible oldest ones'))
+            auto_delete_time = time() - self.auto_delete
+            deleted_callback_ids = []
+            for _ in range(len(self.work)):
+                try:
+                    work = self.work.pop(0)
+                    if work[1] > auto_delete_time:
+                        work.append(work)
+                    else:
+                        deleted_callback_ids.append(work[0])
+                except IndexError:
+                    pass
+            return deleted_callback_ids
 
         if not self.running:
             self.signal.error.emit(-1, ChildProcessError('Not running'))
             return -1
 
-        self.work.append((callback_id, name, args, kwargs))
+        self.work.append((callback_id, time(), name, args, kwargs))
         return callback_id
 
 
@@ -169,7 +185,7 @@ class ThreadedConnection:
         :param error: exception that occurred
         """
 
-        GlobalConf.logger.exception(error)
+        GlobalConf.logger.error(error)
 
         if isinstance(error, ConnectionAbortedError):
             if self.connection_aborted_function is not None:
@@ -187,9 +203,10 @@ class ThreadedConnection:
 
         del self.callbacks[callback_id]
 
-    def callback(self, function, callback_id):
+    def callback(self, function, callback_id: int | list[int]):
         """
-        Calls function when second statement finishes
+        Calls function when second statement finishes. Expects a callback_id, which is a positive integer if successfull,
+        a negative integer if not successfull and a list of integers of deleted callback_ids if queue is already too long
 
         :param function: function to be executed
         :param callback_id: every call of this class will be passed to the worker and return a unique id, which should be passed here
@@ -197,6 +214,10 @@ class ThreadedConnection:
 
         if self.connection is None:
             raise NotImplementedError('There should not be a callback happening')
+
+        if isinstance(callback_id, list):
+            for i in callback_id:
+                del self.callbacks[i]
 
         if not isinstance(callback_id, int):
             raise ValueError(f'Callback id must be <int>, received {type(callback_id)}')
@@ -244,8 +265,6 @@ class ThreadedConnection:
 
         if self.connection is None:
             raise ConnectionError('No connection established')
-
-        getattr(self.connection, name)
 
         def func(*args, **kwargs):
             return self.worker.execute(self.callback_id(), name, *args, **kwargs)

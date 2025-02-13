@@ -150,7 +150,8 @@ int main(int argc, char* argv[]) {
     // Parse input parameters using getopt
     int opt;
     optind = 2;
-    while ((opt = custom_getopt(argc, argv, "o:Ha:b:s:S:vhrm")) != -1) {
+    // HINT: do not forget to include "letters" here
+    while ((opt = custom_getopt(argc, argv, "o:Ha:b:s:S:vhtrm")) != -1) {
         switch (opt) {
         case 'o':
             output_flag = 1;

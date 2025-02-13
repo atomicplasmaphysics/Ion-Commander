@@ -1699,6 +1699,7 @@ class DisplayLabel(QLabel):
     :param target_value: target value
     :param target_value_sign: if sign of target_value matters
     :param deviation: deviation value
+    :param deviation_percent: deviation in percentage
     :param unit: unit to be displayed
     :param decimals: decimals to be shown
     :param enable_prefix: enable prefixing
@@ -1717,6 +1718,7 @@ class DisplayLabel(QLabel):
         target_value: float = 1,
         target_value_sign: bool = False,
         deviation: float = 1,
+        deviation_percent: bool = False,
         unit: str = '',
         decimals: int = 2,
         enable_prefix: bool = False,
@@ -1734,6 +1736,7 @@ class DisplayLabel(QLabel):
         self.target_value = target_value
         self.target_value_sign = target_value_sign
         self.deviation = deviation
+        self.deviation_percent = deviation_percent
         self.unit = unit
         self.decimals = decimals
         self.enable_prefix = enable_prefix
@@ -1869,7 +1872,10 @@ class DisplayLabel(QLabel):
                 difference = abs(self.value) - abs(self.target_value)
             percentage = 0
             if self.deviation != 0:
-                percentage = min(abs(difference) / self.deviation, 1)
+                deviation = self.deviation
+                if self.deviation_percent:
+                    deviation = deviation * abs(self.value)
+                percentage = min(abs(difference) / deviation, 1)
             new_color = linearInterpolateColor(self.color_good, self.color_bad, percentage)
             new_color.setAlpha(90)
             brush.setColor(new_color)

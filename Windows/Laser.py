@@ -10,7 +10,7 @@ from DB.db import DB
 
 from Socket.CommandServer import DeviceMonacoWrapper
 
-from Utility.Layouts import InsertingGridLayout, IndicatorLed, ErrorTable, DoubleSpinBox, SpinBox, ComboBox, DisplayLabel
+from Utility.Layouts import InsertingGridLayout, IndicatorLed, ErrorTable, DoubleSpinBox, SpinBox, ComboBox, DisplayLabel, SpinBoxRange
 from Utility.Dialogs import IPDialog, showMessageBox
 from Utility.Functions import getPrefix, getSignificantDigits, getIntIfInt
 
@@ -33,7 +33,6 @@ class LaserVBoxLayout(QVBoxLayout):
 
         self.active_message_box = False
         self.combobox_message_box_warning = True
-        self.update_frequency_output = False
 
         self.device_wrapper = DeviceMonacoWrapper()
         self.connection: None | MonacoConnection = None
@@ -62,7 +61,7 @@ class LaserVBoxLayout(QVBoxLayout):
             ((10000, 1), 4),
             ((50000, 1), 0.8)
         ]
-        self.amplifier_repetition_rate = 0
+        self.amplifier_repetition_rate = 1
 
         # Connection Group Box
         self.connection_group_box = QGroupBox('Connection and Status')
@@ -233,18 +232,40 @@ class LaserVBoxLayout(QVBoxLayout):
             self.combobox_settings_amplifier
         )
 
-        # Output Settings
-        self.combobox_settings_output = ComboBox()
-        self.state_mrr_setting = 0
-        self.state_rrd_setting = 0
-        self.state_sb_setting = 0
-        self.combobox_settings_output.currentIndexChanged.connect(self.setOutputFrequency)
-        # TODO: deviation and target value to this on update
-        self.status_settings_output = DisplayLabel(value=0, target_value=0, deviation=0, unit='Hz', enable_prefix=True, alignment_flag=Qt.AlignmentFlag.AlignLeft)
+        # Repetition Rate Settings
+        self.spinbox_repetition_rate = DoubleSpinBox(default=100, step_size=0.00001, input_range=SpinBoxRange.ZERO_INF, buttons=False)
+        self.spinbox_repetition_rate.editingFinished.connect(self.checkOutputFrequency)
+        self.combobox_repetition_rate_unit = ComboBox(
+            default=1,
+            entries=['kHz', 'Hz', 'mHz'],
+            entries_save=[1000, 1, 0.001]
+        )
+        self.combobox_repetition_rate_unit.currentIndexChanged.connect(self.checkOutputFrequency)
+        self.button_repetition_rate = QPushButton('Set')
+        self.button_repetition_rate.clicked.connect(self.setOutputFrequency)
         self.settings_grid.addWidgets(
-            QLabel('Output'),
-            self.combobox_settings_output,
-            self.status_settings_output
+            QLabel('Repetition Rate'),
+            self.spinbox_repetition_rate,
+            self.combobox_repetition_rate_unit,
+            self.button_repetition_rate
+        )
+
+        self.settings_grid.addWidgets(
+            None,
+            QLabel('Set'),
+            QLabel('Divisor'),
+            QLabel('Measured')
+        )
+
+        self.status_repetition_rate_set = DisplayLabel(value=0, target_value=0, deviation=1, deviation_percent=True, unit='Hz', enable_prefix=True, alignment_flag=Qt.AlignmentFlag.AlignLeft)
+        self.status_repetition_rate_divisor = DisplayLabel(value=0, target_value=-1, color_bad=Colors.app_background_event, deviation=1, decimals=0, tooltip=False, alignment_flag=Qt.AlignmentFlag.AlignLeft)
+        self.status_repetition_rate_measured = DisplayLabel(value=0, target_value=0, deviation=1, deviation_percent=True, unit='Hz', enable_prefix=True, alignment_flag=Qt.AlignmentFlag.AlignLeft)
+
+        self.settings_grid.addWidgets(
+            None,
+            self.status_repetition_rate_set,
+            self.status_repetition_rate_divisor,
+            self.status_repetition_rate_measured
         )
 
         # RF Level Settings
@@ -442,10 +463,12 @@ class LaserVBoxLayout(QVBoxLayout):
             self.setComboboxAmplifier(params[0], params[3])
             if params[0] != self.amplifier_repetition_rate:
                 self.amplifier_repetition_rate = params[0]
-                self.fillComboboxOutput(params[2])
-            else:
-                self.setComboboxOutput(params[2])
+            self.status_repetition_rate_divisor.setValue(params[2])
             self.status_settings_pulsewidth.setValue(int(params[1]))
+
+            self.status_repetition_rate_set.setValue(params[0] * 1000 / params[2])
+            self.status_repetition_rate_measured.setTargetValue(params[0] * 1000 / params[2])
+
 
         self.device_wrapper.threaded_connection.callback(
             settings,
@@ -457,7 +480,7 @@ class LaserVBoxLayout(QVBoxLayout):
                 GlobalConf.logger.error(f'Output frequency must be <float> and not -1, got {type(frequency)} with value "{frequency}"')
                 return
 
-            self.status_settings_output.setValue(frequency)
+            self.status_repetition_rate_measured.setValue(frequency)
 
         self.device_wrapper.threaded_connection.callback(
             outputFrequency,
@@ -558,16 +581,30 @@ class LaserVBoxLayout(QVBoxLayout):
             self.setComboboxAmplifier(params[0], params[3])
             if params[0] != self.amplifier_repetition_rate:
                 self.amplifier_repetition_rate = params[0]
-                self.fillComboboxOutput(params[2])
-            else:
-                self.setComboboxOutput(params[2])
+            self.status_repetition_rate_divisor.setValue(params[2])
             self.status_settings_pulsewidth.setValue(int(params[1]))
             self.status_settings_pulsewidth.setTargetValue(int(params[1]))
             self.spinbox_settings_pulsewidth.setValue(int(params[1]))
 
+            rep_rate = params[0] * 1000 / params[2]
+            self.status_repetition_rate_set.setValue(rep_rate)
+            self.status_repetition_rate_measured.setTargetValue(rep_rate)
+
+            if int(rep_rate // 1000) > 0:
+                self.spinbox_repetition_rate.setValue(rep_rate / 1000)
+                self.combobox_repetition_rate_unit.setCurrentIndex(0)
+            elif int(rep_rate) > 0:
+                self.spinbox_repetition_rate.setValue(rep_rate)
+                self.combobox_repetition_rate_unit.setCurrentIndex(1)
+            else:
+                self.spinbox_repetition_rate.setValue(rep_rate * 1000)
+                self.combobox_repetition_rate_unit.setCurrentIndex(2)
+
             self.state_mrr_setting = params[0]
             self.state_rdd_setting = params[2]
             self.state_sb_setting = params[3]
+
+            self.checkOutputFrequency()
 
         self.device_wrapper.threaded_connection.callback(
             settings,
@@ -676,17 +713,20 @@ class LaserVBoxLayout(QVBoxLayout):
     def setOutputFrequency(self):
         """Sets output frequency"""
 
-        if not self.update_frequency_output:
-            return
-
         if not self.checkConnection(self.combobox_message_box_warning) or not self.checkKeySwitch(self.combobox_message_box_warning):
             return
 
-        item_data = self.combobox_settings_output.itemData(self.combobox_settings_output.currentIndex())
-        if not isinstance(item_data, int):
-            raise ValueError(f'Expected userData of Output combobox to be a <int>, got {type(item_data)}')
+        req_frequency = self.spinbox_repetition_rate.value() * self.combobox_repetition_rate_unit.getValue(save=True)
+        divisor = round(self.amplifier_repetition_rate * 1000 / req_frequency)
 
-        self.device_wrapper.threaded_connection.setSet(rrd=item_data)
+        self.device_wrapper.threaded_connection.rrdSet(divisor)
+
+    def checkOutputFrequency(self):
+        """Checks if output frequency entered matches output frequency that is set"""
+
+        req_frequency = self.spinbox_repetition_rate.value() * self.combobox_repetition_rate_unit.getValue(save=True)
+
+        self.status_repetition_rate_set.setTargetValue(req_frequency)
 
     def setRFLevel(self):
         """Sets RF level"""
@@ -781,81 +821,6 @@ class LaserVBoxLayout(QVBoxLayout):
 
         self.combobox_message_box_warning = True
 
-    def fillComboboxOutputItem(self, mrr: float, rrd: int, select: bool = False):
-        """
-        Fills one item in combobox output
-
-        :param mrr: amplifier repetition rate in kHz
-        :param rrd: repetition rate divisor
-        :param select: selects newly added item
-        """
-
-        self.update_frequency_output = False
-
-        frequency = mrr / rrd
-
-        frequency_modified, frequency_prefix = getPrefix(frequency * 1000)
-        frequency_modified = getSignificantDigits(frequency_modified, digits=3)
-        frequency_modified = getIntIfInt(frequency_modified)
-        text = f'{frequency_modified} {frequency_prefix}Hz'
-
-        self.combobox_settings_output.addItem(text, userData=rrd)
-
-        self.update_frequency_output = True
-
-        if select:
-            self.combobox_settings_output.setCurrentIndex(self.combobox_settings_output.count() - 1)
-
-    def fillComboboxOutput(self, rrd: int = -1, clear: bool = True):
-        """
-        Fills items in combobox output
-
-        :param rrd: repetition rate divisor to be selected
-        :param clear: clears the combobox first
-        """
-
-        self.combobox_message_box_warning = False
-
-        if clear:
-            self.combobox_settings_output.clear()
-
-        item_data = self.combobox_settings_amplifier.itemData(self.combobox_settings_amplifier.currentIndex())
-        if not isinstance(item_data, tuple) and len(item_data) != 3:
-            raise ValueError(f'Expected userData of Amplifier combobox to be a <tuple> of size 3, got {type(item_data)}')
-
-        rrds = 100
-        for i in range(1, rrds + 1):
-            self.fillComboboxOutputItem(item_data[0], i)
-
-        if 0 < rrd < rrds:
-            self.combobox_settings_output.setCurrentIndex(rrd - 1)
-
-        self.combobox_message_box_warning = True
-
-    def setComboboxOutput(self, rrd: int):
-        """
-        Switches to the given output frequency in the combobox or adds new item and selects it
-
-        :param rrd: repetition rate divisor
-        """
-
-        self.combobox_message_box_warning = False
-
-        for i in range(self.combobox_settings_output.count()):
-            item_data = self.combobox_settings_output.itemData(i)
-            if not isinstance(item_data, int):
-                raise ValueError(f'Item data must be an <int>, got <{tuple(item_data)}>')
-            if item_data == rrd:
-                self.combobox_settings_output.setCurrentIndex(rrd - 1)
-                return
-
-        item_data = self.combobox_settings_amplifier.itemData(self.combobox_settings_amplifier.currentIndex())
-        if not isinstance(item_data, tuple) and len(item_data) != 3:
-            raise ValueError(f'Expected userData of Amplifier combobox to be a <tuple> of size 3, got {type(item_data)}')
-
-        self.fillComboboxOutputItem(item_data[0], rrd, select=True)
-
-        self.combobox_message_box_warning = True
 
     def connectionPreferences(self):
         """Open dialog to get user input on IP address and port number of laser"""
@@ -1029,11 +994,13 @@ class LaserVBoxLayout(QVBoxLayout):
         self.table_system_faults.resetTable()
 
         self.fillComboboxAmplifier(4)
-        self.fillComboboxOutput()
-        self.setComboboxOutput(10)
-        self.status_settings_output.setValue(0)
-        self.status_settings_output.setTargetValue(0)
-        self.status_settings_output.setDeviation(0)
+        self.spinbox_repetition_rate.reset()
+        self.combobox_repetition_rate_unit.reset()
+        self.status_repetition_rate_set.setValue(0)
+        self.status_repetition_rate_set.setTargetValue(0)
+        self.status_repetition_rate_divisor.setValue(0)
+        self.status_repetition_rate_measured.setValue(0)
+        self.status_repetition_rate_measured.setTargetValue(0)
         self.spinbox_settings_rflevel.reset()
         self.status_settings_rflevel.setValue(0)
         self.status_settings_rflevel.setTargetValue(0)
@@ -1068,17 +1035,18 @@ class LaserVBoxLayout(QVBoxLayout):
         if not self.checkConnection(False):
             return
 
+        # TODO
         db.insertLaser(
-            self.indicator_shutter.value(),
-            self.indicator_pulsing.value(),
-            self.state_system_status,
-            self.status_chiller_temperature.value,
-            self.status_chiller_temperature.target_value,
-            self.status_baseplate_temperature.value,
-            self.status_chiller_flow.value,
-            self.state_mrr_setting,
-            int(self.status_settings_pulsewidth.value),
-            self.state_rrd_setting,
-            self.state_sb_setting,
-            self.status_settings_rflevel.value,
+            s = self.indicator_shutter.value(),
+            pc = self.indicator_pulsing.value(),
+            l = self.state_system_status,
+            cht = self.status_chiller_temperature.value,
+            chst = self.status_chiller_temperature.target_value,
+            bt = self.status_baseplate_temperature.value,
+            chf = self.status_chiller_flow.value,
+            #mrr = self.state_mrr_setting,
+            pw = int(self.status_settings_pulsewidth.value),
+            #rrd = self.state_rrd_setting,
+            #sb = self.state_sb_setting,
+            rl = self.status_settings_rflevel.value,
         )

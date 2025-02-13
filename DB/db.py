@@ -425,18 +425,18 @@ class DB:
 
     def insertLaser(
         self,
-        s: bool | int,
-        pc: bool | int,
-        l: int,
-        cht: float,
-        chst: float,
-        bt: float,
-        chf: float,
-        mrr: float,
-        pw: int,
-        rrd: int,
-        sb: int,
-        rl: float
+        s: bool | int = -1,
+        pc: bool | int = -1,
+        l: int = -1,
+        cht: float = -1,
+        chst: float = -1,
+        bt: float = -1,
+        chf: float = -1,
+        mrr: float = -1,
+        pw: int = -1,
+        rrd: int = -1,
+        sb: int = -1,
+        rl: float = -1
     ):
         """
         Inserts Laser values
