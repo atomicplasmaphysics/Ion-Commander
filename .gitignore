@@ -13,6 +13,8 @@ DB/*.db-journal
 Tips/entries/*
 Tips/images/*
 
+Scripts/*
+
 /guis/
 /data/
 /tests/

@@ -30,16 +30,24 @@ You are a big boy 🐶, there is no manual needed, you can figure it out yoursel
 Maybe get some popcorn while figuring it out 🍿
 
 ## TODOs
-- [ ] Make LogNorm stuff working
-- [ ] Better fitting routine and better starting parameters
+- [x] Make LogNorm stuff working
+- [x] Better fitting routine and better starting parameters
 - [x] Make the current Data-Analysis application as a subtab
-- [ ] Build a control subtab (Pressure, Voltage, Laser)
-- [ ] Logg everything in the control-tab
+- [x] Build a control subtab (Pressure, Voltage, Laser)
+- [x] Logg everything in the control-tab
 - [ ] Build a measure subtab (for TAC)
 - [ ] Build a measure subtab (for TDC)
 - [ ] Build a measure subtab (for NDIGO - if NDIGO is built)
-- [ ] Build a laser subtab
-- [ ] Make better logo and splash screen
+- [x] Build a laser subtab
+- [x] Make better logo and splash screen
+- [ ] Start TDC software automatic with a button press and safe it automatically
+- [ ] 
+- [ ] 
+- [ ] 
+- [ ] 
+- [ ] 
+- [ ] 
+
 
 ## BUGs
 - [ ] Pack images in executable - otherwise not shown

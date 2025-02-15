@@ -43,8 +43,8 @@ class Styles:
 
     global_style_sheet = f'''
         QWidget {{
-            background-color: {Colors.app_background};
-            color: {Colors.app_text};
+            #background-color: {Colors.app_background};
+            #color: {Colors.app_text};
         }}
 
         QPushButton,
@@ -53,22 +53,22 @@ class Styles:
         QSpinBox,
         QTabBar::tab,
         QDial {{
-            background-color: {Colors.app_background_event};
-            border: 1px solid {Colors.app_background_lighter};
+            #background-color: {Colors.app_background_event};
+            #border: 1px solid {Colors.app_background_lighter};
             padding: 3px;
-            color: #CCCCCC;
+            #color: #CCCCCC;
         }}
 
         QPushButton:hover,
         QComboBox:hover,
         QDoubleSpinBox:hover,
         QSpinBox:hover {{
-            background-color: #666666;
+            #background-color: #666666;
         }}
         
         QMenuBar::item:selected,
         QMenuBar::item:pressed {{
-            color: #000000;
+            #color: #000000;
         }}
         
         QLabel {{
@@ -76,27 +76,27 @@ class Styles:
         }}
         
         QTabWidget::pane {{
-            border: 0px;
-            border-top: 1px solid #CCCCCC;
+            #border: 0px;
+            #border-top: 1px solid #CCCCCC;
         }}
         
         QTabBar::tab:selected,
         QDial {{
-            background-color: {Colors.app_background_light};
-            color: #000000;
+            #background-color: {Colors.app_background_light};
+            #color: #000000;
         }}
         
         QTableWidget {{
-            background-color: {Colors.app_background_lighter};
-            color: #FFFFFF;
+            #background-color: {Colors.app_background_lighter};
+            #color: #FFFFFF;
             border: none;
-            gridline-color: {Colors.app_background_event};
+            #gridline-color: {Colors.app_background_event};
         }}
         
         QHeaderView,
         QCalendarWidget QTableView {{   
-            color: #000000;
-            background-color: {Colors.app_background_light};
+            #color: #000000;
+            #background-color: {Colors.app_background_light};
         }}
     '''
 
@@ -104,10 +104,10 @@ class Styles:
         qproperty-alignment: AlignCenter;
         border-top-left-radius: 10px;
         border-top-right-radius: 10px;
-        background-color: {Colors.app_background_light};
+        #background-color: {Colors.app_background_light};
         padding: 1px 5px;
         margin: 0px;
-        color: #000000;
+        #color: #000000;
     '''
 
     indicator_size = QSize(20, 20)

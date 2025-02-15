@@ -1051,6 +1051,10 @@ class MonacoConnection(TelnetConnection):
         """Allows the amplifier laser pulse repetition rate to be divided by an integer"""
         self._queryAndReturn(f'RRD={divisor}')
 
+    def rrSet(self, repetition_rate: float):
+        """Sets the output repetition rate"""
+        self.rrdSet(round(self.setGet()[0] * 1000 / repetition_rate))
+
     def rrdGet(self) -> int:
         """Returns the laser pulse repetition rate divisor"""
         return self._queryAndReturnInt('?RRD')

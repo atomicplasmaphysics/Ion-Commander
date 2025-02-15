@@ -29,7 +29,8 @@ class TipsWindow(TabWidget):
         self.tip_extension = f'.{DefaultParams.tip_extension}'
         self.path_tips_entries = str(join(self.path_tips, DefaultParams.tip_file_folder))
         self.path_tips_images = str(join(self.path_tips, 'images'))
-        self.checkTipsPath()
+        for p in [self.path_tips_entries, self.path_tips_images]:
+            makedirs(abspath(p), exist_ok=True)
         self.tips: list[str] = []
 
         # SPLITTER
@@ -97,17 +98,6 @@ class TipsWindow(TabWidget):
 
         self.updateTips()
 
-    def checkTipsPath(self):
-        """Checks if path of tips exists and creates it if not"""
-
-        for p in [
-            self.path_tips_entries,
-            self.path_tips_images
-        ]:
-            try:
-                makedirs(abspath(p))
-            except FileExistsError:
-                pass
 
     def updateTips(self):
         """Updates list of tips"""
@@ -144,7 +134,7 @@ class TipsWindow(TabWidget):
         # try generating tip file
         tip_path = str(join(self.path_tips_entries, f'{tip_name}{self.tip_extension}'))
         try:
-            with open(tip_path, 'w', encoding='utf-8') as _:
+            with open(tip_path, 'w', encoding=DefaultParams.tip_encoding) as _:
                 self.writeStatusBar(f'Tip file "{tip_path}" generated successfully')
         except FileNotFoundError:
             self.writeStatusBar(f'Tip file "{tip_path}" could not be generated')

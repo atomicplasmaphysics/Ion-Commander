@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING, Callable
 from math import log10, inf
 from time import time
 from datetime import datetime
-from os import path
+from os import path, listdir, rename as os_rename, remove as os_remove
 from shutil import copy
 from io import BytesIO
 from enum import Enum, auto
@@ -14,13 +14,14 @@ import numpy as np
 
 from PyQt6.QtCore import Qt, pyqtSignal, QByteArray, QSize, QRect, QRectF, QPointF
 from PyQt6.QtGui import (
-    QIcon, QPainter, QPixmap, QColor, QBrush, QLinearGradient, QPainterPath, QAction, QFont, QFontMetrics, QTextCursor, QPen
+    QIcon, QPainter, QPixmap, QColor, QBrush, QLinearGradient, QPainterPath, QAction, QFont, QFontMetrics, QTextCursor,
+    QPen, QTextFormat, QPalette
 )
 from PyQt6.QtWidgets import (
     QHBoxLayout, QLabel, QWidget, QVBoxLayout, QSpinBox, QDoubleSpinBox, QCheckBox, QComboBox, QLineEdit, QPushButton,
-    QListWidget, QListWidgetItem, QApplication, QStyleOption, QTableWidget, QTableWidgetItem, QAbstractItemView, QGridLayout,
-    QLCDNumber, QFrame, QTextEdit, QMenuBar, QMessageBox, QInputDialog, QMenu, QColorDialog, QDialog, QGroupBox, QDateTimeEdit,
-    QCalendarWidget, QDial, QHeaderView
+    QListWidget, QListWidgetItem, QApplication, QStyleOption, QTableWidget, QTableWidgetItem, QAbstractItemView,
+    QGridLayout, QLCDNumber, QFrame, QTextEdit, QMenuBar, QMessageBox, QInputDialog, QMenu, QColorDialog, QDialog,
+    QGroupBox, QDateTimeEdit, QCalendarWidget, QDial, QHeaderView, QPlainTextEdit
 )
 from PyQt6.QtSvgWidgets import QSvgWidget
 from PyQt6.QtSvg import QSvgRenderer
@@ -1871,10 +1872,10 @@ class DisplayLabel(QLabel):
             else:
                 difference = abs(self.value) - abs(self.target_value)
             percentage = 0
-            if self.deviation != 0:
-                deviation = self.deviation
-                if self.deviation_percent:
-                    deviation = deviation * abs(self.value)
+            deviation = self.deviation
+            if self.deviation_percent:
+                deviation = deviation * abs(self.value)
+            if deviation != 0:
                 percentage = min(abs(difference) / deviation, 1)
             new_color = linearInterpolateColor(self.color_good, self.color_bad, percentage)
             new_color.setAlpha(90)
@@ -2441,24 +2442,156 @@ class ButtonGridLayout(QGridLayout):
         self.fillGrid()
 
 
+class FilesList(QListWidget):
+    """
+    List of files in a given folder, files can be renamed and deleted
+
+    :param folder: folder for displaying files
+    :param extensions: file extension or list of file extensions
+    """
+
+    def __init__(self, folder: str, extensions: str | list[str] ):
+        super().__init__()
+
+        if not path.isdir(folder):
+            raise OSError(f'Provided folder "{folder}" is not a folder')
+
+        self.folder = folder
+        if not isinstance(extensions, list):
+            extensions = [extensions]
+        self.extensions = extensions
+        self.setSelectionMode(QListWidget.SelectionMode.SingleSelection)
+
+        self.currentRowChanged.connect(self._setSelectedFile)
+
+        self.selected_file = None
+        self.listFiles()
+
+    def _setSelectedFile(self, row_idx: int):
+        """Set selected file based on row index"""
+        if row_idx < 0 or row_idx >= self.count():
+            return
+        self.selected_file = self.item(row_idx).text()
+
+    def listFiles(self):
+        """Reload view and list all files"""
+
+        self.clear()
+        one_selected = False
+
+        for file in listdir(self.folder):
+            if not file.split('.')[-1] in self.extensions:
+                continue
+
+            item = QListWidgetItem()
+
+            layout = QHBoxLayout()
+            layout.setAlignment(Qt.AlignmentFlag.AlignLeft)
+
+            widget = QWidget()
+            widget.setLayout(layout)
+
+            item.setText(file)
+            item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+
+            button_delete = QPushButton()
+            button_delete.setToolTip('Delete Script')
+            button_delete.setIcon(QIcon('icons/delete.png'))
+            button_delete.setIconSize(QSize(10, 10))
+            button_delete.setContentsMargins(0, 0, 0, 0)
+            layout.addWidget(button_delete, alignment=Qt.AlignmentFlag.AlignLeft)
+            button_delete.clicked.connect(lambda _, i=item: self._deleteFile(i))
+
+            button_rename = QPushButton()
+            button_rename.setToolTip('Rename Script')
+            button_rename.setIcon(QIcon('icons/rename.png'))
+            button_rename.setIconSize(QSize(10, 10))
+            button_rename.setContentsMargins(0, 0, 0, 0)
+            layout.addWidget(button_rename, alignment=Qt.AlignmentFlag.AlignLeft)
+            button_rename.clicked.connect(lambda _, i=item: self._renameFile(i))
+
+            layout.addWidget(QLabel(file))
+
+            layout.setContentsMargins(0, 0, 0, 0)
+            layout.setSpacing(5)
+
+            self.addItem(item)
+            self.setItemWidget(item, widget)
+
+            if file == self.selected_file:
+                one_selected = True
+                self.setCurrentItem(item)
+
+        if not one_selected:
+            if self.count():
+                self.selected_file = self.item(0).text()
+                self.setCurrentRow(0)
+            else:
+                self.selected_file = None
+
+    def _renameFile(self, item: QListWidgetItem):
+        """
+        Prompt user for new file name and rename the file.
+
+        :param item: item of file to be modified
+        """
+
+        self.setCurrentItem(item)
+        old_name = item.text()
+        new_name, ok = QInputDialog.getText(self, f'Rename Script "{old_name}"', 'New name:', text=old_name)
+        if ok and new_name:
+            old_path = path.join(self.folder, old_name)
+
+            if not new_name.split('.')[-1] in self.extensions:
+                new_name += f'.{self.extensions[0]}'
+
+            new_path = path.join(self.folder, new_name)
+
+            if path.exists(new_path):
+                QMessageBox.warning(self, 'Error', 'File with this name already exists!')
+                return
+
+            os_rename(old_path, new_path)
+            self.selected_file = new_name
+            self.listFiles()
+
+
+    def _deleteFile(self, item: QListWidgetItem):
+        """
+        Delete the selected file
+
+        :param item: item of file to be deleted
+        """
+        self.setCurrentItem(item)
+        name = item.text()
+        confirm = QMessageBox.question(self, 'Confirm Delete', f'Delete "{name}"?', QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+        if confirm == QMessageBox.StandardButton.Yes:
+            os_remove(path.join(self.folder, name))
+            self.listFiles()
+
+
 class TextEdit(QWidget):
     """
     Text editor, which is a QTextEdit with a menu bar
 
+    :param menu: display menu
     :parm image_directors: directory of images
     :param save_button: if save button should be displayed
     :param load_button: if load button should be displayed
     :param file_extensions: list of possible file extensions
     :param encoding: encoding of file
+    :param html_save: read and write as html files
     """
 
     def __init__(
         self,
+        menu: bool = True,
         image_directory: str = None,
         save_button: bool = True,
         load_button: bool = True,
         file_extensions: list[str] | None = None,
         encoding: str = 'utf-8',
+        html_save: bool = True,
         **kwargs
     ):
         super().__init__(**kwargs)
@@ -2472,61 +2605,63 @@ class TextEdit(QWidget):
         else:
             self.file_filter = 'Text Files (' + ', '.join([f'.{file_extension}' for file_extension in file_extensions]) + ')'
         self.encoding = encoding
+        self.html_save = html_save
 
         # add menu bar
-        self.menu = QMenuBar(self)
-        self.main_layout.setMenuBar(self.menu)
+        if menu:
+            self.menu = QMenuBar(self)
+            self.main_layout.setMenuBar(self.menu)
 
-        self.menu_file = self.menu.addMenu('File')
+            self.menu_file = self.menu.addMenu('File')
 
-        if save_button:
-            self.menu_file_save = QAction('Save', self)
-            self.menu_file_save.setShortcut('Ctrl+S')
-            self.menu_file_save.triggered.connect(self.saveFile)
-            self.menu_file.addAction(self.menu_file_save)
+            if save_button:
+                self.menu_file_save = QAction('Save', self)
+                self.menu_file_save.setShortcut('Ctrl+S')
+                self.menu_file_save.triggered.connect(self.saveFile)
+                self.menu_file.addAction(self.menu_file_save)
 
-        if load_button:
-            self.menu_file_load = QAction('Open', self)
-            self.menu_file_load.setShortcut('Ctrl+O')
-            self.menu_file_load.triggered.connect(self.openFile)
-            self.menu_file.addAction(self.menu_file_load)
+            if load_button:
+                self.menu_file_load = QAction('Open', self)
+                self.menu_file_load.setShortcut('Ctrl+O')
+                self.menu_file_load.triggered.connect(self.openFile)
+                self.menu_file.addAction(self.menu_file_load)
 
-        self.menu_file_insert_image = QAction('Insert Image', self)
-        self.menu_file_insert_image.setShortcut('Ctrl+G')
-        self.menu_file_insert_image.triggered.connect(self.insertImage)
-        self.menu_file.addAction(self.menu_file_insert_image)
+            self.menu_file_insert_image = QAction('Insert Image', self)
+            self.menu_file_insert_image.setShortcut('Ctrl+G')
+            self.menu_file_insert_image.triggered.connect(self.insertImage)
+            self.menu_file.addAction(self.menu_file_insert_image)
 
-        self.menu_format = self.menu.addMenu('Format')
+            self.menu_format = self.menu.addMenu('Format')
 
-        self.menu_format_bold = QAction('Bold', self)
-        self.menu_format_bold.setShortcut('Ctrl+B')
-        self.menu_format_bold.triggered.connect(self.setBold)
-        self.menu_format.addAction(self.menu_format_bold)
+            self.menu_format_bold = QAction('Bold', self)
+            self.menu_format_bold.setShortcut('Ctrl+B')
+            self.menu_format_bold.triggered.connect(self.setBold)
+            self.menu_format.addAction(self.menu_format_bold)
 
-        self.menu_format_italic = QAction('Italic', self)
-        self.menu_format_italic.setShortcut('Ctrl+I')
-        self.menu_format_italic.triggered.connect(self.setItalic)
-        self.menu_format.addAction(self.menu_format_italic)
+            self.menu_format_italic = QAction('Italic', self)
+            self.menu_format_italic.setShortcut('Ctrl+I')
+            self.menu_format_italic.triggered.connect(self.setItalic)
+            self.menu_format.addAction(self.menu_format_italic)
 
-        self.menu_format_underline = QAction('Underline', self)
-        self.menu_format_underline.setShortcut('Ctrl+U')
-        self.menu_format_underline.triggered.connect(self.setUnderline)
-        self.menu_format.addAction(self.menu_format_underline)
+            self.menu_format_underline = QAction('Underline', self)
+            self.menu_format_underline.setShortcut('Ctrl+U')
+            self.menu_format_underline.triggered.connect(self.setUnderline)
+            self.menu_format.addAction(self.menu_format_underline)
 
-        self.menu_format_increase_font = QAction('Increase Font', self)
-        self.menu_format_increase_font.setShortcut('Ctrl++')
-        self.menu_format_increase_font.triggered.connect(lambda: self.increaseFontSize(1))
-        self.menu_format.addAction(self.menu_format_increase_font)
+            self.menu_format_increase_font = QAction('Increase Font', self)
+            self.menu_format_increase_font.setShortcut('Ctrl++')
+            self.menu_format_increase_font.triggered.connect(lambda: self.increaseFontSize(1))
+            self.menu_format.addAction(self.menu_format_increase_font)
 
-        self.menu_format_decrease_font = QAction('Decrease Font', self)
-        self.menu_format_decrease_font.setShortcut('Ctrl+-')
-        self.menu_format_decrease_font.triggered.connect(lambda: self.increaseFontSize(-1))
-        self.menu_format.addAction(self.menu_format_decrease_font)
+            self.menu_format_decrease_font = QAction('Decrease Font', self)
+            self.menu_format_decrease_font.setShortcut('Ctrl+-')
+            self.menu_format_decrease_font.triggered.connect(lambda: self.increaseFontSize(-1))
+            self.menu_format.addAction(self.menu_format_decrease_font)
 
-        self.menu_format_red = QAction('Change Color', self)
-        self.menu_format_red.setShortcut('Ctrl+Q')
-        self.menu_format_red.triggered.connect(self.changeColor)
-        self.menu_format.addAction(self.menu_format_red)
+            self.menu_format_red = QAction('Change Color', self)
+            self.menu_format_red.setShortcut('Ctrl+Q')
+            self.menu_format_red.triggered.connect(self.changeColor)
+            self.menu_format.addAction(self.menu_format_red)
 
         # actual text editor
         self.text_editor = QTextEdit(self)
@@ -2553,7 +2688,10 @@ class TextEdit(QWidget):
 
         try:
             with open(file_name, 'w', encoding=self.encoding, errors='ignore') as file:
-                file.write(self.text_editor.toHtml())
+                if self.html_save:
+                    file.write(self.text_editor.toHtml())
+                else:
+                    file.write(self.text_editor.toPlainText())
         except (OSError, FileNotFoundError, FileExistsError) as e:
             QMessageBox.warning(self, 'Error', f'Failed to save file: {e}')
             return 2
@@ -2575,7 +2713,10 @@ class TextEdit(QWidget):
 
         try:
             with open(file_name, 'r', encoding=self.encoding, errors='ignore') as file:
-                self.text_editor.setHtml(file.read())
+                if self.html_save:
+                    self.text_editor.setHtml(file.read())
+                else:
+                    self.text_editor.setText(file.read())
         except (OSError, FileNotFoundError, FileExistsError) as e:
             QMessageBox.warning(self, 'Error', f'Failed to open file: {e}')
             return 2
@@ -2695,6 +2836,184 @@ class TextEdit(QWidget):
         # Replace the existing image HTML with new dimensions
         new_img_html = f'<img src="{src}" width="{width}" height="{height}" />'
         cursor.insertHtml(new_img_html)
+
+
+class LineNumberArea(QWidget):
+    """
+    Line number area of FileEditor
+
+    :param editor: FileEditor
+    """
+
+    def __init__(self, editor: FileEditor):
+        super().__init__(editor)
+        self.editor = editor
+
+    def sizeHint(self):
+        """Returns size of line number area"""
+        return QSize(self.editor.lineNumberAreaWidth(), 0)
+
+    def paintEvent(self, event):
+        """Called when a paint event happens"""
+        self.editor.lineNumberAreaPaintEvent(event)
+
+
+class FileEditor(QPlainTextEdit):
+    """
+    QPlainTextEdit with line numbers and marks current line when clicked
+
+    :param parent: parent widget
+    :param line_numbering: (optional) if textbox should have line numbering
+    :param readonly: (optional) if textbox should be readonly
+    :param mono: (optional) if textbox should have mono font
+    :param offset: (optional) offset for line numbers
+    :param highlighting: (optional) enables highlighting of current selected line
+    :param color_line_number: (optional) color of line number area
+    :param color_highlight: (optional) color of highlighting line
+    """
+
+    def __init__(
+        self,
+        parent = None,
+        line_numbering: bool = True,
+        readonly: bool = True,
+        mono: bool = True,
+        offset: int = 0,
+        highlighting: bool = True,
+        color_line_number: str | None = None,
+        color_highlight: str | None = None,
+    ):
+        super().__init__(parent)
+        self.line_numbering = line_numbering
+        self.offset = offset
+
+        palette = self.palette()
+
+        self.pen_color = palette.color(QPalette.ColorRole.Text)
+
+        if color_highlight is None:
+            self.color_highlight = palette.color(QPalette.ColorRole.Highlight)
+            hsv = self.color_highlight.getHsv()
+            self.color_highlight.setHsv(
+                (hsv[0] + 128) % 256,
+                hsv[1],
+                hsv[2],
+                hsv[3],
+            )
+        else:
+            self.color_highlight = QColor(color_highlight)
+
+        if color_line_number is None:
+            self.color_line_number = palette.color(QPalette.ColorRole.Light)
+        else:
+            self.color_line_number = QColor(color_line_number)
+
+        self.line_number_area = LineNumberArea(self)
+
+        self.updateLineNumberAreaWidth()
+
+        self.blockCountChanged.connect(lambda _: self.updateLineNumberAreaWidth())
+        self.updateRequest.connect(self.updateLineNumberArea)
+        if highlighting:
+            self.cursorPositionChanged.connect(self.highlightCurrentLine)
+
+        if readonly:
+            self.setReadOnly(True)
+
+        if mono:
+            mono_font = QFont('Courier New')
+            mono_font.setStyleHint(QFont.StyleHint.TypeWriter)
+            self.setFont(mono_font)
+
+    def updateOffset(self, offset: int):
+        """Updates the offset of the line numbers"""
+        self.offset = offset
+
+    def lineNumberAreaWidth(self):
+        """Returns the width of the line number area"""
+        digits = len(str(self.blockCount() + self.offset))
+        space = 5 + self.fontMetrics().horizontalAdvance('9') * digits
+        return space
+
+    def updateLineNumberAreaWidth(self):
+        """Updates width of line number area"""
+        if not self.line_numbering:
+            return
+
+        self.setViewportMargins(self.lineNumberAreaWidth() + 5, 0, 0, 0)
+
+    def updateLineNumberArea(self, rect, dy):
+        """Updates line number area"""
+        if dy:
+            self.line_number_area.scroll(0, dy)
+        else:
+            self.line_number_area.update(0, rect.y(), self.line_number_area.width(), rect.height())
+
+        if rect.contains(self.viewport().rect()):
+            self.updateLineNumberAreaWidth()
+
+    def resizeEvent(self, event):
+        """On resize"""
+        super().resizeEvent(event)
+
+        cr = self.contentsRect()
+        self.line_number_area.setGeometry(QRect(cr.left(), cr.top(), self.lineNumberAreaWidth(), cr.height()))
+
+    def lineNumberAreaPaintEvent(self, event):
+        """Called when a paint event happens"""
+        if not self.line_numbering:
+            return
+
+        painter = QPainter(self.line_number_area)
+        painter.fillRect(event.rect(), self.color_line_number)
+
+        block = self.firstVisibleBlock()
+        block_number = block.blockNumber()
+        top = self.blockBoundingGeometry(block).translated(self.contentOffset()).top()
+        bottom = top + self.blockBoundingRect(block).height()
+
+        # make sure to use the right font
+        height = self.fontMetrics().height()
+        while block.isValid() and (top <= event.rect().bottom()):
+            if block.isVisible() and (bottom >= event.rect().top()):
+                painter.setPen(self.pen_color)
+                painter.drawText(
+                    0,
+                    int(top),
+                    int(self.line_number_area.width()),
+                    int(height),
+                    Qt.AlignmentFlag.AlignRight,
+                    str(block_number + 1 + self.offset)
+                )
+
+            block = block.next()
+            top = bottom
+            bottom = top + self.blockBoundingRect(block).height()
+            block_number += 1
+
+    def highlightCurrentLine(self):
+        """Highlight current line"""
+        selections = []
+
+        text_cursor = self.textCursor()
+        block = text_cursor.block()
+        cursor_position = block.position()
+        while True:
+            new_text_cursor = QTextCursor(text_cursor)
+            new_text_cursor.setPosition(cursor_position)
+            cursor_position += 1
+            if new_text_cursor.atBlockEnd():
+                break
+
+            selection = QTextEdit.ExtraSelection()
+            selection.cursor = new_text_cursor
+            selections.append(selection)
+
+        for selection in selections:
+            selection.format.setBackground(self.color_highlight)
+            selection.format.setProperty(QTextFormat.Property.FullWidthSelection, True)
+
+        self.setExtraSelections(selections)
 
 
 class FittingWidget(QWidget):

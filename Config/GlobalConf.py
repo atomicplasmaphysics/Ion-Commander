@@ -79,6 +79,11 @@ class DefaultParams:
     cs_encoding = 'utf-8'
     cs_max_connections = 10
 
+    # Script parameters
+    script_folder = 'Scripts'
+    script_extension = 'lsd'
+    script_encoding = 'utf-8'
+
 
 class GlobalConf:
     """

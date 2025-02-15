@@ -41,10 +41,10 @@ def main():
 
     # get splash size
     screen = app.primaryScreen().availableVirtualGeometry()
-    splash_size = QSize(int(min(766, screen.width() * 0.5)), int(min(383, screen.height() * 0.5)))
+    splash_size = QSize(int(min(766., screen.width() * 0.5)), int(min(383., screen.height() * 0.5)))
 
     # show splashscreen on startup
-    pixmap = SplashPixmap('icons/splash.png', 'v0.1.20', QRect(0, 1000, 2250, 150), font_size=100, color=Qt.GlobalColor.white)
+    pixmap = SplashPixmap('icons/splash.png', 'v0.1.35', QRect(0, 1000, 2250, 150), font_size=100, color=Qt.GlobalColor.white)
     pixmap = pixmap.scaled(splash_size, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
     splash = QSplashScreen(pixmap)
     splash.show()

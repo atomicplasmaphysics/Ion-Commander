@@ -1,0 +1,18 @@
+TIME 10
+# first line always has to specify the interval of the commands
+# lines with a '#' are treated as comment and are ignored
+# in line comments do not work
+# empty lines will also be ignored
+
+# commands will be set one after another
+# '%' can be used as placeholder and following arguments will be placed inside
+LASER:rfSet(%) 23, 24
+
+# '	' are treated as loops
+	LASER:rrSet(%) 10, 1
+
+# the total code will actually perform following commands:
+# 1: LASER:rfSet(23) AND LASER:rrSet(10)
+# 2: LASER:rrSet(1)
+# 3: LASER:rfSet(24) AND LASER:rrSet(10)
+# 4: LASER:rrSet(1)

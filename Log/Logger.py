@@ -4,7 +4,7 @@ import logging.handlers
 from contextlib import contextmanager
 import json
 from pathlib import Path
-from os import mkdir
+from os import makedirs
 
 
 from Config.GlobalConf import GlobalConf, DefaultParams
@@ -48,12 +48,9 @@ def setupLogging(level: int = logging.WARNING):
 
     root_path = Path(__file__).parents[1]
 
-    try:
-        mkdir(root_path / DefaultParams.logging_folder / DefaultParams.logging_log_folder)
-    except FileExistsError:
-        pass
+    makedirs(root_path / DefaultParams.logging_folder / DefaultParams.logging_log_folder, exist_ok=True)
 
-    with open(root_path / DefaultParams.logging_folder / DefaultParams.logging_json_file, 'r') as log_file:
+    with open(root_path / DefaultParams.logging_folder / DefaultParams.logging_json_file, 'r', encoding='utf-8') as log_file:
         config = json.load(log_file)
     config['handlers']['console']['level'] = logging.getLevelName(level)
     config['handlers']['file']['filename'] = str(root_path / DefaultParams.logging_folder / DefaultParams.logging_log_folder / f'{GlobalConf.title.replace(" ", "_")}.log')

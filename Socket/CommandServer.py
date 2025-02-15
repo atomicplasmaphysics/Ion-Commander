@@ -139,7 +139,7 @@ class CommandServer(QObject):
     :param encoding: used encoding
     :param max_connections: maximum number of simultaneous connections
     :param max_packet: maximum bytesize of packet
-    :param debug: if debug messages should be displayed,
+    :param debug: if debug messages should be displayed
     :param daemonic: sets the threads to daemonic
     """
 
