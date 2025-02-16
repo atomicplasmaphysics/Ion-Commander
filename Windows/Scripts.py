@@ -221,7 +221,7 @@ class ScriptsWindow(TabWidget):
             self.script_action_abort.setDisabled(True)
             return
 
-        name = self.script_selection_list.item(list_idx).text()
+        name = self.script_selection_list.item(list_idx).data(100)
 
         self.saveScript()
 
@@ -269,7 +269,7 @@ class ScriptsWindow(TabWidget):
             self.script_server.finish.connect(self.processFinishScript)
             self.script_server.start()
 
-        except ValueError as error:
+        except (ValueError, ConnectionError, ConnectionRefusedError) as error:
             self.script_output.setPlainText(str(error))
             self.abortScript()
             return
@@ -293,7 +293,6 @@ class ScriptsWindow(TabWidget):
 
         self.script_run_progress.setValue(100)
 
-
     def processLogScript(self, log: str):
         """Processes the log messages of the script running"""
 
@@ -302,10 +301,7 @@ class ScriptsWindow(TabWidget):
         if self.script_server is None:
             return
 
-        if not self.script_server.command_queue.queue:
-            self.script_run_progress.setValue(0)
-        else:
-            self.script_run_progress.setValue(round(100 * self.script_server.command_queue_idx / len(self.script_server.command_queue.queue)))
+        self.script_run_progress.setValue(self.script_server.progress())
 
     def closeEvent(self, event):
         """Save current script editor"""

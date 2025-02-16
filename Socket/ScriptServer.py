@@ -1,9 +1,9 @@
 from typing import Self
 from socket import socket, AF_INET, SOCK_STREAM
-from time import time
+from time import time, sleep
 
 
-from PyQt6.QtCore import QTimer, QElapsedTimer, pyqtSignal, QObject
+from PyQt6.QtCore import QTimer, QElapsedTimer, pyqtSignal, QObject, QRunnable, pyqtSlot, QThreadPool
 
 
 from Config.GlobalConf import GlobalConf, DefaultParams
@@ -189,6 +189,90 @@ class CommandQueue:
         return cmd_queue
 
 
+class ScriptServerWorkerSignals(QObject):
+    """
+    Signals for <ScriptServerWorker>
+
+    log: log messages
+    finish: only signal on finish
+    """
+
+    log = pyqtSignal(str)
+    finish = pyqtSignal()
+
+
+class ScriptServerWorker(QRunnable):
+    """
+    Threaded ScriptServer for communicating with socket server
+
+    :param command_queue: filled <CommandQueue> object
+    :param socket_connection: opened socket
+    :param encoding: encoding of socket
+    """
+
+    def __init__(
+        self,
+        command_queue: CommandQueue,
+        socket_connection: socket,
+        encoding: str = 'utf-8'
+    ):
+        super().__init__()
+        self.command_queue = command_queue
+        self.socket_connection = socket_connection
+        self.encoding = encoding
+
+        self.signal = ScriptServerWorkerSignals()
+
+        self.command_queue_idx = 0
+        self.is_running = False
+
+    @pyqtSlot()
+    def run(self):
+        """Called when worker is started"""
+
+        self.is_running = True
+        self.command_queue.start_time = time()
+        self.nextCommand()
+
+        while True:
+            if not self.is_running:
+                break
+
+            if self.command_queue_idx * self.command_queue.interval > time() - self.command_queue.start_time:
+                sleep(0.001)
+                continue
+
+            self.nextCommand()
+
+    def nextCommand(self):
+        """Executes next command"""
+
+        if self.socket_connection is None:
+            raise ConnectionError('ScriptServer did not establish connection yet')
+
+        if self.command_queue_idx >= len(self.command_queue.queue):
+            self.signal.log.emit('ScriptServer executed all commands')
+            self.signal.finish.emit()
+            self.is_running = False
+            return
+
+        commands = self.command_queue.queue[self.command_queue_idx]
+        if not isinstance(commands, list):
+            commands = [commands]
+        for command in commands:
+            self.socket_connection.sendall(command.encode(self.encoding))
+            elapsed_time = time() - self.command_queue.start_time
+            self.command_queue.command_times.append(elapsed_time)
+            recv_msg = self.socket_connection.recv(1024).decode(self.encoding)
+            self.signal.log.emit(f'ScriptServer sent "{command}" at {elapsed_time:.3f} seconds and received "{recv_msg}"')
+
+        self.command_queue_idx += 1
+
+    def stop(self):
+        """Stops execution of commands"""
+        self.is_running = False
+
+
 class ScriptServer(QObject):
     """
     Server to execute scripts on the <CommandServer>
@@ -209,7 +293,6 @@ class ScriptServer(QObject):
         host: str = DefaultParams.cs_host,
         port: int = DefaultParams.cs_port,
         encoding: str = DefaultParams.cs_encoding,
-
         debug: bool = False,
     ):
         super().__init__()
@@ -224,70 +307,48 @@ class ScriptServer(QObject):
         self.encoding = encoding
         self.debug = debug
 
-        self.interval_timer = QTimer()
-        self.interval_timer.timeout.connect(self.nextCommand)
-        self.elapsed_timer = QElapsedTimer()
+        self.socket = socket(AF_INET, SOCK_STREAM)
+        self.socket.connect((self.host, self.port))
+        if self.debug:
+            GlobalConf.logger.debug(f'ScriptServer connected to "{self.host}:{self.port}"')
 
-        self.socket: socket | None = None
-        self.command_queue_idx = 0
+        self.worker = ScriptServerWorker(self.command_queue, self.socket)
+        self.worker.signal.log.connect(self.handleLog)
+        self.worker.signal.finish.connect(self.handleFinish)
+
+    @pyqtSlot(str)
+    def handleLog(self, log: str):
+        """Handles log signals"""
+        if self.debug:
+            GlobalConf.logger.debug(log)
+        self.log.emit(log)
+
+    @pyqtSlot()
+    def handleFinish(self):
+        """Handles finish signals"""
+        if self.debug:
+            GlobalConf.logger.debug('ScriptServer finished')
+        self.finish.emit()
+        self.socket.close()
 
     def start(self):
         """Starts the execution of commands"""
-
-        self.socket = socket(AF_INET, SOCK_STREAM)
-        self.socket.connect((self.host, self.port))
-        log_msg = f'ScriptServer connected to "{self.host}:{self.port}" with encoding "{self.encoding}"'
-        self.log.emit(log_msg)
-        if self.debug:
-            GlobalConf.logger.debug(log_msg)
-
-        self.elapsed_timer.start()
-        self.interval_timer.start(round(self.command_queue.interval * 1000))
-        self.command_queue.start_time = time()
-        self.nextCommand()
+        QThreadPool.globalInstance().start(self.worker)
 
     def stop(self):
         """Stops execution of commands"""
-
-        if self.socket is not None:
-            self.socket.close()
-        self.interval_timer.stop()
+        self.worker.stop()
+        self.socket.close()
 
     def isRunning(self) -> bool:
         """Determines if script server is running"""
-        return self.socket is not None
+        return self.worker.is_running
 
-    def nextCommand(self):
-        """Executes next command"""
-
-        if self.socket is None:
-            raise ConnectionError('ScriptServer did not establish connection yet')
-
-        if self.command_queue_idx >= len(self.command_queue.queue):
-            self.interval_timer.stop()
-            self.socket.close()
-            log_msg = 'ScriptServer executed all commands'
-            self.log.emit(log_msg)
-            self.finish.emit()
-            if self.debug:
-                GlobalConf.logger.debug(log_msg)
-            return
-
-        commands = self.command_queue.queue[self.command_queue_idx]
-        if not isinstance(commands, list):
-            commands = [commands]
-        for command in commands:
-            self.socket.sendall(command.encode(self.encoding))
-            elapsed_time = self.elapsed_timer.elapsed() / 1000
-            self.command_queue.command_times.append(elapsed_time)
-            recv_msg = self.socket.recv(1024).decode(self.encoding)
-            log_msg = f'ScriptServer sent "{command}" at {elapsed_time:.3f} seconds and received "{recv_msg}"'
-            self.log.emit(log_msg)
-            if self.debug:
-                GlobalConf.logger.debug(log_msg)
-
-        self.command_queue_idx += 1
-
+    def progress(self) -> int:
+        """Returns progress"""
+        if not self.command_queue.queue:
+            return 0
+        return round(100 * (self.worker.command_queue_idx - 1) / len(self.command_queue.queue))
 
 
 def main():
@@ -329,6 +390,7 @@ LASER:rfSet(%) 23, 24
     print('we are here')
 
     sys.exit(app.exec())
+
 
 if __name__ == '__main__':
     main()

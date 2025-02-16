@@ -2491,7 +2491,7 @@ class FilesList(QListWidget):
             widget = QWidget()
             widget.setLayout(layout)
 
-            item.setText(file)
+            item.setData(100, file)
             item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
 
             button_delete = QPushButton()
@@ -2537,7 +2537,7 @@ class FilesList(QListWidget):
         """
 
         self.setCurrentItem(item)
-        old_name = item.text()
+        old_name = item.data(100)
         new_name, ok = QInputDialog.getText(self, f'Rename Script "{old_name}"', 'New name:', text=old_name)
         if ok and new_name:
             old_path = path.join(self.folder, old_name)
@@ -2555,7 +2555,6 @@ class FilesList(QListWidget):
             self.selected_file = new_name
             self.listFiles()
 
-
     def _deleteFile(self, item: QListWidgetItem):
         """
         Delete the selected file
@@ -2563,7 +2562,7 @@ class FilesList(QListWidget):
         :param item: item of file to be deleted
         """
         self.setCurrentItem(item)
-        name = item.text()
+        name = item.data(100)
         confirm = QMessageBox.question(self, 'Confirm Delete', f'Delete "{name}"?', QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
         if confirm == QMessageBox.StandardButton.Yes:
             os_remove(path.join(self.folder, name))

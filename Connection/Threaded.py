@@ -53,7 +53,7 @@ class ConnectionWorkerSignals(QObject):
     """
     Signals for connection worker
 
-    error: any occurring error
+    error: callback_id, any occurring error
     result: callback_id, result
     """
 
@@ -76,6 +76,7 @@ class ConnectionWorker(QRunnable):
         self.connection: ISEGConnection | ThyracontConnection | MonacoConnection | TLPMxConnection = connection
         self.signal = ConnectionWorkerSignals()
         self.running = True
+        self.close_called = False
         self.started = False
         self.auto_delete = auto_delete
         self.work = []
@@ -100,10 +101,11 @@ class ConnectionWorker(QRunnable):
                 obj_func = getattr(self.connection, name)
                 result = obj_func(*args, **kwargs)
                 self.signal.result.emit(callback_id, result)
-            except (AttributeError, ConnectionError, NameError, TypeError, ValueError) as error:
+            except Exception as error:
                 self.signal.error.emit(callback_id, error)
 
             if name == 'close':
+                self.close_called = True
                 self.running = False
                 self.work = []
 
@@ -123,6 +125,7 @@ class ConnectionWorker(QRunnable):
             if self.auto_delete is None:
                 self.signal.error.emit(-1, BufferError('Too many tasks in queue'))
                 return -1
+
             self.signal.error.emit(-1, BufferError('Too many tasks in queue, will delete possible oldest ones'))
             auto_delete_time = time() - self.auto_delete
             deleted_callback_ids = []
@@ -138,6 +141,9 @@ class ConnectionWorker(QRunnable):
             return deleted_callback_ids
 
         if not self.running:
+            if self.close_called:
+                return -10
+
             self.signal.error.emit(-1, ChildProcessError('Not running'))
             return -1
 
@@ -145,7 +151,7 @@ class ConnectionWorker(QRunnable):
         return callback_id
 
 
-class ThreadedConnection:
+class ThreadedConnection(QObject):
     """
     Baseclass for threaded connections
 
@@ -158,11 +164,12 @@ class ThreadedConnection:
         connection: ISEGConnection | ThyracontConnection | TPG300Connection | MixedPressureConnection | MonacoConnection | TLPMxConnection | None,
         connection_aborted_function: Callable = None
     ):
+        super().__init__()
         self.connection = connection
         self.connection_aborted_function = connection_aborted_function
 
         self.worker = ConnectionWorker(connection)
-        self.worker.signal.error.connect(self.error)
+        self.worker.signal.error.connect(self.handleError)
         self.worker.signal.result.connect(self.executeCallback)
 
         self.threadpool = QThreadPool.globalInstance()
@@ -177,7 +184,8 @@ class ThreadedConnection:
 
         return self.connection is None
 
-    def error(self, callback_id: int, error: Exception):
+    @pyqtSlot(int, Exception)
+    def handleError(self, callback_id: int, error: Exception):
         """
         Called when an exception in the worker thread occurs
 
@@ -203,10 +211,12 @@ class ThreadedConnection:
 
         del self.callbacks[callback_id]
 
-    def callback(self, function, callback_id: int | list[int]):
+    def callback(self, function, callback_id):
         """
         Calls function when second statement finishes. Expects a callback_id, which is a positive integer if successfull,
         a negative integer if not successfull and a list of integers of deleted callback_ids if queue is already too long
+
+        Example: callback(func_to_execute_on_callback, threaded_connection.func_for_device(args))
 
         :param function: function to be executed
         :param callback_id: every call of this class will be passed to the worker and return a unique id, which should be passed here
@@ -221,11 +231,14 @@ class ThreadedConnection:
 
         if not isinstance(callback_id, int):
             raise ValueError(f'Callback id must be <int>, received {type(callback_id)}')
+        elif callback_id == -10:
+            return
         elif callback_id < 0:
             raise ValueError(f'Callback id "{callback_id}" is invalid')
 
         self.callbacks[callback_id] = function
 
+    @pyqtSlot(int, object)
     def executeCallback(self, callback_id: int, result):
         """
         Executes callback function with given result
