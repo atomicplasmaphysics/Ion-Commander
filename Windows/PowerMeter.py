@@ -11,6 +11,8 @@ from Config.StylesConf import Colors
 
 from DB.db import DB
 
+from Socket.CommandServer import DeviceTLPMxWrapper
+
 from Utility.Layouts import InsertingGridLayout, IndicatorLed, DoubleSpinBox, DisplayLabel, SpinBox, ComboBox, LatexLabel
 from Utility.Functions import getPrefix
 from Utility.Dialogs import showMessageBox
@@ -31,8 +33,9 @@ class PowerMeterVBoxLayout(QVBoxLayout):
 
         self.active_message_box = False
 
+        self.device_wrapper = DeviceTLPMxWrapper()
         self.connection: None | TLPMxConnection = None
-        self.threaded_connection: ThreadedDummyConnection | ThreadedTLPMxConnection = ThreadedDummyConnection()
+        self.device_wrapper.threaded_connection = ThreadedDummyConnection()
 
         # Connection Group Box
         self.connection_group_box = QGroupBox('Connection and Status')
@@ -238,7 +241,10 @@ class PowerMeterVBoxLayout(QVBoxLayout):
                 self.status_wavelength.setTargetValue(wavelength)
                 self.spinbox_wavelength.setValue(round(wavelength))
 
-        self.threaded_connection.callback(setWavelength, self.threaded_connection.getWavelength(TLPMxValues.Attribute.SetValue))
+        self.device_wrapper.threaded_connection.callback(
+            setWavelength,
+            self.device_wrapper.threaded_connection.getWavelength(TLPMxValues.Attribute.SetValue)
+        )
 
         # get attenuation
         def setAttenuation(attenuation: float):
@@ -247,7 +253,10 @@ class PowerMeterVBoxLayout(QVBoxLayout):
                 self.status_attenuation.setTargetValue(attenuation)
                 self.spinbox_attenuation.setValue(attenuation)
 
-        self.threaded_connection.callback(setAttenuation, self.threaded_connection.getAttenuation(TLPMxValues.Attribute.SetValue))
+        self.device_wrapper.threaded_connection.callback(
+            setAttenuation,
+            self.device_wrapper.threaded_connection.getAttenuation(TLPMxValues.Attribute.SetValue)
+        )
 
         # get averaging
         def setAveraging(averaging: int):
@@ -256,7 +265,10 @@ class PowerMeterVBoxLayout(QVBoxLayout):
                 self.status_averaging.setTargetValue(averaging)
                 self.spinbox_averaging.setValue(averaging)
 
-        self.threaded_connection.callback(setAveraging, self.threaded_connection.getAverageCount())
+        self.device_wrapper.threaded_connection.callback(
+            setAveraging,
+            self.device_wrapper.threaded_connection.getAverageCount()
+        )
 
         # get beam diameter
         def setBeamDiameter(diameter: float):
@@ -266,7 +278,10 @@ class PowerMeterVBoxLayout(QVBoxLayout):
                 self.status_beam_diameter.setTargetValue(diameter)
                 self.spinbox_beam_diameter.setValue(diameter)
 
-        self.threaded_connection.callback(setBeamDiameter, self.threaded_connection.getBeamDiameter(TLPMxValues.Attribute.SetValue))
+        self.device_wrapper.threaded_connection.callback(
+            setBeamDiameter,
+            self.device_wrapper.threaded_connection.getBeamDiameter(TLPMxValues.Attribute.SetValue)
+        )
 
         # get display value
         def setDisplayValue(values: [float, float]):
@@ -279,7 +294,10 @@ class PowerMeterVBoxLayout(QVBoxLayout):
                 self.reset_min_max_next_update = False
                 self.resetMinMax()
 
-        self.threaded_connection.callback(setDisplayValue, self.threaded_connection.measure())
+        self.device_wrapper.threaded_connection.callback(
+            setDisplayValue,
+            self.device_wrapper.threaded_connection.measure()
+        )
 
     def updateAllValues(self):
         """Updates all values"""
@@ -330,7 +348,7 @@ class PowerMeterVBoxLayout(QVBoxLayout):
             return
 
         self.status_wavelength.setTargetValue(wavelength)
-        self.threaded_connection.setWavelength(wavelength)
+        self.device_wrapper.threaded_connection.setWavelength(wavelength)
 
     def setAttenuation(self, attenuation: float):
         """
@@ -342,8 +360,8 @@ class PowerMeterVBoxLayout(QVBoxLayout):
         if not self.checkConnection():
             return
 
-        self.threaded_connection.setAttenuation(attenuation)
         self.status_attenuation.setTargetValue(attenuation)
+        self.device_wrapper.threaded_connection.setAttenuation(attenuation)
 
     def setAveraging(self, average_count: int):
         """
@@ -355,8 +373,8 @@ class PowerMeterVBoxLayout(QVBoxLayout):
         if not self.checkConnection():
             return
 
-        self.threaded_connection.setAverageCount(average_count)
         self.status_averaging.setTargetValue(average_count)
+        self.device_wrapper.threaded_connection.setAverageCount(average_count)
 
     def setBeamDiameter(self, diameter: float):
         """
@@ -369,8 +387,8 @@ class PowerMeterVBoxLayout(QVBoxLayout):
             return
 
         diameter_set = diameter / sqrt(2)  # conversion from gauss circular beam
-        self.threaded_connection.setBeamDiameter(diameter_set)
         self.status_beam_diameter.setTargetValue(diameter)
+        self.device_wrapper.threaded_connection.setBeamDiameter(diameter_set)
 
     def resetMinMax(self):
         """Resets the min and max values"""
@@ -416,7 +434,7 @@ class PowerMeterVBoxLayout(QVBoxLayout):
             port = self.combobox_connection.getValue(save=True)
         self.setPort(port)
 
-        connect = self.threaded_connection.isDummy()
+        connect = self.device_wrapper.threaded_connection.isDummy()
 
         self.unconnect()
 
@@ -429,21 +447,23 @@ class PowerMeterVBoxLayout(QVBoxLayout):
                 )
 
                 self.connection.open()
-                self.threaded_connection = ThreadedTLPMxConnection(self.connection)
+                self.device_wrapper.threaded_connection = ThreadedTLPMxConnection(
+                    self.connection,
+                    self.unconnect
+                )
                 self.indicator_connection.setValue(True)
                 self.status_connection.setText('Connected')
                 self.combobox_connection.setEnabled(False)
                 self.button_connection_refresh.setEnabled(False)
                 self.button_connection.setText('Disconnect')
 
-                self.threaded_connection.setAutoRange((1, 1))
+                self.device_wrapper.threaded_connection.setAutoRange((1, 1))
 
             except (ConnectionError, AttributeError, FileNotFoundError) as error:
                 try:
                     self.connection.close()
                 except (ConnectionError, AttributeError):
                     pass
-
                 self.connection = None
                 self.reset()
 
@@ -468,8 +488,8 @@ class PowerMeterVBoxLayout(QVBoxLayout):
     def unconnect(self):
         """Disconnect from any port"""
 
-        self.threaded_connection.close()
-        self.threaded_connection = ThreadedDummyConnection()
+        self.device_wrapper.threaded_connection.close()
+        self.device_wrapper.threaded_connection = ThreadedDummyConnection()
         if self.connection is not None:
             self.connection.close()
             self.connection = None
@@ -494,7 +514,7 @@ class PowerMeterVBoxLayout(QVBoxLayout):
     def reset(self):
         """Resets everything to default"""
 
-        self.threaded_connection.close()
+        self.device_wrapper.threaded_connection.close()
         if self.connection is not None:
             self.connection.close()
 
@@ -552,7 +572,8 @@ class PowerMeterVBoxLayout(QVBoxLayout):
     def closeEvent(self):
         """Must be called when application is closed"""
 
-        self.threaded_connection.close()
+        self.device_wrapper.threaded_connection.close()
+
         if self.connection is not None:
             self.connection.close()
 

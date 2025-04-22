@@ -91,6 +91,7 @@ class MainWindow(QMainWindow):
             'PSU': self.control_window.psu_group_vbox.device_wrapper,
             'LASER': self.control_window.laser_group_vbox.device_wrapper,
             'PRESSURE': self.control_window.pressure_group_vbox.device_wrapper,
+            'POWER': self.monitor_window.power_meter_group_vbox.device_wrapper
         })
         self.server.startServer()
 

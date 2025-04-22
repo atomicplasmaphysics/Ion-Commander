@@ -19,12 +19,12 @@ from Utility.Layouts import createFittingBars, FittingWidget
 
 simplefilter('ignore', OptimizeWarning)
 simplefilter('ignore', RuntimeWarning)
-supported_file_types = ['dat', 'cod', 'cod2']
+supported_file_types = ['dat', 'cod', 'cod2', 'lmftxt']
 
 
 def getTACFileData(filename: str, tac: int, delay: float = 0) -> tuple[np.ndarray, np.ndarray]:
     """
-    Converts TAC-file (.dat) into x, y, y_max values
+    Converts TAC-file (.dat) into x, y values
 
     :param filename: filename of TAC file
     :param tac: total TAC time in ns (50, 100, 200, ...)
@@ -42,7 +42,7 @@ def getTACFileData(filename: str, tac: int, delay: float = 0) -> tuple[np.ndarra
 
 def getTDCFileData(filename: str) -> tuple[np.ndarray, np.ndarray]:
     """
-    Converts TDC-file (.cod) into x, y, y_max values
+    Converts TDC-file (.cod) into x, y values
 
     :param filename: filename of TDC file
     :return: x-array (in ns), y-array (counts(int))
@@ -60,13 +60,68 @@ def getTDCFileData(filename: str) -> tuple[np.ndarray, np.ndarray]:
     return np.array(x), np.array(y).astype(int)
 
 
+def getLMFTXTFileData(filename: str) -> tuple[np.ndarray, np.ndarray]:
+    """
+    Converts LMFTXT-file (.lmftxt) into x, y values
+
+    :param filename: filename of TDC file
+    :return: x-array (in ns), y-array (counts(int))
+    """
+
+    tofs = []
+    falling = []
+
+    resolution = np.nan
+    range_start = np.nan
+    range_end = np.nan
+
+    with open(filename, 'r', encoding='utf-8') as file:
+        for line in file.readlines():
+            line = line.strip()
+            if 'TDC resolution' in line:
+                resolution = float(line.split('=')[-1].split('ps')[0]) / 1000
+            if 'Group range start' in line:
+                range_start = float(line.split('=')[-1].split('ns')[0])
+            if 'Group range end' in line:
+                range_end = float(line.split('=')[-1].split('ns')[0])
+            split = line.split('\t')
+            if len(split) < 4:
+                continue
+
+            try:
+                tofs.append(float(split[3]))
+                falling.append(int(split[4]))
+            except (ValueError, IndexError):
+                continue
+
+    if resolution == np.nan:
+        raise IOError('Resolution not set')
+
+    if range_start == np.nan or range_end == np.nan:
+        raise IOError('Range start or end not set')
+
+    tofs = np.array(tofs)
+    falling = np.array(falling)
+
+    if len(falling):
+        if len(tofs) != len(falling):
+            raise IOError('Number of "falling" values do not match "tofs".')
+        tofs = tofs[falling == True]
+
+    bins = np.arange(range_start, range_end + resolution, resolution)
+    y, _ = np.histogram(tofs, bins)
+    x = (bins[1:] + bins[:-1]) / 2
+
+    return x, y.astype(int)
+
+
 def getFileData(filename: str, tac: int = -1, delay: float = 0) -> tuple[np.ndarray, np.ndarray]:
     """
     Converts supported file into x, y
 
     :param filename: name of file (path)
-    :param tac: (only required for .dat files) total TAC time in ns (50, 100, 200, ...)
-    :param delay: (only required for .dat files) delay time before TAC signal in ns
+    :param tac: (only required for .dat (=TAC) files) total TAC time in ns (50, 100, 200, ...)
+    :param delay: (only required for .dat (=TAC) files) delay time before TAC signal in ns
     :return: x-array (in ns), y-array (counts)
     """
 
@@ -79,8 +134,10 @@ def getFileData(filename: str, tac: int = -1, delay: float = 0) -> tuple[np.ndar
         return getTDCFileData(filename)
     elif filetype == 'dat':
         return getTACFileData(filename, tac, delay)
+    elif filetype == 'lmftxt':
+        return getLMFTXTFileData(filename)
     else:
-        raise NotImplementedError(f'Not implemented type of "{filetype}"!')
+        raise NotImplementedError(f'Not implemented type of "{filetype}"! Should not happen!')
 
 
 class FitMethod:
@@ -234,13 +291,13 @@ class FitGaussRange(FitMethod):
         bounds = ([0, bar_values[0], 0], [bar_values[1] - bar_values[0], bar_values[1], c0 * 10])
 
         try:
-            popt = curve_fit(self.fitFunction, x_data_limit, y_data_limit, p0=p0, bounds=bounds)
+            popt = curve_fit(self.fitFunction, x_data_limit, y_data_limit, p0=p0, bounds=bounds)[0]
             # self.parameter = [sigma, mu, c, FWHM]
             self.parameter = [
-                popt[0][0],
-                popt[0][1],
-                popt[0][2],
-                2 * np.sqrt(2 * np.log(2)) * popt[0][0]
+                popt[0],
+                popt[1],
+                popt[2],
+                2 * np.sqrt(2 * np.log(2)) * popt[0]
             ]
             self.updateParameters()
 
@@ -346,13 +403,13 @@ class FitGaussCenter(FitMethod):
         bounds = ([0, limit_x[0], 0], [limit_x[1] - limit_x[0], limit_x[1], c0 * 10])
 
         try:
-            popt = curve_fit(self.fitFunction, x_data_limit, y_data_limit, p0=p0, bounds=bounds)
+            popt = curve_fit(self.fitFunction, x_data_limit, y_data_limit, p0=p0, bounds=bounds)[0]
             # self.parameter = [sigma, mu, c, FWHM]
             self.parameter = [
-                popt[0][0],
-                popt[0][1],
-                popt[0][2],
-                2 * np.sqrt(2 * np.log(2)) * popt[0][0]
+                popt[0],
+                popt[1],
+                popt[2],
+                2 * np.sqrt(2 * np.log(2)) * popt[0]
             ]
             self.updateParameters()
 
@@ -367,6 +424,7 @@ class FitGaussCenter(FitMethod):
         return f'({self.parameter[1]}, {self.parameter[2]}, {self.parameter[3]})'
 
 
+# TODO: improve LogNorm fitting
 class FitLogNormRange(FitMethod):
     """
     Method to log-norm-fit data from start to stop
@@ -421,10 +479,11 @@ class FitLogNormRange(FitMethod):
         :return: y-values
         """
 
-        xdata = (xdata - x0)
-        ydata = c / (sigma * xdata * np.sqrt(2 * np.pi)) * np.exp(-np.square(np.log(xdata) - mu) / (2 * np.square(sigma)))
+        x = (xdata - x0)
+        ydata = c / (sigma * x * np.sqrt(2 * np.pi)) * np.exp(-np.square(np.log(x) - mu) / (2 * np.square(sigma)))
         return np.nan_to_num(ydata)
 
+    # TODO: unfinished
     def fitting(self, bar_values: list[float], data: tuple[np.ndarray, np.ndarray], view_range: list[list[float, float]]):
         """
         Fitting function to determine parameters
@@ -443,29 +502,41 @@ class FitLogNormRange(FitMethod):
             return
 
         max_index = np.argmax(y_data_limit)
-        mean0 = 0
-        x0 = x_data_limit[max_index]
-        c0 = y_data_limit[max_index]
-        sigma0 = (x_data_limit[-1] - x_data_limit[0]) / 4
+        mean0_gauss = x_data_limit[max_index]
+        c0_gauss = y_data_limit[max_index]
+        sigma0_gauss = (x_data_limit[-1] - x_data_limit[0]) / 4
 
-        limit0 = np.greater(y_data_limit, c0)
-        if np.any(limit0):
-            sigma0 = np.std(np.repeat(x_data_limit[limit0], y_data_limit[limit0]))
+        limit0_gauss = np.greater(y_data_limit, c0_gauss)
+        if np.any(limit0_gauss):
+            sigma0_gauss = np.std(np.repeat(x_data_limit[limit0_gauss], y_data_limit[limit0_gauss]))
 
-        p0 = [sigma0, mean0, x0, c0]
-        # TODO: better bounds for x0, mean0
-        bounds = ([0, 0, bar_values[0], 0], [bar_values[1] - bar_values[0], bar_values[1], bar_values[1], c0 * 10])
+        p0_gauss = [sigma0_gauss, mean0_gauss, c0_gauss]
+        bounds_gauss = ([0, bar_values[0], 0], [bar_values[1] - bar_values[0], bar_values[1], c0_gauss * 10])
 
         try:
-            popt = curve_fit(self.fitFunction, x_data_limit, y_data_limit, p0=p0, bounds=bounds)
+            popt_gauss = curve_fit(FitGaussRange.fitFunction, x_data_limit, y_data_limit, p0=p0_gauss, bounds=bounds_gauss)[0]
+        except RuntimeError as error:
+            self.parent.writeStatusBar(f'Error in fitting LogNorm(Gauss): {error}')
+            GlobalConf.logger.info(f'Error in fitting LogNorm(Gauss): {error}')
+            return
+
+        v = np.log(1 + np.square(popt_gauss[0] / popt_gauss[1]))
+        p0_log_norm = [np.sqrt(v), np.log(popt_gauss[1]) - 0.5 * v, 0, popt_gauss[2] * popt_gauss[1]]
+        bounds_log_norm = (
+            [p0_log_norm[0] / 2, p0_log_norm[1] * 0.8, -np.inf, 0],
+            [p0_log_norm[0] * 2, p0_log_norm[1] * 1.2, np.inf, p0_log_norm[3] * 2]
+        )
+
+        try:
+            popt = curve_fit(self.fitFunction, x_data_limit, y_data_limit, p0=p0_log_norm, bounds=bounds_log_norm)[0]
             # self.parameter = [sigma, mu, x0, c, mode, FWHM]
             self.parameter = [
-                popt[0][0],
-                popt[0][1],
-                popt[0][2],
-                popt[0][3],
-                np.exp(popt[0][1] - np.square(popt[0][0])) + popt[0][2],
-                np.exp(popt[0][1] - np.square(popt[0][0])) * (np.exp(np.sqrt(2 * np.log(2)) * popt[0][0]) - np.exp(-np.sqrt(2 * np.log(2)) * popt[0][0]))
+                popt[0],
+                popt[1],
+                popt[2],
+                popt[3],
+                np.exp(popt[1] - np.square(popt[0])) + popt[2],
+                np.exp(popt[1] - np.square(popt[0])) * (np.exp(np.sqrt(2 * np.log(2)) * popt[0]) - np.exp(-np.sqrt(2 * np.log(2)) * popt[0]))
             ]
             self.updateParameters()
 
@@ -623,12 +694,12 @@ class FitGaussCountsRange(FitMethod):
         bounds = ([0, bar_values[0], 0], [bar_values[1] - bar_values[0], bar_values[1], c0 * 10])
 
         try:
-            popt = curve_fit(self.fitFunction, x_data_limit, y_data_limit, p0=p0, bounds=bounds)
+            popt = curve_fit(self.fitFunction, x_data_limit, y_data_limit, p0=p0, bounds=bounds)[0]
             # self.parameter = [sigma, mu, c, FWHM, Counts]
-            self.parameter[0] = float(popt[0][0])
-            self.parameter[1] = float(popt[0][1])
-            self.parameter[2] = float(popt[0][2])
-            self.parameter[3] = 2 * np.sqrt(2 * np.log(2)) * popt[0][0]
+            self.parameter[0] = float(popt[0])
+            self.parameter[1] = float(popt[1])
+            self.parameter[2] = float(popt[2])
+            self.parameter[3] = 2 * np.sqrt(2 * np.log(2)) * popt[0]
 
         except (ValueError, RuntimeError) as error:
             self.parent.writeStatusBar(f'Error in fitting Gauss: {error}')

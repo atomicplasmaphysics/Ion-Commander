@@ -316,7 +316,7 @@ class AnalyseWindow(TabWidget):
                     view_all = view_all and (self.files_opened == widget.path)
                     self.files_opened = False
 
-                except (OSError, ValueError) as error:
+                except (OSError, ValueError, IOError) as error:
                     self.writeStatusBar(f'File could not be read: {error}')
 
         self.graph.plotTOF(self.data, view_all=view_all, fill_histogram=self.button_fill_histo.value())
