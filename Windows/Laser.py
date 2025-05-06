@@ -859,6 +859,10 @@ class LaserVBoxLayout(QVBoxLayout):
         :param messagebox: enable popup of infobox
         """
 
+        if self.device_wrapper.threaded_connection.isDummy() and self.indicator_connection.value():
+            self.unconnect()
+            return False
+
         if self.indicator_connection.value():
             return True
 
@@ -946,7 +950,10 @@ class LaserVBoxLayout(QVBoxLayout):
 
         self.device_wrapper.threaded_connection = ThreadedDummyConnection()
         if self.connection is not None:
-            self.connection.close()
+            try:
+                self.connection.close()
+            except (ConnectionError, ConnectionRefusedError, ConnectionResetError, ConnectionAbortedError):
+                pass
             self.connection = None
 
         self.reset()

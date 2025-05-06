@@ -195,7 +195,7 @@ class ThreadedConnection(QObject):
 
         GlobalConf.logger.error(error)
 
-        if isinstance(error, ConnectionAbortedError):
+        if isinstance(error, ConnectionAbortedError) or isinstance(error, ConnectionResetError):
             if self.connection_aborted_function is not None:
                 self.connection_aborted_function()
             return

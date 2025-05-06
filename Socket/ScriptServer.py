@@ -3,7 +3,7 @@ from socket import socket, AF_INET, SOCK_STREAM
 from time import time, sleep
 
 
-from PyQt6.QtCore import QTimer, QElapsedTimer, pyqtSignal, QObject, QRunnable, pyqtSlot, QThreadPool
+from PyQt6.QtCore import pyqtSignal, QObject, QRunnable, pyqtSlot, QThreadPool
 
 
 from Config.GlobalConf import GlobalConf, DefaultParams
@@ -40,6 +40,7 @@ class CommandQueue:
         """Returns the queue"""
         return self.queue
 
+    # TODO: also allow multiple commands to be set at each timestep
     @staticmethod
     def _buildCommands(indent_commands: list[tuple[int, list[str]]]) -> tuple[int, list[str | list[str]]]:
         """
@@ -155,6 +156,10 @@ class CommandQueue:
                 cmd_queue.error = f'Line {line_nbr}: "{line}": TIME already set in line 1'
                 return cmd_queue
 
+            if func_name.upper().startswith('WAIT') and len(line) != len('WAIT'):
+                cmd_queue.error = f'Line {line_nbr}: "{line}": WAIT statement has no allowed arguments'
+                return cmd_queue
+
             if placeholder_char in func_name:
                 if not args[0]:
                     cmd_queue.error = f'Line {line_nbr}: "{line}": "{placeholder_char}" in function, but no arguments are given'
@@ -260,6 +265,8 @@ class ScriptServerWorker(QRunnable):
         if not isinstance(commands, list):
             commands = [commands]
         for command in commands:
+            if command == 'WAIT':
+                continue
             self.socket_connection.sendall(command.encode(self.encoding))
             elapsed_time = time() - self.command_queue.start_time
             self.command_queue.command_times.append(elapsed_time)
@@ -365,14 +372,18 @@ TIME 10
 # in line comments do not work
 # empty lines will also be ignored
 
+# sleep statement does nothing for a 'cycle'
+WAIT
+
 # commands will be set one after another
 # '%' can be used as placeholder and following arguments will be placed inside
 LASER:rfSet(%) 23, 24
 
-# '	' are treated as loops
-	LASER:rrSet(%) 10, 1
+# Tabs '\t' are treated as loops
+\tLASER:rrSet(%) 10, 1
 
 # the total code will actually perform following commands:
+# (0: wait)
 # 1: LASER:rfSet(23) AND LASER:rrSet(10)
 # 2: LASER:rrSet(1)
 # 3: LASER:rfSet(24) AND LASER:rrSet(10)

@@ -24,6 +24,8 @@ class ScriptsWindow(TabWidget):
     :param parent: parent widget
     """
 
+    # TODO: also add QProgressBar with timer until next command will be executed
+
     def __init__(self, parent):
         super().__init__(parent)
 
