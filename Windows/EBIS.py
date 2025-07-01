@@ -9,6 +9,8 @@ from PyQt6.QtWidgets import QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QGrou
 from Config.GlobalConf import GlobalConf, DefaultParams
 from Config.StylesConf import Colors
 
+from DB.db import DB
+
 from Utility.Layouts import InsertingGridLayout, IndicatorLed, DoubleSpinBox, DisplayLabel, ComboBox
 from Utility.Dialogs import showMessageBox
 
@@ -621,3 +623,16 @@ class EBISVBoxLayout(QVBoxLayout):
             self.connection.close()
 
         GlobalConf.updateConnections(ebis=last_connection)
+
+
+    # def log(self, db: DB):
+    #     """
+    #     Called to log all important value
+
+    #     :param db: database class
+    #     """
+
+    #     if self.connection is not None:
+    #         db.insertEBIS(
+    #             self.
+    #         )

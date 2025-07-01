@@ -44,7 +44,7 @@ class ControlWindow(TabWidget):
         self.psu_vbox_parent.setLayout(self.psu_vbox)
         self.splitter.addWidget(self.psu_vbox_parent)
 
-        self.ebis_enabled = False
+        self.ebis_enabled = True
         if self.ebis_enabled:
             # EBIS CONTROL
             self.ebis_vbox = VBoxTitleLayout('EBIS', parent=self, add_stretch=True, popout_enable=True)

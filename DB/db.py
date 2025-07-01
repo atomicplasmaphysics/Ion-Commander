@@ -168,6 +168,27 @@ class PowerMeterTable(Tables):
     def __init__(self):
         super().__init__()
 
+class EBISTable(Tables):
+    name = 'EBIS'
+    structure = {
+        'Time': '''INTEGER DEFAULT (strftime('%s', 'now'))''',
+        'Cathode_Voltage': 'FLOAT default 0',
+        'Cathode_Current': 'FLOAT default 0',
+        'DT1_Voltage': 'FLOAT default 0',
+        'DT1_Current': 'FLOAT default 0',
+        'DT2_Voltage': 'FLOAT default 0',
+        'DT2_Current': 'FLOAT default 0',
+        'DT3_Voltage': 'FLOAT default 0',
+        'DT3_Current': 'FLOAT default 0',
+        'Repeller_Voltage': 'FLOAT default 0',
+        'Repeller_Current': 'FLOAT default 0',
+        'Heating_Voltage': 'FLOAT default 0',
+        'Heating_Current': 'FLOAT default 0',
+    }
+
+    def __init__(self):
+        super().__init__()
+
 
 class DB:
     """
@@ -205,11 +226,13 @@ class DB:
         self.psu_table = PSUTable()
         self.laser_table = LaserTable()
         self.power_meter_table = PowerMeterTable()
+        self.ebis_table = EBISTable()
         self.tables = [
             self.pressure_table,
             self.psu_table,
             self.laser_table,
-            self.power_meter_table
+            self.power_meter_table,
+            self.ebis_table
         ]
 
         if not no_setup:
@@ -524,6 +547,64 @@ class DB:
         """
 
         return self.getData(self.tables.index(self.power_meter_table), start_time, end_time)
+
+    def insertEBIS(
+        self,
+        CatV: float,
+        CatI: float,
+        DT1V: float,
+        DT1I: float,
+        DT2V: float,
+        DT2I: float,
+        DT3V: float,
+        DT3I: float,
+        RepV: float,
+        RepI: float,
+        HeatV: float,
+        HeatI: float
+    ): 
+        """
+        Inserts EBIS values
+
+        :param CatV: cathode voltage in [V]
+        :param CatI: cathode current in [A]
+        :param DT1V: drift tube 1 voltage in [V]
+        :param DT1I: drift tube 1 current in [A]
+        :param DT2V: drift tube 2 voltage in [V]
+        :param DT2I: drift tube 2 current in [A]
+        :param DT3V: drift tube 3 voltage in [V]
+        :param DT3I: drift tube 3 current in [A]
+        :param RepV: repeller voltage in [V]
+        :param RepI: repeller current in [A]
+        :param HeatV: heating voltage in [V]
+        :param HeatI: heating current in [A]
+        """
+
+        self._execute(self.ebis_table.insert(CatV, CatI, DT1V, DT1I, DT2V, DT2I, DT3V, DT3I, RepV, RepI, HeatV, HeatI))
+
+    def getEBIS(self, start_time: int | None = None, end_time: int | None = None) -> bool | np.ndarray:
+        """
+        Get EBIS values
+
+        :returns: list of np.ndarrays[
+            times,
+            cathode voltages in [V],
+            cathode currents in [A],
+            drift tube 1 voltages in [V],
+            drift tube 1 currents in [A],
+            drift tube 2 voltages in [V],
+            drift tube 2 currents in [A],
+            drift tube 3 voltages in [V],
+            drift tube 3 currents in [A],
+            repeller voltages in [V],
+            repeller currents in [A],
+            heating voltages in [V],
+            heating currents in [A]
+        ]
+        """
+
+        return self.getData(self.tables.index(self.ebis_table), start_time, end_time)
+
 
     def close(self):
         """Must be called on close"""
