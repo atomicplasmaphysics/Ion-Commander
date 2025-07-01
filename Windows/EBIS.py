@@ -111,7 +111,7 @@ class EBISVBoxLayout(QVBoxLayout):
 
         # Cathode Potential
         self.label_1 = QLabel('Cathode')
-        self.spinbox_1 = DoubleSpinBox(default=0, step_size=0.1, input_range=(0, self.voltage_maximum), decimals=1, buttons=False)
+        self.spinbox_1 = DoubleSpinBox(default=0, step_size=10, input_range=(0, self.voltage_maximum), decimals=1, buttons=False)
         self.spinbox_1.editingFinished.connect(lambda: self.setVoltage(0, self.spinbox_1.value()))
         self.status_voltage_1 = DisplayLabel(value=0, unit='V', target_value=0, deviation=self.voltage_deviation)
         self.status_current_1 = DisplayLabel(value=0, unit='A', target_value=0, deviation=self.current_maximum, enable_prefix=True)
@@ -129,7 +129,7 @@ class EBISVBoxLayout(QVBoxLayout):
 
         # Drift Tube 1
         self.label_2 = QLabel('Drift Tube 1')
-        self.spinbox_2 = DoubleSpinBox(default=0, step_size=0.1, input_range=(0, self.voltage_maximum), decimals=1, buttons=False)
+        self.spinbox_2 = DoubleSpinBox(default=0, step_size=10, input_range=(0, self.voltage_maximum), decimals=1, buttons=False)
         self.spinbox_2.editingFinished.connect(lambda: self.setVoltage(1, self.spinbox_2.value()))
         self.status_voltage_2 = DisplayLabel(value=0, unit='V', target_value=0, deviation=self.voltage_deviation)
         self.status_current_2 = DisplayLabel(value=0, unit='A', target_value=0, deviation=self.current_maximum, enable_prefix=True)
@@ -147,7 +147,7 @@ class EBISVBoxLayout(QVBoxLayout):
 
         # Drift Tube 2
         self.label_3 = QLabel('Drift Tube 2')
-        self.spinbox_3 = DoubleSpinBox(default=0, step_size=0.1, input_range=(0, self.voltage_maximum), decimals=1, buttons=False)
+        self.spinbox_3 = DoubleSpinBox(default=0, step_size=10, input_range=(0, self.voltage_maximum), decimals=1, buttons=False)
         self.spinbox_3.editingFinished.connect(lambda: self.setVoltage(2, self.spinbox_3.value()))
         self.status_voltage_3 = DisplayLabel(value=0, unit='V', target_value=0, deviation=self.voltage_deviation)
         self.status_current_3 = DisplayLabel(value=0, unit='A', target_value=0, deviation=self.current_maximum, enable_prefix=True)
@@ -165,7 +165,7 @@ class EBISVBoxLayout(QVBoxLayout):
 
         # Drift Tube 3
         self.label_4 = QLabel('Drift Tube 3')
-        self.spinbox_4 = DoubleSpinBox(default=0, step_size=0.1, input_range=(0, self.voltage_maximum), decimals=1, buttons=False)
+        self.spinbox_4 = DoubleSpinBox(default=0, step_size=10, input_range=(0, self.voltage_maximum), decimals=1, buttons=False)
         self.spinbox_4.editingFinished.connect(lambda: self.setVoltage(3, self.spinbox_4.value()))
         self.status_voltage_4 = DisplayLabel(value=0, unit='V', target_value=0, deviation=self.voltage_deviation)
         self.status_current_4 = DisplayLabel(value=0, unit='A', target_value=0, deviation=self.current_maximum, enable_prefix=True)
@@ -183,7 +183,7 @@ class EBISVBoxLayout(QVBoxLayout):
 
         # Repeller
         self.label_5 = QLabel('Repeller')
-        self.spinbox_5 = DoubleSpinBox(default=0, step_size=0.1, input_range=(0, self.voltage_maximum), decimals=1, buttons=False)
+        self.spinbox_5 = DoubleSpinBox(default=0, step_size=10, input_range=(0, self.voltage_maximum), decimals=1, buttons=False)
         self.spinbox_5.editingFinished.connect(lambda: self.setVoltage(4, self.spinbox_5.value()))
         self.status_voltage_5 = DisplayLabel(value=0, unit='V', target_value=0, deviation=self.voltage_deviation)
         self.status_current_5 = DisplayLabel(value=0, unit='A', target_value=0, deviation=self.current_maximum, enable_prefix=True)
@@ -239,7 +239,7 @@ class EBISVBoxLayout(QVBoxLayout):
         # Cathode Heating Current
         self.label_current_6 = QLabel('Heating Current')
         # TODO: enable button here, but it will be stuck on the editingFinished if the warning label overtakes!
-        self.spinbox_current_6 = DoubleSpinBox(default=0, step_size=0.05, input_range=(0, 5), decimals=2, buttons=False)
+        self.spinbox_current_6 = DoubleSpinBox(default=0, step_size=0.01, input_range=(0, 5), decimals=2, buttons=False)
         self.spinbox_current_6.editingFinished.connect(lambda: self.setCurrent(5, self.spinbox_current_6.value()))
         self.status_current_6 = DisplayLabel(value=0, unit='A', target_value=0, deviation=self.current_deviation, decimals=4)
         self.heating_grid.addWidgets(
