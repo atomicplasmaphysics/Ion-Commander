@@ -114,3 +114,5 @@ class ControlWindow(TabWidget):
         self.psu_group_vbox.log(db)
         self.laser_group_vbox.log(db)
         self.pressure_group_vbox.log(db)
+        if self.ebis_enabled:
+            self.ebis_group_vbox.log(db)
