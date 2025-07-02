@@ -292,7 +292,8 @@ class EBISVBoxLayout(QVBoxLayout):
         # Safe heating current
         self.label_safe_current = QLabel('Safe heating current [A]')
         self.safe_current_val = 0.0
-        self.spinbox_safe_current = DoubleSpinBox(default=self.safe_current_val, step_size=0.1, input_range=(0, 2), decimals=2, buttons=False)
+        self.spinbox_safe_current = DoubleSpinBox(default=self.safe_current_val, step_size=0.1, input_range=(0, 3), decimals=2, buttons=False)
+        self.spinbox_safe_current.editingFinished.connect(lambda: setattr(self, 'safe_current_val', self.spinbox_safe_current.value()))
         self.pressure_grid.addWidgets(
             self.label_safe_current,
             self.spinbox_safe_current
