@@ -14,6 +14,7 @@ from Windows.Laser import LaserVBoxLayout
 from Windows.Pressure import PressureVBoxLayout
 
 from math import ceil
+from statistics import median
 
 class ControlWindow(TabWidget):
     """
@@ -119,15 +120,17 @@ class ControlWindow(TabWidget):
         # Hard limit : turn off immediately if pressure is above hard limit
         if last_pressure > self.ebis_group_vbox.hard_pmax_val:
             self.ebis_group_vbox.setCurrent(5, safe_current)
+            self.ebis_group_vbox.spinbox_current_6.setValue(safe_current)
             return
 
         # Soft limit : turn off if average pressure is above soft limit
         pressure_buffer_length = ceil(1000 * self.ebis_group_vbox.soft_time_val / DefaultParams.update_timer_time)
         self.pressure_buffer.append(self.pressure_group_vbox.pressure_widget_1.pressure)
         self.pressure_buffer = self.pressure_buffer[-pressure_buffer_length:]
-        average_pressure = sum(self.pressure_buffer) / len(self.pressure_buffer)
-        if average_pressure > self.ebis_group_vbox.soft_pmax_val:
+        # average_pressure = sum(self.pressure_buffer) / len(self.pressure_buffer)
+        if median(self.pressure_buffer) > self.ebis_group_vbox.soft_pmax_val:
             self.ebis_group_vbox.setCurrent(5, safe_current)
+            self.ebis_group_vbox.spinbox_current_6.setValue(safe_current)
             return
 
 
