@@ -71,34 +71,34 @@ class PressureVBoxLayout(QVBoxLayout):
         self.connection_hbox_selection.addWidget(self.button_connection_refresh)
 
         # PITBUL
-        self.group_box_pitbul = QGroupBox('PITBUL')
-        self.pressure_widget_pitbul = PressureWidget()
-        self.layout_pitbul = QVBoxLayout()
-        self.layout_pitbul.addWidget(self.pressure_widget_pitbul)
-        self.group_box_pitbul.setLayout(self.layout_pitbul)
-        self.addWidget(self.group_box_pitbul)
+        self.group_box_1 = QGroupBox('PITBUL')
+        self.pressure_widget_1 = PressureWidget()
+        self.layout_1 = QVBoxLayout()
+        self.layout_1.addWidget(self.pressure_widget_1)
+        self.group_box_1.setLayout(self.layout_1)
+        self.addWidget(self.group_box_1)
 
         # LSD
-        self.group_box_lsd = QGroupBox('LSD')
-        self.pressure_widget_lsd = PressureWidget()
-        self.layout_lsd = QVBoxLayout()
-        self.layout_lsd.addWidget(self.pressure_widget_lsd)
-        self.group_box_lsd.setLayout(self.layout_lsd)
-        self.addWidget(self.group_box_lsd)
+        self.group_box_2 = QGroupBox('LSD')
+        self.pressure_widget_2 = PressureWidget()
+        self.layout_2 = QVBoxLayout()
+        self.layout_2.addWidget(self.pressure_widget_2)
+        self.group_box_2.setLayout(self.layout_2)
+        self.addWidget(self.group_box_2)
 
         # Pre-vacuum
-        self.group_box_prevac = QGroupBox('Pre-Vacuum')
-        self.pressure_widget_prevac = PressureWidget(input_range=(1E3, 5E-3))
-        self.layout_prevac = QVBoxLayout()
-        self.layout_prevac.addWidget(self.pressure_widget_prevac)
-        self.group_box_prevac.setLayout(self.layout_prevac)
-        self.addWidget(self.group_box_prevac)
+        self.group_box_3 = QGroupBox('Pre-Vacuum')
+        self.pressure_widget_3 = PressureWidget(input_range=(1E3, 5E-3))
+        self.layout_3 = QVBoxLayout()
+        self.layout_3.addWidget(self.pressure_widget_3)
+        self.group_box_3.setLayout(self.layout_3)
+        self.addWidget(self.group_box_3)
 
         # grouped items
         self.pressure_widgets = [
-            self.pressure_widget_pitbul,
-            self.pressure_widget_lsd,
-            self.pressure_widget_prevac,
+            self.pressure_widget_1,
+            self.pressure_widget_2,
+            self.pressure_widget_3,
             None
         ]
 
@@ -221,9 +221,9 @@ class PressureVBoxLayout(QVBoxLayout):
         self.status_connection.setText('Not connected')
         self.button_connection.setText('Connect')
 
-        self.pressure_widget_pitbul.setPressure(0)
-        self.pressure_widget_lsd.setPressure(0)
-        self.pressure_widget_prevac.setPressure(0)
+        self.pressure_widget_1.setPressure(0)
+        self.pressure_widget_2.setPressure(0)
+        self.pressure_widget_3.setPressure(0)
 
         self.combobox_connection.setEnabled(True)
         self.button_connection_refresh.setEnabled(True)
@@ -262,7 +262,7 @@ class PressureVBoxLayout(QVBoxLayout):
 
         if self.connection is not None:
             db.insertPressure(
-                self.pressure_widget_pitbul.pressure,
-                self.pressure_widget_lsd.pressure,
-                self.pressure_widget_prevac.pressure,
+                self.pressure_widget_1.pressure,
+                self.pressure_widget_2.pressure,
+                self.pressure_widget_3.pressure,
             )

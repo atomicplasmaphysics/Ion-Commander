@@ -1,6 +1,8 @@
 from PyQt6.QtWidgets import QSplitter, QWidget, QBoxLayout
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QTimer
 
+
+from Config.GlobalConf import GlobalConf, DefaultParams
 
 from Utility.Layouts import TabWidget, VBoxTitleLayout
 
@@ -24,6 +26,12 @@ class ControlWindow(TabWidget):
 
         self.main_layout = QBoxLayout(QBoxLayout.Direction.TopToBottom)
         self.setLayout(self.main_layout)
+
+        # local timers
+        self.pressure_check_timer = QTimer()
+        self.pressure_check_timer.timeout.connect(self.pressureCheck)
+        self.pressure_check_timer.setInterval(DefaultParams.update_timer_time)
+        self.pressure_check_timer.start()
 
         # SPLITTER
         self.splitter = QSplitter()
@@ -95,6 +103,14 @@ class ControlWindow(TabWidget):
         for c in range(splitter_count):
             self.splitter.setStretchFactor(c, splitter_width)
         self.splitter.setStretchFactor(splitter_count, int(100 - splitter_width * splitter_count))
+
+    def pressureCheck(self):
+        """Checks pressure periodically"""
+
+        # disable EBIS heating current if pressure is too high
+        if self.ebis_enabled:
+            if self.pressure_group_vbox.pressure_widget_1.pressure > 1E-7:
+                self.ebis_group_vbox.setCurrent(5, 0)
 
     def closeEvent(self, event):
         """Closes all connections"""

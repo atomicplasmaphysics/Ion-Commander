@@ -624,7 +624,6 @@ class EBISVBoxLayout(QVBoxLayout):
 
         GlobalConf.updateConnections(ebis=last_connection)
 
-
     def log(self, db: DB):
         """
         Called to log all important value
@@ -634,16 +633,16 @@ class EBISVBoxLayout(QVBoxLayout):
 
         if self.connection is not None:
             db.insertEBIS(
-                abs(self.status_voltage_1.value), # CatV, negative
-                abs(self.status_current_1.value), # CatI, negative
-                self.status_voltage_2.value, # DT1V
-                self.status_current_2.value, # DT1I
-                self.status_voltage_3.value, # DT2V
-                self.status_current_3.value, # DT2I
-                self.status_voltage_4.value, # DT3V
-                self.status_current_4.value, # DT3I
-                abs(self.status_voltage_5.value), # RepV, negative
-                abs(self.status_current_5.value), # RepI, negative
-                self.status_voltage_6.value, # HeatV
-                self.status_current_6.value  # HeatI
+                abs(self.status_voltage_1.value),  # CatV, negative
+                abs(self.status_current_1.value),  # CatI, negative
+                self.status_voltage_2.value,  # DT1V
+                self.status_current_2.value,  # DT1I
+                self.status_voltage_3.value,  # DT2V
+                self.status_current_3.value,  # DT2I
+                self.status_voltage_4.value,  # DT3V
+                self.status_current_4.value,  # DT3I
+                abs(self.status_voltage_5.value),  # RepV, negative
+                abs(self.status_current_5.value),  # RepI, negative
+                self.status_voltage_6.value,  # HeatV
+                self.status_current_6.value   # HeatI
             )
