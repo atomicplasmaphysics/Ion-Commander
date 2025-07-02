@@ -13,6 +13,7 @@ from Windows.EBIS import EBISVBoxLayout
 from Windows.Laser import LaserVBoxLayout
 from Windows.Pressure import PressureVBoxLayout
 
+from math import ceil
 
 class ControlWindow(TabWidget):
     """
@@ -26,12 +27,6 @@ class ControlWindow(TabWidget):
 
         self.main_layout = QBoxLayout(QBoxLayout.Direction.TopToBottom)
         self.setLayout(self.main_layout)
-
-        # local timers
-        self.pressure_check_timer = QTimer()
-        self.pressure_check_timer.timeout.connect(self.pressureCheck)
-        self.pressure_check_timer.setInterval(DefaultParams.update_timer_time)
-        self.pressure_check_timer.start()
 
         # SPLITTER
         self.splitter = QSplitter()
@@ -67,6 +62,13 @@ class ControlWindow(TabWidget):
             self.ebis_vbox.setBodyLayout(self.ebis_group_vbox)
             self.ebis_parent.setLayout(self.ebis_vbox)
             self.splitter.addWidget(self.ebis_parent)
+
+            # Pressure check timer
+            self.pressure_check_timer = QTimer()
+            self.pressure_check_timer.timeout.connect(self.pressureCheck)
+            self.pressure_check_timer.setInterval(DefaultParams.update_timer_time)
+            self.pressure_check_timer.start()
+            self.pressure_buffer=[]
 
         # LASER CONTROL
         self.laser_vbox = VBoxTitleLayout('LASER', parent=self, add_stretch=True, popout_enable=True)
@@ -108,9 +110,26 @@ class ControlWindow(TabWidget):
         """Checks pressure periodically"""
 
         # disable EBIS heating current if pressure is too high
-        if self.ebis_enabled:
-            if self.pressure_group_vbox.pressure_widget_1.pressure > 1E-7:
-                self.ebis_group_vbox.setCurrent(5, 0)
+        if not self.ebis_enabled:
+            return
+
+        last_pressure = self.pressure_group_vbox.pressure_widget_1.pressure
+        safe_current = self.ebis_group_vbox.safe_current_val
+
+        # Hard limit : turn off immediately if pressure is above hard limit
+        if last_pressure > self.ebis_group_vbox.hard_pmax_val:
+            self.ebis_group_vbox.setCurrent(5, safe_current)
+            return
+
+        # Soft limit : turn off if average pressure is above soft limit
+        pressure_buffer_length = ceil(1000 * self.ebis_group_vbox.soft_time_val / DefaultParams.update_timer_time)
+        self.pressure_buffer.append(self.pressure_group_vbox.pressure_widget_1.pressure)
+        self.pressure_buffer = self.pressure_buffer[-pressure_buffer_length:]
+        average_pressure = sum(self.pressure_buffer) / len(self.pressure_buffer)
+        if average_pressure > self.ebis_group_vbox.soft_pmax_val:
+            self.ebis_group_vbox.setCurrent(5, safe_current)
+            return
+
 
     def closeEvent(self, event):
         """Closes all connections"""

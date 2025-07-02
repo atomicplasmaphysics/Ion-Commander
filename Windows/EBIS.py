@@ -248,6 +248,56 @@ class EBISVBoxLayout(QVBoxLayout):
             self.status_current_6,
         )
 
+        # Pressure safety
+        self.pressure_group_box = QGroupBox('Pressure Control')
+        self.addWidget(self.pressure_group_box)
+
+        self.pressure_hbox = QHBoxLayout()
+        self.pressure_hbox.setAlignment(Qt.AlignmentFlag.AlignLeft)
+        self.pressure_group_box.setLayout(self.pressure_hbox)
+
+        self.pressure_grid = InsertingGridLayout()
+        self.pressure_hbox.addLayout(self.pressure_grid)
+
+        # Hard pressure limit (turns off immediately)
+        self.label_hard_pmax = QLabel('Hard limit max pressure [10^-8 mbar]') # Not great but I dont want to make a new SpinBox class for scientific notation
+        self.hard_pmax_val = 10
+        self.spinbox_hard_pmax = DoubleSpinBox(default=self.hard_pmax_val, step_size=1, input_range=(0.1, 1000), decimals=1, buttons=False)
+        self.spinbox_hard_pmax.editingFinished.connect(lambda: setattr(self, 'hard_pmax_val', self.spinbox_hard_pmax.value()*1E-8)) # set pressure in 10^-8mbar
+        self.pressure_grid.addWidgets(
+            self.label_hard_pmax,
+            self.spinbox_hard_pmax
+        )
+
+        # Soft pressure limit (turns off if avg perssure is over limit for too long)
+        self.label_soft_pmax = QLabel('Soft limit max pressure [10^-8 mbar]')
+        self.soft_pmax_val = 10
+        self.spinbox_soft_pmax = DoubleSpinBox(default=self.soft_pmax_val, step_size=1, input_range=(0.11, 1000), decimals=1, buttons=False)
+        self.spinbox_soft_pmax.editingFinished.connect(lambda: setattr(self, 'soft_pmax_val', self.spinbox_soft_pmax.value()*1E-8)) # set pressure in 10^-8mbar
+        self.pressure_grid.addWidgets(
+            self.label_soft_pmax,
+            self.spinbox_soft_pmax
+        )
+
+        # Soft pressure limit time
+        self.label_soft_pmax_time = QLabel('Soft limit duration [s]')
+        self.soft_time_val = 3
+        self.spinbox_soft_time = DoubleSpinBox(default=self.soft_time_val, step_size=1, input_range=(0, 100), decimals=1, buttons=False)
+        self.spinbox_soft_time.editingFinished.connect(lambda: setattr(self, 'soft_time_val', self.spinbox_soft_time.value()))
+        self.pressure_grid.addWidgets(
+            self.label_soft_pmax_time,
+            self.spinbox_soft_time
+        )
+
+        # Safe heating current
+        self.label_safe_current = QLabel('Safe heating current [A]')
+        self.safe_current_val = 0.0
+        self.spinbox_safe_current = DoubleSpinBox(default=self.safe_current_val, step_size=0.1, input_range=(0, 2), decimals=2, buttons=False)
+        self.pressure_grid.addWidgets(
+            self.label_safe_current,
+            self.spinbox_safe_current
+        )
+
         # grouped items
         self.channel_dict = {
             0: 0,
