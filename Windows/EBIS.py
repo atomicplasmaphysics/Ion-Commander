@@ -269,6 +269,16 @@ class EBISVBoxLayout(QVBoxLayout):
             self.spinbox_hard_pmax
         )
 
+        # Safe heating current
+        self.label_hard_current = QLabel('Hard target current [A]')
+        self.hard_current_val = 0.0
+        self.spinbox_hard_current = DoubleSpinBox(default=self.hard_current_val, step_size=0.1, input_range=(0, 3), decimals=2, buttons=False)
+        self.spinbox_hard_current.editingFinished.connect(lambda: setattr(self, 'hard_current_val', self.spinbox_hard_current.value()))
+        self.pressure_grid.addWidgets(
+            self.label_hard_current,
+            self.spinbox_hard_current
+        )
+
         # Soft pressure limit (turns off if avg perssure is over limit for too long)
         self.label_soft_pmax = QLabel('Soft limit max pressure [10^-8 mbar]')
         self.soft_pmax_val = 10
@@ -290,13 +300,13 @@ class EBISVBoxLayout(QVBoxLayout):
         )
 
         # Safe heating current
-        self.label_safe_current = QLabel('Safe heating current [A]')
-        self.safe_current_val = 0.0
-        self.spinbox_safe_current = DoubleSpinBox(default=self.safe_current_val, step_size=0.1, input_range=(0, 3), decimals=2, buttons=False)
-        self.spinbox_safe_current.editingFinished.connect(lambda: setattr(self, 'safe_current_val', self.spinbox_safe_current.value()))
+        self.label_soft_current = QLabel('Soft target current [A]')
+        self.soft_current_val = 0.0
+        self.spinbox_soft_current = DoubleSpinBox(default=self.soft_current_val, step_size=0.1, input_range=(0, 3), decimals=2, buttons=False)
+        self.spinbox_soft_current.editingFinished.connect(lambda: setattr(self, 'soft_current_val', self.spinbox_soft_current.value()))
         self.pressure_grid.addWidgets(
-            self.label_safe_current,
-            self.spinbox_safe_current
+            self.label_soft_current,
+            self.spinbox_soft_current
         )
 
         # grouped items
