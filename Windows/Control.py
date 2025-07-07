@@ -16,6 +16,7 @@ from Windows.Pressure import PressureVBoxLayout
 from math import ceil
 from statistics import median
 
+
 class ControlWindow(TabWidget):
     """
     Widget for controlling hardware
@@ -111,7 +112,7 @@ class ControlWindow(TabWidget):
         """Checks pressure periodically"""
 
         # disable EBIS heating current if pressure is too high
-        if not self.ebis_enabled:
+        if not self.ebis_enabled or not self.ebis_group_vbox.indicator_connection.value():
             return
 
         last_pressure = self.pressure_group_vbox.pressure_widget_1.pressure
@@ -131,7 +132,6 @@ class ControlWindow(TabWidget):
             self.ebis_group_vbox.setCurrent(5, self.ebis_group_vbox.soft_current_val)
             self.ebis_group_vbox.spinbox_current_6.setValue(self.ebis_group_vbox.soft_current_val)
             return
-
 
     def closeEvent(self, event):
         """Closes all connections"""

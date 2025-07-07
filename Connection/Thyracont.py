@@ -5,7 +5,16 @@ from Connection.LucidControl import LucidControlConnection
 
 
 def thyracontVoltageToPressure(voltage: float) -> float:
-    """Convert voltage to pressure in mbar"""
+    """
+    Convert voltage to pressure in mbar
+
+    :param voltage: voltage received in [V]
+    :return: pressure in [mbar] or 0 if unconnected (voltage ~ 0)
+    """
+
+    # return 0 if unconnected
+    if voltage < 0.1:
+        return 0
 
     # check min range
     if voltage < 1.2:
