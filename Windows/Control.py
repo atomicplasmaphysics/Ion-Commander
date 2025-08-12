@@ -118,7 +118,7 @@ class ControlWindow(TabWidget):
         last_pressure = self.pressure_group_vbox.pressure_widget_1.pressure
 
         # Hard limit : turn off immediately if pressure is above hard limit
-        if last_pressure > self.ebis_group_vbox.hard_pmax_val:
+        if last_pressure > self.ebis_group_vbox.hard_pmax_val and self.ebis_group_vbox.spinbox_current_6.value() > self.ebis_group_vbox.hard_current_val:
             self.ebis_group_vbox.setCurrent(5, self.ebis_group_vbox.hard_current_val)
             self.ebis_group_vbox.spinbox_current_6.setValue(self.ebis_group_vbox.hard_current_val)
             return
@@ -128,7 +128,7 @@ class ControlWindow(TabWidget):
         self.pressure_buffer.append(self.pressure_group_vbox.pressure_widget_1.pressure)
         self.pressure_buffer = self.pressure_buffer[-pressure_buffer_length:]
         # average_pressure = sum(self.pressure_buffer) / len(self.pressure_buffer)
-        if median(self.pressure_buffer) > self.ebis_group_vbox.soft_pmax_val:
+        if median(self.pressure_buffer) > self.ebis_group_vbox.soft_pmax_val and self.ebis_group_vbox.spinbox_current_6.value() > self.ebis_group_vbox.soft_current_val:
             self.ebis_group_vbox.setCurrent(5, self.ebis_group_vbox.soft_current_val)
             self.ebis_group_vbox.spinbox_current_6.setValue(self.ebis_group_vbox.soft_current_val)
             return

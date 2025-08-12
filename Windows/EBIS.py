@@ -292,7 +292,7 @@ class EBISVBoxLayout(QVBoxLayout):
         # Soft pressure limit time
         self.label_soft_pmax_time = QLabel('Soft limit duration [s]')
         self.soft_time_val = 3
-        self.spinbox_soft_time = DoubleSpinBox(default=self.soft_time_val, step_size=1, input_range=(0, 100), decimals=1, buttons=False)
+        self.spinbox_soft_time = DoubleSpinBox(default=self.soft_time_val, step_size=1, input_range=(0, 1000), decimals=1, buttons=False)
         self.spinbox_soft_time.editingFinished.connect(lambda: setattr(self, 'soft_time_val', self.spinbox_soft_time.value()))
         self.pressure_grid.addWidgets(
             self.label_soft_pmax_time,
