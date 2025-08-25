@@ -244,24 +244,34 @@ class DB:
         self.debug = debug
 
         if not db_file:
-            db_file = DefaultParams.db_file
+            if db_type == DB.DBType.sqlite3:
+                db_file = DefaultParams.db_file_sqlite3
+            elif db_type == DB.DBType.duckdb:
+                db_file = DefaultParams.db_file_duckdb
+            else:
+                GlobalConf.logger.error(f'Provided database type "{db_type}" is not supported!')
+                raise ValueError(f'Provided database type "{db_type}" is not supported!')
 
         database_path = Path(__file__).parents[1] / DefaultParams.db_folder / db_file
         self.connection: Connection | DuckDBPyConnection | None = None
         self.cursor: Cursor | DuckDBPyConnection | None = None
+        print('here 1')
 
         try:
             if db_type == DB.DBType.sqlite3:
                 self.connection = connect_sqlite3(database_path)
             elif db_type == DB.DBType.duckdb:
+                print('here 2')
                 self.connection = connect_duckdb(database_path)
             else:
+                GlobalConf.logger.error(f'Provided database type "{db_type}" is not supported!')
                 raise ValueError(f'Provided database type "{db_type}" is not supported!')
 
             self.cursor = self.connection.cursor()
 
         except (OperationalError, CatalogException) as error:
             GlobalConf.logger.error(f'DB: Can not connect to database in file "{database_path}" because: {error}')
+
         
         self.new_commit_time = datetime.now()
 
@@ -785,7 +795,8 @@ def time_db():
     from time import time
     from datetime import datetime
 
-    db = DB(debug=True)
+    db = DB()
+    #db = DB(debug=True, db_type=DB.DBType.sqlite3, db_file='Laserlab_backup.db')
 
     start_time = time()
     db.getLaser(
@@ -805,7 +816,7 @@ def time_db():
     db.close()
 
 
-def setup_duckdb():
+def setup_duckdb_naive():
     db_sqlite3 = DB(debug=True, no_setup=True, db_file='Laserlab.db', db_type=DB.DBType.sqlite3)
     db_duckdb = DB(debug=True, db_type=DB.DBType.duckdb)
 
@@ -827,5 +838,20 @@ def setup_duckdb():
     db_duckdb.close()
 
 
+def setup_duckdb():
+    db_duckdb = DB(debug=True, db_type=DB.DBType.duckdb)
+
+    db_duckdb._execute('INSTALL sqlite;')
+    db_duckdb._execute('LOAD sqlite;')
+
+    db_duckdb._execute(f'''ATTACH '{Path(__file__).parents[1] / DefaultParams.db_folder / 'Laserlab_backup.db'}' AS sqlite_db (TYPE SQLITE);''')
+
+    for table in ['Pressure', 'PSU', 'Laser', 'PowerMeter', 'EBIS']:
+        print(f'Copying table {table} ...')
+        db_duckdb._execute(f'''INSERT INTO {table} SELECT * FROM sqlite_db.{table}''')
+
+    db_duckdb.close()
+
+
 if __name__ == '__main__':
-    setup_duckdb()
+    time_db()
