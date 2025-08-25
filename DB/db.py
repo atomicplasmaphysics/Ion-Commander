@@ -255,17 +255,16 @@ class DB:
         database_path = Path(__file__).parents[1] / DefaultParams.db_folder / db_file
         self.connection: Connection | DuckDBPyConnection | None = None
         self.cursor: Cursor | DuckDBPyConnection | None = None
-        print('here 1')
 
         try:
             if db_type == DB.DBType.sqlite3:
                 self.connection = connect_sqlite3(database_path)
             elif db_type == DB.DBType.duckdb:
-                print('here 2')
                 self.connection = connect_duckdb(database_path)
             else:
                 GlobalConf.logger.error(f'Provided database type "{db_type}" is not supported!')
                 raise ValueError(f'Provided database type "{db_type}" is not supported!')
+            GlobalConf.logger.info(f'Using database system "{db_type}"')
 
             self.cursor = self.connection.cursor()
 

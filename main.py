@@ -2,6 +2,9 @@ from sys import argv
 from platform import system
 import logging
 
+# this line is not the hero we deserved, but the hero we needed
+# don't delete plz
+import duckdb
 
 from PyQt6.QtCore import Qt, QSize, QRect
 from PyQt6.QtWidgets import QApplication, QSplashScreen
