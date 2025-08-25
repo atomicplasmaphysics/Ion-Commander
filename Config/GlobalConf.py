@@ -60,7 +60,8 @@ class DefaultParams:
 
     # database parameters
     db_folder = 'DB'
-    db_file = 'Laserlab.db'
+    #db_file = 'Laserlab.db'
+    db_file = 'Laserlab.duckdb'
 
     # logging parameters
     logging_folder = 'log'

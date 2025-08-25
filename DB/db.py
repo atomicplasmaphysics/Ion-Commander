@@ -1,8 +1,11 @@
 from __future__ import annotations
-from sqlite3 import connect, OperationalError, Connection, Cursor
+from sqlite3 import connect as connect_sqlite3, OperationalError, Connection, Cursor
+from duckdb import connect as connect_duckdb, CatalogException, DuckDBPyConnection
+
 from datetime import datetime, timedelta
 from pathlib import Path
 
+from enum import Enum, auto
 
 import numpy as np
 
@@ -17,16 +20,20 @@ class Tables:
 
     name = ''
     structure = {
-        'Time': '''INTEGER DEFAULT (strftime('%s', 'now'))''',
+        'Time': '''BIGINT DEFAULT CAST(EXTRACT(EPOCH FROM now()) AS BIGINT)''',
     }
+    index = ''
 
     def __init__(self):
         self.variables = []
 
         if not self.name:
-            raise ValueError(f'No name defined')
+            raise ValueError('No name defined')
         if not self.structure:
             raise ValueError(f'Table "{self.name}" has no structure')
+
+        if ' ' in self.name:
+            raise ValueError(f'Name {self.name} cannot have a space inside')
 
         for variable, variable_type in self.structure.items():
             if 'DEFAULT' not in variable_type:
@@ -36,16 +43,33 @@ class Tables:
         """Returns the column names"""
         return list(self.structure.keys())
 
-    def create(self) -> str:
+    def create_table(self) -> str:
+        """SQL query to create table"""
         table_string = ''
         for variable, variable_type in self.structure.items():
             table_string += f' {variable} {variable_type},\n'
 
         return f'''CREATE TABLE {self.name} (\n{table_string[:-2]}\n);'''
 
-    def exists(self) -> str:
+    def _index_name(self) -> str:
+        """Returns name of index"""
+        return f'idx_{self.name.lower()}_{self.index.lower()}'
+
+    def create_index(self) -> str:
+        """SQL query to create index"""
+        if not self.index:
+            return ''
+        return f'''CREATE INDEX IF NOT EXISTS {self._index_name()} ON {self.name}({self.index})'''
+
+    def exists_table(self) -> str:
         """SQL query if table exists"""
         return f'''SELECT * FROM {self.name} LIMIT 1;'''
+
+    def exists_index(self) -> str:
+        """SQL query if index exists"""
+        if not self.index:
+            return ''
+        return f'''SELECT name FROM sqlite_master WHERE type='index' AND name='{self._index_name()}';'''
 
     def columns(self) -> str:
         """SQL query for column names"""
@@ -101,7 +125,7 @@ class Tables:
 class PressureTable(Tables):
     name = 'Pressure'
     structure = {
-        'Time': '''INTEGER DEFAULT (strftime('%s', 'now'))''',
+        'Time': '''BIGINT DEFAULT CAST(EXTRACT(EPOCH FROM now()) AS BIGINT)''',
         'PITBUL': 'FLOAT default 0',
         'LSD': 'FLOAT default 0',
         'Prevac': 'FLOAT default 0',
@@ -114,7 +138,7 @@ class PressureTable(Tables):
 class PSUTable(Tables):
     name = 'PSU'
     structure = {
-        'Time': '''INTEGER DEFAULT (strftime('%s', 'now'))''',
+        'Time': '''BIGINT DEFAULT CAST(EXTRACT(EPOCH FROM now()) AS BIGINT)''',
         'Channel0_Voltage': 'FLOAT default 0',
         'Channel0_Current': 'FLOAT default 0',
         'Channel1_Voltage': 'FLOAT default 0',
@@ -132,7 +156,7 @@ class PSUTable(Tables):
 class LaserTable(Tables):
     name = 'Laser'
     structure = {
-        'Time': '''INTEGER DEFAULT (strftime('%s', 'now'))''',
+        'Time': '''BIGINT DEFAULT CAST(EXTRACT(EPOCH FROM now()) AS BIGINT)''',
         'Shutter': 'INTEGER default 0',
         'Pulsing': 'INTEGER default 0',
         'Status': 'INTEGER default 0',
@@ -154,7 +178,7 @@ class LaserTable(Tables):
 class PowerMeterTable(Tables):
     name = 'PowerMeter'
     structure = {
-        'Time': '''INTEGER DEFAULT (strftime('%s', 'now'))''',
+        'Time': '''BIGINT DEFAULT CAST(EXTRACT(EPOCH FROM now()) AS BIGINT)''',
         'Power': 'FLOAT default 0',
         'Power_dBm': 'FLOAT default 0',
         'Current': 'FLOAT default 0',
@@ -168,10 +192,11 @@ class PowerMeterTable(Tables):
     def __init__(self):
         super().__init__()
 
+
 class EBISTable(Tables):
     name = 'EBIS'
     structure = {
-        'Time': '''INTEGER DEFAULT (strftime('%s', 'now'))''',
+        'Time': '''BIGINT DEFAULT CAST(EXTRACT(EPOCH FROM now()) AS BIGINT)''',
         'Cathode_Voltage': 'FLOAT default 0',
         'Cathode_Current': 'FLOAT default 0',
         'DT1_Voltage': 'FLOAT default 0',
@@ -197,7 +222,13 @@ class DB:
     :param commit_time_interval: interval in seconds until database will be committed if a query is executed
     :param no_setup: no setup at startup
     :param debug: if debug is enabled
+    :param db_file: use given database file (use empty for default one)
+    :param db_type: use database query language <DBType>
     """
+
+    class DBType(Enum):
+        sqlite3 = auto()
+        duckdb = auto()
 
     default_last_seconds = 300
 
@@ -205,19 +236,31 @@ class DB:
         self,
         commit_time_interval: int = 300,
         no_setup: bool = False,
-        debug: bool = False
+        debug: bool = False,
+        db_file: str = '',
+        db_type: DBType = DBType.duckdb
     ):
         self.commit_time_interval = commit_time_interval
         self.debug = debug
 
-        database_path = Path(__file__).parents[1] / DefaultParams.db_folder / DefaultParams.db_file
-        self.connection: Connection | None = None
-        self.cursor: Cursor | None = None
+        if not db_file:
+            db_file = DefaultParams.db_file
+
+        database_path = Path(__file__).parents[1] / DefaultParams.db_folder / db_file
+        self.connection: Connection | DuckDBPyConnection | None = None
+        self.cursor: Cursor | DuckDBPyConnection | None = None
 
         try:
-            self.connection = connect(database_path)
+            if db_type == DB.DBType.sqlite3:
+                self.connection = connect_sqlite3(database_path)
+            elif db_type == DB.DBType.duckdb:
+                self.connection = connect_duckdb(database_path)
+            else:
+                raise ValueError(f'Provided database type "{db_type}" is not supported!')
+
             self.cursor = self.connection.cursor()
-        except OperationalError as error:
+
+        except (OperationalError, CatalogException) as error:
             GlobalConf.logger.error(f'DB: Can not connect to database in file "{database_path}" because: {error}')
         
         self.new_commit_time = datetime.now()
@@ -306,15 +349,25 @@ class DB:
         """Sets up all tables"""
 
         for table in self.tables:
+            # check if table exists and if not create it
             try:
-                self._execute(table.exists())
-            except OperationalError:
+                self._execute(table.exists_table())
+            except (OperationalError, CatalogException):
                 GlobalConf.logger.info(f'DB: Table "{table.name}" did not exist, will create it...')
-                self._execute(table.create())
+                self._execute(table.create_table())
 
+            # check if table structure is correct
             result = [res[1] for res in self._execute_return(table.columns())]
             if set(result) != set(table.column_names()):
                 raise RuntimeError(f'Columns of existing table "{table.name}" of ({result}) do not match required column names ({table.column_names()}).')
+
+            # check if index exists and if not create it
+            index_query = table.exists_index()
+            if index_query:
+                self._execute(index_query)
+                if not self.cursor.fetchone():
+                    GlobalConf.logger.info(f'DB: Index for table "{table.name}" on "{table.index}" did not exist, will create it...')
+                    self._execute(table.create_index())
 
     def updateColumns(self):
         """Updates all columns of all tables. WARNING: will delete old columns that are not used"""
@@ -605,7 +658,6 @@ class DB:
 
         return self.getData(self.tables.index(self.ebis_table), start_time, end_time)
 
-
     def close(self):
         """Must be called on close"""
         if self.connection is None or self.cursor is None:
@@ -712,5 +764,68 @@ def rename_columns():
     db.close()
 
 
+def query_plan():
+    db = DB(debug=True)
+
+    print(db._execute_return('''
+        EXPLAIN QUERY PLAN
+        SELECT * FROM Laser WHERE Time >= 1700000000 AND Time <= 1700003600;
+    '''))
+
+    print(db._execute_return('PRAGMA table_info(Laser);'))
+
+    print(db._execute_return('SELECT typeof(Time), Time FROM Laser LIMIT 20;'))
+
+    print(db._execute_return('SELECT typeof(Time), COUNT(*) FROM Laser GROUP BY typeof(Time);'))
+
+    db.close()
+
+
+def time_db():
+    from time import time
+    from datetime import datetime
+
+    db = DB(debug=True)
+
+    start_time = time()
+    db.getLaser(
+        start_time=int(datetime.strptime('01.08.2025 00:00:00', '%d.%m.%Y %H:%M:%S').timestamp()),
+        end_time=int(datetime.strptime('31.08.2025 00:00:00', '%d.%m.%Y %H:%M:%S').timestamp())
+    )
+    print(f'Took {time() - start_time}s to look up data from 01.08.2025 to 31.08.2025')
+
+
+    start_time = time()
+    db.getLaser(
+        start_time=int(datetime.strptime('01.01.2025 00:00:00', '%d.%m.%Y %H:%M:%S').timestamp()),
+        end_time=int(datetime.strptime('31.08.2025 00:00:00', '%d.%m.%Y %H:%M:%S').timestamp())
+    )
+    print(f'Took {time() - start_time}s to look up data from 01.01.2025 to 31.08.2025')
+
+    db.close()
+
+
+def setup_duckdb():
+    db_sqlite3 = DB(debug=True, no_setup=True, db_file='Laserlab.db', db_type=DB.DBType.sqlite3)
+    db_duckdb = DB(debug=True, db_type=DB.DBType.duckdb)
+
+    for device in ['Pressure', 'PSU', 'Laser', 'PowerMeter',  'EBIS']:
+        print(f'Working on migrating "{device}"')
+        print(' .reading data')
+        data = db_sqlite3.__getattribute__(f'get{device}')(
+            start_time=int(datetime.strptime('01.01.2000 00:00:00', '%d.%m.%Y %H:%M:%S').timestamp()),
+            end_time=int(datetime.strptime('01.01.2030 00:00:00', '%d.%m.%Y %H:%M:%S').timestamp())
+        )
+
+        print(' .writing data')
+        for d in data:
+            db_duckdb.__getattribute__(f'insert{device}')(*d[1:])
+
+        print(' .done')
+
+    db_sqlite3.close()
+    db_duckdb.close()
+
+
 if __name__ == '__main__':
-    rename_columns()
+    setup_duckdb()
