@@ -1333,7 +1333,7 @@ class DateTimeEdit(QWidget):
         if self.now_button:
             self.now_button = QPushButton('now')
             self.now_button.setToolTip('Select Date and Time as now')
-            self.now_button.clicked.connect(lambda: self.setTime(datetime.now()))
+            self.now_button.clicked.connect(lambda: self.setTime(None))
             self.main_layout.addWidget(self.now_button, stretch=0)
 
     def _selectionPopup(self):
@@ -1347,12 +1347,15 @@ class DateTimeEdit(QWidget):
         )
         self.date_time_edit.setDateTime(self.date_time_selection.timestamp)
 
-    def setTime(self, timestamp: datetime):
+    def setTime(self, timestamp: datetime | None):
         """
         Set the datetime of the widget
 
         :param timestamp: datetime object
         """
+
+        if timestamp is None:
+            timestamp = datetime.now()
 
         self.date_time_edit.setDateTime(timestamp)
 

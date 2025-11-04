@@ -42,6 +42,8 @@ class LaserVBoxLayout(QVBoxLayout):
         self.chiller_temperature_high = DefaultParams.laser_chiller_temperature_high
         self.chiller_flow_low = DefaultParams.laser_chiller_flow_low
         self.chiller_flow_high = DefaultParams.laser_chiller_flow_high
+        self.chiller_pressure_low = DefaultParams.laser_chiller_pressure_low
+        self.chiller_pressure_high = DefaultParams.laser_chiller_pressure_high
         self.baseplate_temperature_off = DefaultParams.laser_baseplate_temperature_off
         self.baseplate_temperature_on = DefaultParams.laser_baseplate_temperature_on
 
@@ -156,16 +158,16 @@ class LaserVBoxLayout(QVBoxLayout):
         self.label_chiller_temperature = QLabel('Chiller Temp.')
         self.indicator_chiller_temperature = IndicatorLed()
         self.status_chiller_temperature = DisplayLabel(value=0, target_value=0, deviation=0.5, unit='°C', alignment_flag=Qt.AlignmentFlag.AlignLeft)
-        self.chiller_grid.addWidgets(
-            self.label_chiller_temperature,
-            self.indicator_chiller_temperature,
-            self.status_chiller_temperature
-        )
 
         # Baseplate Temperature
         self.label_baseplate_temperature = QLabel('Baseplate Temp.')
         self.status_baseplate_temperature = DisplayLabel(value=0, target_value=0, deviation=0.5, unit='°C', alignment_flag=Qt.AlignmentFlag.AlignLeft)
+
         self.chiller_grid.addWidgets(
+            self.label_chiller_temperature,
+            self.indicator_chiller_temperature,
+            self.status_chiller_temperature,
+            None,
             self.label_baseplate_temperature,
             None,
             self.status_baseplate_temperature
@@ -175,13 +177,37 @@ class LaserVBoxLayout(QVBoxLayout):
         self.label_chiller_flow = QLabel('Chiller Flow')
         self.indicator_chiller_flow = IndicatorLed()
         self.status_chiller_flow = DisplayLabel(value=0, target_value=0, deviation=0.3, unit='lpm', decimals=1, alignment_flag=Qt.AlignmentFlag.AlignLeft)
-        self.button_clear_chiller_service = QPushButton('Serviced')
-        self.button_clear_chiller_service.pressed.connect(self.setChillerServiced)
+
+        # Chiller Pressure
+        self.label_chiller_pressure = QLabel('Chiller Pressure')
+        self.indicator_chiller_pressure = IndicatorLed()
+        # TODO: check if unit is right
+        self.status_chiller_pressure = DisplayLabel(value=0, target_value=0, deviation=5, unit='bar', decimals=1, alignment_flag=Qt.AlignmentFlag.AlignLeft)
+
         self.chiller_grid.addWidgets(
             self.label_chiller_flow,
             self.indicator_chiller_flow,
             self.status_chiller_flow,
+            None,
+            self.label_chiller_pressure,
+            self.indicator_chiller_pressure,
+            self.status_chiller_pressure,
+        )
+
+        # Chiller Service
+        self.label_chiller_service = QLabel('Service')
+        self.indicator_chiller_service = IndicatorLed()
+        self.status_chiller_service = DisplayLabel(value=0, target_value=182, deviation=182, unit='days', decimals=0, alignment_flag=Qt.AlignmentFlag.AlignLeft)
+        self.button_clear_chiller_service = QPushButton('Serviced')
+        self.button_clear_chiller_service.pressed.connect(self.setChillerServiced)
+        self.chiller_grid.addWidgets(
+            self.label_chiller_service,
+            self.indicator_chiller_service,
+            self.status_chiller_service,
             self.button_clear_chiller_service,
+            None,
+            None,
+            None
         )
 
         # Faults Group Box
@@ -417,6 +443,34 @@ class LaserVBoxLayout(QVBoxLayout):
             chillerFlow,
             self.device_wrapper.threaded_connection.chfGet()
         )
+        
+        def chillerPressure(pressure: float):
+            if (not isinstance(pressure, float) and not isinstance(pressure, int)) or pressure == -1:
+                GlobalConf.logger.error(f'Chiller pressure must be <float> and not -1, got {type(pressure)} with value "{pressure}"')
+                return
+
+            self.status_chiller_pressure.setValue(pressure)
+            # TODO: no idea if this is correct
+            self.status_chiller_pressure.setTargetValue((self.chiller_pressure_high + self.chiller_pressure_low) / 2)
+            self.indicator_chiller_pressure.setValue(self.chiller_pressure_low <= pressure <= self.chiller_pressure_high)
+
+        self.device_wrapper.threaded_connection.callback(
+            chillerPressure,
+            self.device_wrapper.threaded_connection.chpGet()
+        )
+
+        def chillerService(hours: float):
+            if (not isinstance(hours, float) and not isinstance(hours, int)) or hours == -1:
+                GlobalConf.logger.error(f'Chiller service time must be <float> and not -1, got {type(hours)} with value "{hours}"')
+                return
+
+            self.status_chiller_service.setValue(hours / 24)
+            self.indicator_chiller_service.setValue(hours <= 0)
+
+        self.device_wrapper.threaded_connection.callback(
+            chillerService,
+            self.device_wrapper.threaded_connection.chservicehrsremGet()
+        )
 
         def faultsTable(faults: tuple[dict[int, tuple[str, str]], dict[int, tuple[str, str]]]):
             if not isinstance(faults, tuple) or not len(faults) == 2:
@@ -468,7 +522,6 @@ class LaserVBoxLayout(QVBoxLayout):
 
             self.status_repetition_rate_set.setValue(params[0] * 1000 / params[2])
             self.status_repetition_rate_measured.setTargetValue(params[0] * 1000 / params[2])
-
 
         self.device_wrapper.threaded_connection.callback(
             settings,
@@ -551,6 +604,30 @@ class LaserVBoxLayout(QVBoxLayout):
         self.device_wrapper.threaded_connection.callback(
             setChillerFlowHigh,
             self.device_wrapper.threaded_connection.chfhGet()
+        )
+        
+        def setChillerPressureLow(pressure: float):
+            if (not isinstance(pressure, float) and not isinstance(pressure, int)) or pressure == -1:
+                GlobalConf.logger.error(f'Chiller pressure low must be <float> and not -1, got {type(pressure)} with value "{pressure}"')
+                return
+
+            self.chiller_pressure_low = pressure
+
+        self.device_wrapper.threaded_connection.callback(
+            setChillerPressureLow,
+            self.device_wrapper.threaded_connection.chplGet()
+        )
+
+        def setChillerPressureHigh(pressure: float):
+            if (not isinstance(pressure, float) and not isinstance(pressure, int)) or pressure == -1:
+                GlobalConf.logger.error(f'Chiller pressure high must be <float> and not -1, got {type(pressure)} with value "{pressure}"')
+                return
+
+            self.chiller_pressure_high = pressure
+
+        self.device_wrapper.threaded_connection.callback(
+            setChillerPressureHigh,
+            self.device_wrapper.threaded_connection.chphGet()
         )
 
         def rfLevel(level: float):
@@ -1051,6 +1128,7 @@ class LaserVBoxLayout(QVBoxLayout):
             chst = self.status_chiller_temperature.target_value,
             bt = self.status_baseplate_temperature.value,
             chf = self.status_chiller_flow.value,
+            chp = self.status_chiller_pressure.value,
             #mrr = self.state_mrr_setting,
             pw = int(self.status_settings_pulsewidth.value),
             #rrd = self.state_rrd_setting,

@@ -6,8 +6,10 @@ from PyQt6.QtWidgets import (
     QSplitter, QWidget, QBoxLayout, QHBoxLayout, QVBoxLayout, QPushButton, QGroupBox, QListWidget, QListWidgetItem, QApplication,
     QLabel, QMessageBox
 )
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QTimer
 
+
+from Config.GlobalConf import DefaultParams
 
 from DB.db import DB
 
@@ -41,6 +43,10 @@ class HistoryWindow(TabWidget):
         self.selection_widget = QWidget()
         self.selection_hbox = QHBoxLayout()
         self.selection_widget.setLayout(self.selection_hbox)
+
+        self.update_timer = QTimer()
+        self.update_timer.timeout.connect(self.updatePreview)
+        self.update_timer.setInterval(DefaultParams.update_timer_time)
 
         self.selection_listwidgets: list[QListWidget] = []
 
@@ -82,11 +88,19 @@ class HistoryWindow(TabWidget):
         self.export_title_hbox.setAlignment(Qt.AlignmentFlag.AlignLeft)
         self.preview_export_vbox.addLayout(self.export_title_hbox)
 
+        # Auto update button
+        self.auto_update_button = IndicatorLedButton('Auto update')
+        self.auto_update_button.setToolTip('Will show last 10 minutes')
+        self.auto_update_button.clicked.connect(self.autoUpdate)
+        self.export_title_hbox.addWidget(self.auto_update_button, alignment=Qt.AlignmentFlag.AlignLeft)
+
+        # Update preview button
         self.button_update_preview = QPushButton('Update Preview')
         self.button_update_preview.setToolTip('Might take some time, since all data will be previewed')
         self.button_update_preview.clicked.connect(self.updatePreview)
         self.export_title_hbox.addWidget(self.button_update_preview, alignment=Qt.AlignmentFlag.AlignLeft)
 
+        # Start time widget
         self.start_datetime_label = QLabel('Start time:')
         self.export_title_hbox.addWidget(self.start_datetime_label, alignment=Qt.AlignmentFlag.AlignLeft)
         self.start_datetime_widget = DateTimeEdit(
@@ -95,6 +109,7 @@ class HistoryWindow(TabWidget):
         )
         self.export_title_hbox.addWidget(self.start_datetime_widget, alignment=Qt.AlignmentFlag.AlignLeft)
 
+        # End time widget
         self.end_datetime_label = QLabel('End time:')
         self.export_title_hbox.addWidget(self.end_datetime_label, alignment=Qt.AlignmentFlag.AlignLeft)
         self.end_datetime_widget = DateTimeEdit(
@@ -105,11 +120,13 @@ class HistoryWindow(TabWidget):
         self.export_title_hbox.addWidget(self.end_datetime_widget, alignment=Qt.AlignmentFlag.AlignLeft)
 
         self.export_title_hbox.addStretch()
-        
+
+        # Y-log button
         self.button_log_y_preview = IndicatorLedButton('Log-y')
         self.button_log_y_preview.clicked.connect(self.logYAxis)
         self.export_title_hbox.addWidget(self.button_log_y_preview, alignment=Qt.AlignmentFlag.AlignRight)
 
+        # Plotting canvas
         self.time_canvas = TimeCanvas([], grid=True)
         self.preview_export_vbox.addWidget(self.time_canvas)
 
@@ -117,6 +134,7 @@ class HistoryWindow(TabWidget):
         self.export_hbox.setAlignment(Qt.AlignmentFlag.AlignLeft)
         self.preview_export_vbox.addLayout(self.export_hbox)
 
+        # Exporting path
         self.file_path_label = QLabel('File path:')
         self.export_hbox.addWidget(self.file_path_label)
         self.file_path = FilePath(
@@ -130,6 +148,7 @@ class HistoryWindow(TabWidget):
         )
         self.export_hbox.addWidget(self.file_path, alignment=Qt.AlignmentFlag.AlignLeft)
 
+        # Exporting button
         self.export_button = QPushButton('Export')
         self.export_button.setToolTip('Export selected data to selected file')
         self.export_button.clicked.connect(self.exportData)
@@ -173,7 +192,7 @@ class HistoryWindow(TabWidget):
         labels = []
 
         for i, table in enumerate(self.database.tables):
-            checked = []
+            checked = [0]
             table_labels = []
             for row, attribute in enumerate(list(table.structure.keys())[1:]):
                 if self.selection_listwidgets[i].item(row).checkState() == Qt.CheckState.Checked:
@@ -181,15 +200,14 @@ class HistoryWindow(TabWidget):
                     checked.append(row + 1)
             if not checked:
                 continue
-            data = self.database.getData(self.database.tables.index(table), start_time, end_time)
+            data = self.database.getData(self.database.tables.index(table), tuple(checked), start_time, end_time)
 
             if data is False:
                 continue
+            column_names, column_values = data
 
-            checked.insert(0, 0)
-
-            labels.extend(table_labels)
-            datas.append(data[:, checked])
+            labels.extend(column_names[1:])
+            datas.append(column_values)
 
         if not labels:
             return np.array([]), []
@@ -199,6 +217,10 @@ class HistoryWindow(TabWidget):
 
     def updatePreview(self):
         """Updates the preview with given data"""
+
+        if self.auto_update_button.value():
+            self.start_datetime_widget.setTime(datetime.now() - timedelta(minutes=10))
+            self.end_datetime_widget.setTime(datetime.now())
 
         QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
 
@@ -249,6 +271,20 @@ class HistoryWindow(TabWidget):
                 self.writeStatusBar('Exporting aborted')
 
         QApplication.restoreOverrideCursor()
+
+    def autoUpdate(self):
+        """Automatically updates graphs"""
+
+        auto_update_status = self.auto_update_button.value()
+
+        self.button_update_preview.setDisabled(auto_update_status)
+        self.start_datetime_widget.setDisabled(auto_update_status)
+        self.end_datetime_widget.setDisabled(auto_update_status)
+
+        if auto_update_status:
+            self.update_timer.start()
+        else:
+            self.update_timer.stop()
 
     def logYAxis(self):
         """Updates the y-axis to be logarithmic or normal"""

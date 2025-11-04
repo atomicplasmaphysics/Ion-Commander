@@ -76,7 +76,11 @@ class Tables:
         return f'''PRAGMA table_info({self.name})'''
 
     def alter_add(self, columns: list[str]) -> str:
-        """SQL query to alter the table and add given columns"""
+        """
+        SQL query to alter the table and add given columns
+
+        :param columns: list of columns
+        """
 
         add_structure = dict()
         for column in columns:
@@ -90,8 +94,12 @@ class Tables:
 
         return f'''ALTER TABLE {self.name}\n{table_string[:-2]};'''
 
-    def alter_remove(self, columns: list[str]):
-        """SQL query to alter the table and remove given columns"""
+    def alter_remove(self, columns: list[str]) -> str:
+        """
+        SQL query to alter the table and remove given columns
+
+        :param columns: list of columns
+        """
 
         table_string = ''
         for column in columns:
@@ -107,8 +115,25 @@ class Tables:
 
         return f'''INSERT INTO {self.name} ({','.join(self.variables)}) VALUES ({','.join([str(arg) for arg in args])});'''
 
-    def get(self, start_time: int | None, end_time: int | None):
-        """SQL query to get last seconds of data"""
+    def get(self, column_ids: tuple[int], start_time: int | None, end_time: int | None) -> tuple[list, str]:
+        """
+        SQL query to get columns of data within given timeframe
+
+        :param column_ids: ids of columns
+        :param start_time: start time as timestamp
+        :param end_time: end time as timestamp
+
+        :returns: list of columns, sql query
+        """
+
+        if not column_ids:
+            raise ValueError('No columns provided')
+        column_names = []
+        column_names_all = list(self.structure.keys())
+        for column_id in column_ids:
+            if column_id < 0 or column_id >= len(column_names_all):
+                raise ValueError(f'Column id ({column_id}) is invalid, must be in range (0 .. {len(column_names_all)})')
+            column_names.append(column_names_all[column_id])
 
         conditions = []
         if start_time is not None:
@@ -119,7 +144,7 @@ class Tables:
         if condition:
             condition = f' WHERE {condition}'
 
-        return f'''SELECT * FROM {self.name}{condition};'''
+        return column_names, f'''SELECT {', '.join(column_names)} FROM {self.name}{condition};'''
 
 
 class PressureTable(Tables):
@@ -164,6 +189,7 @@ class LaserTable(Tables):
         'Chiller_Set_Temperature': 'FLOAT default 0',
         'Baseplate_Temperature': 'FLOAT default 0',
         'Chiller_Flow': 'FLOAT default 0',
+        'Chiller_Pressure': 'FLOAT default 0',
         'Amplifier_Repetition_Rate': 'FLOAT default 0',
         'Pulse_Width': 'INTEGER default 0',
         'Repetition_Rate_Divisor': 'INTEGER default 0',
@@ -252,15 +278,15 @@ class DB:
                 GlobalConf.logger.error(f'Provided database type "{db_type}" is not supported!')
                 raise ValueError(f'Provided database type "{db_type}" is not supported!')
 
-        database_path = Path(__file__).parents[1] / DefaultParams.db_folder / db_file
+        self.database_path = Path(__file__).parents[1] / DefaultParams.db_folder / db_file
         self.connection: Connection | DuckDBPyConnection | None = None
         self.cursor: Cursor | DuckDBPyConnection | None = None
 
         try:
             if db_type == DB.DBType.sqlite3:
-                self.connection = connect_sqlite3(database_path)
+                self.connection = connect_sqlite3(self.database_path)
             elif db_type == DB.DBType.duckdb:
-                self.connection = connect_duckdb(database_path)
+                self.connection = connect_duckdb(self.database_path)
             else:
                 GlobalConf.logger.error(f'Provided database type "{db_type}" is not supported!')
                 raise ValueError(f'Provided database type "{db_type}" is not supported!')
@@ -269,9 +295,8 @@ class DB:
             self.cursor = self.connection.cursor()
 
         except (OperationalError, CatalogException) as error:
-            GlobalConf.logger.error(f'DB: Can not connect to database in file "{database_path}" because: {error}')
+            GlobalConf.logger.error(f'DB: Can not connect to database in file "{self.database_path}" because: {error}')
 
-        
         self.new_commit_time = datetime.now()
 
         self.pressure_table = PressureTable()
@@ -425,13 +450,42 @@ class DB:
             if diff_columns:
                 self._execute(table.alter_remove(diff_columns))
 
-    def getData(self, table_idx: int, start_time: int | None = None, end_time: int | None = None) -> bool | np.ndarray:
-        """Get values from table with table_idx"""
+    def getData(
+        self,
+        table_idx: int,
+        columns: int | tuple[int] | list[str] | None = None,
+        start_time: int | None = None,
+        end_time: int | None = None
+    ) -> bool | tuple[list, np.ndarray]:
+        """
+        Get values from table with table_idx
 
-        results = self._execute_return(self.tables[table_idx].get(start_time, end_time))
+        :param columns: column ids or column names
+        :param table_idx: index of table
+        :param start_time: start time as timestamp
+        :param end_time: end time as timestamp
+        """
+
+        columns_all = list(self.tables[table_idx].structure.keys())
+
+        column_ids = columns
+        if columns is None:
+            column_ids = tuple(range(len(columns_all)))
+        elif isinstance(columns, int):
+            column_ids = (columns, )
+        elif isinstance(columns, list):
+            column_ids = []
+            for column in columns:
+                if column not in columns_all:
+                    raise ValueError(f'Column "{column}" is not in table {self.tables[table_idx].name}')
+                column_ids.append(columns_all.index(column))
+            column_ids = tuple(column_ids)
+
+        column_names, query = self.tables[table_idx].get(column_ids, start_time, end_time)
+        results = self._execute_return(query)
         if not results:
             return False
-        return np.array(results)
+        return column_names, np.array(results)
 
     def insertPressure(
         self,
@@ -440,7 +494,7 @@ class DB:
         prevac: float
     ):
         """
-        Inserts pressure values
+        Inserts Pressure values
 
         :param pitbul: pressure for PITBUL in [mbar]
         :param lsd: pressure for LSD in [mbar]
@@ -449,19 +503,23 @@ class DB:
 
         self._execute(self.pressure_table.insert(pitbul, lsd, prevac))
 
-    def getPressure(self, start_time: int | None = None, end_time: int | None = None) -> bool | np.ndarray:
+    def getPressure(
+        self,
+        columns: int | tuple[int] | list[str] | None = None,
+        start_time: int | None = None,
+        end_time: int | None = None
+    ) -> bool | tuple[list, np.ndarray]:
         """
-        Get pressure values
+        Get Pressure values
 
-        :returns: list of np.ndarrays[
-            times,
-            PITBUL pressures in [mbar],
-            LSD pressures in [mbar],
-            prevacuum pressures in [mbar]
-        ]
+        :param columns: list of name of columns, tuple of ids of columns or None(=all columns)
+        :param start_time: start time as timestamp
+        :param end_time: end time as timestamp
+
+        :returns: tuple of column names and column values
         """
 
-        return self.getData(self.tables.index(self.pressure_table), start_time, end_time)
+        return self.getData(self.tables.index(self.pressure_table), columns, start_time, end_time)
 
     def insertPSU(
         self,
@@ -489,24 +547,23 @@ class DB:
 
         self._execute(self.psu_table.insert(ch0v, ch0i, ch1v, ch1i, ch2v, ch2i, ch3v, ch3i))
 
-    def getPSU(self, start_time: int | None = None, end_time: int | None = None) -> bool | np.ndarray:
+    def getPSU(
+        self,
+        columns: int | tuple[int] | list[str] | None = None,
+        start_time: int | None = None,
+        end_time: int | None = None
+    ) -> bool | tuple[list, np.ndarray]:
         """
         Get PSU values
 
-        :returns: list of np.ndarrays[
-            times,
-            channel 0 measured voltages in [V],
-            channel 0 measured currents in [A],
-            channel 1 measured voltages in [V],
-            channel 1 measured currents in [A],
-            channel 2 measured voltages in [V],
-            channel 2 measured currents in [A],
-            channel 3 measured voltages in [V],
-            channel 3 measured currents in [A]
-        ]
+        :param columns: list of name of columns, tuple of ids of columns or None(=all columns)
+        :param start_time: start time as timestamp
+        :param end_time: end time as timestamp
+
+        :returns: tuple of column names and column values
         """
 
-        return self.getData(self.tables.index(self.psu_table), start_time, end_time)
+        return self.getData(self.tables.index(self.psu_table), columns, start_time, end_time)
 
     def insertLaser(
         self,
@@ -517,6 +574,7 @@ class DB:
         chst: float = -1,
         bt: float = -1,
         chf: float = -1,
+        chp: float = -1,
         mrr: float = -1,
         pw: int = -1,
         rrd: int = -1,
@@ -533,6 +591,7 @@ class DB:
         :param chst: chiller set temperature in [°C]
         :param bt: baseplate temperature in [°C]
         :param chf: chiller flowrate in [lpm]
+        :param chp: chiller pressure in [bar]
         :param mrr: amplifier repetition rate in [kHz]
         :param pw: pulse width in [fs]
         :param rrd: repetition rate divisor
@@ -540,30 +599,25 @@ class DB:
         :param rl: RF level in [%]
         """
 
-        self._execute(self.laser_table.insert(int(s), int(pc), l, cht, chst, bt, chf, mrr, pw, rrd, sb, rl))
+        self._execute(self.laser_table.insert(int(s), int(pc), l, cht, chst, bt, chf, chp, mrr, pw, rrd, sb, rl))
 
-    def getLaser(self, start_time: int | None = None, end_time: int | None = None) -> bool | np.ndarray:
+    def getLaser(
+        self,
+        columns: int | tuple[int] | list[str] | None = None,
+        start_time: int | None = None,
+        end_time: int | None = None
+    ) -> bool | tuple[list, np.ndarray]:
         """
         Get Laser values
 
-        :returns: list of np.ndarrays[
-            times,
-            shutter ons,
-            pulsing ons,
-            system stati,
-            chiller temperatures in [°C],
-            chiller set temperatures in [°C],
-            baseplate temperatures in [°C],
-            chiller flowrates in [lpm],
-            amplifier repetition rates in [kHz],
-            pulse widths in [fs],
-            repetition rate divisors,
-            numbers of seeder bursts,
-            RF levels in [%]
-        ]
+        :param columns: list of name of columns, tuple of ids of columns or None(=all columns)
+        :param start_time: start time as timestamp
+        :param end_time: end time as timestamp
+
+        :returns: tuple of column names and column values
         """
 
-        return self.getData(self.tables.index(self.laser_table), start_time, end_time)
+        return self.getData(self.tables.index(self.laser_table), columns, start_time, end_time)
 
     def insertPowerMeter(
         self,
@@ -591,24 +645,23 @@ class DB:
 
         self._execute(self.power_meter_table.insert(power, power_dbm, current, irradiance, beam_diameter, attenuation, averaging, wavelength))
 
-    def getPowerMeter(self, start_time: int | None = None, end_time: int | None = None) -> bool | np.ndarray:
+    def getPowerMeter(
+        self,
+        columns: int | tuple[int] | list[str] | None = None,
+        start_time: int | None = None,
+        end_time: int | None = None
+    ) -> bool | tuple[list, np.ndarray]:
         """
         Get Power Meter values
 
-        :returns: list of np.ndarrays[
-            times
-            powers in [W]
-            powers in [dBm]
-            currents in [A]
-            irradiances in [W/cm²]
-            beam diameters in [mm]
-            attenuations in [dBm]
-            counts of averaging events
-            wavelengths in [nm]
-        ]
+        :param columns: list of name of columns, tuple of ids of columns or None(=all columns)
+        :param start_time: start time as timestamp
+        :param end_time: end time as timestamp
+
+        :returns: tuple of column names and column values
         """
 
-        return self.getData(self.tables.index(self.power_meter_table), start_time, end_time)
+        return self.getData(self.tables.index(self.power_meter_table), columns, start_time, end_time)
 
     def insertEBIS(
         self,
@@ -644,28 +697,23 @@ class DB:
 
         self._execute(self.ebis_table.insert(CatV, CatI, DT1V, DT1I, DT2V, DT2I, DT3V, DT3I, RepV, RepI, HeatV, HeatI))
 
-    def getEBIS(self, start_time: int | None = None, end_time: int | None = None) -> bool | np.ndarray:
+    def getEBIS(
+        self,
+        columns: int | tuple[int] | list[str] | None = None,
+        start_time: int | None = None,
+        end_time: int | None = None
+    ) -> bool | tuple[list, np.ndarray]:
         """
         Get EBIS values
 
-        :returns: list of np.ndarrays[
-            times,
-            cathode voltages in [V],
-            cathode currents in [A],
-            drift tube 1 voltages in [V],
-            drift tube 1 currents in [A],
-            drift tube 2 voltages in [V],
-            drift tube 2 currents in [A],
-            drift tube 3 voltages in [V],
-            drift tube 3 currents in [A],
-            repeller voltages in [V],
-            repeller currents in [A],
-            heating voltages in [V],
-            heating currents in [A]
-        ]
+        :param columns: list of name of columns, tuple of ids of columns or None(=all columns)
+        :param start_time: start time as timestamp
+        :param end_time: end time as timestamp
+
+        :returns: tuple of column names and column values
         """
 
-        return self.getData(self.tables.index(self.ebis_table), start_time, end_time)
+        return self.getData(self.tables.index(self.ebis_table), columns, start_time, end_time)
 
     def close(self):
         """Must be called on close"""
@@ -814,6 +862,22 @@ def time_db():
 
     db.close()
 
+    """
+    Results
+
+    sqlite3(indexed):
+    Took 4.675286531448364s to look up data from 01.08.2025 to 31.08.2025
+    Took 63.097015380859375s to look up data from 01.01.2025 to 31.08.2025
+    
+    sqlite3(pragmas):
+    Took 4.630336761474609s to look up data from 01.08.2025 to 31.08.2025
+    Took 63.966304540634155s to look up data from 01.01.2025 to 31.08.2025
+    
+    duckdb:
+    Took 3.174304723739624s to look up data from 01.08.2025 to 31.08.2025
+    Took 45.66825556755066s to look up data from 01.01.2025 to 31.08.2025
+    """
+
 
 def setup_duckdb_naive():
     db_sqlite3 = DB(debug=True, no_setup=True, db_file='Laserlab.db', db_type=DB.DBType.sqlite3)
@@ -853,4 +917,12 @@ def setup_duckdb():
 
 
 if __name__ == '__main__':
-    time_db()
+    db_duckdb = DB(debug=True, db_type=DB.DBType.duckdb)
+    laser_columns, laser_data = db_duckdb.getLaser(
+        9,
+        start_time=int(datetime.strptime('04.11.2025 00:00:00', '%d.%m.%Y %H:%M:%S').timestamp()),
+        end_time=int(datetime.strptime('05.11.2025 00:00:00', '%d.%m.%Y %H:%M:%S').timestamp())
+    )
+    print(laser_columns)
+    print(laser_data[0])
+    db_duckdb.close()

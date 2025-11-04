@@ -52,6 +52,8 @@ class DefaultParams:
     laser_chiller_temperature_high = 33
     laser_chiller_flow_low = 4.7
     laser_chiller_flow_high = 5.3
+    laser_chiller_pressure_low = 3
+    laser_chiller_pressure_high = 35
     laser_baseplate_temperature_off = 27.5
     laser_baseplate_temperature_on = 28
 
