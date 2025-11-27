@@ -9,6 +9,8 @@ Log/logs/*
 
 DB/*.db
 DB/*.db-journal
+DB/*.duckdb
+DB/*.duckdb.wal
 
 Tips/entries/*
 Tips/images/*
@@ -18,3 +20,6 @@ Scripts/*
 /guis/
 /data/
 /tests/
+
+desktop.ini
+

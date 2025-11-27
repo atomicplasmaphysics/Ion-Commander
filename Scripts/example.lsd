@@ -1,7 +1,7 @@
 TIME 10
 # first line always has to specify the interval of the commands
 # lines with a '#' are treated as comment and are ignored
-# in line comments do not work
+# in-line comments do not work
 # empty lines will also be ignored
 
 # sleep statement does nothing for a 'cycle'

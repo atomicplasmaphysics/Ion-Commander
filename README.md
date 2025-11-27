@@ -5,14 +5,15 @@ Quick and dirty python code for commanding our Ions in the LaserLab 💡⚔
 The GUI needs [Python ≥ 3.11](https://www.python.org/downloads/) with following packages installed:
 
 ```
-Package     Version
------------ ----------
+Package     min. Version
+----------- ------------
 PyQt6       6.5.2
 pyqtgraph   0.13.3
 numpy       1.24.3
 scipy       1.10.1
 matplotlib  3.8.3
 pyserial    3.5
+duckdb      1.3.2
 ```
 
 To execute the GUI, download all files from this repository and execute the `main.py` file from the console.

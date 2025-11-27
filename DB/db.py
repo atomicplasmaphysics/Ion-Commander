@@ -153,6 +153,7 @@ class PressureTable(Tables):
         'Time': '''BIGINT DEFAULT CAST(EXTRACT(EPOCH FROM now()) AS BIGINT)''',
         'PITBUL': 'FLOAT default 0',
         'LSD': 'FLOAT default 0',
+        'ESD': 'FLOAT default 0',
         'Prevac': 'FLOAT default 0',
     }
 
@@ -393,7 +394,7 @@ class DB:
             # check if table structure is correct
             result = [res[1] for res in self._execute_return(table.columns())]
             if set(result) != set(table.column_names()):
-                raise RuntimeError(f'Columns of existing table "{table.name}" of ({result}) do not match required column names ({table.column_names()}).')
+                raise RuntimeError(f'Columns of existing table "{table.name}" of ({result}) do not match required column names ({table.column_names()}).\nTry to call DB.updateColumns() for updating the columns. You should probably safe the DB beforehand.')
 
             # check if index exists and if not create it
             index_query = table.exists_index()
@@ -491,6 +492,7 @@ class DB:
         self,
         pitbul: float,
         lsd: float,
+        esd: float,
         prevac: float
     ):
         """
@@ -498,10 +500,11 @@ class DB:
 
         :param pitbul: pressure for PITBUL in [mbar]
         :param lsd: pressure for LSD in [mbar]
+        :param esd: pressure for ESD in [mbar]
         :param prevac: pressure for prevacuum in [mbar]
         """
 
-        self._execute(self.pressure_table.insert(pitbul, lsd, prevac))
+        self._execute(self.pressure_table.insert(pitbul, lsd, esd, prevac))
 
     def getPressure(
         self,
@@ -917,12 +920,6 @@ def setup_duckdb():
 
 
 if __name__ == '__main__':
-    db_duckdb = DB(debug=True, db_type=DB.DBType.duckdb)
-    laser_columns, laser_data = db_duckdb.getLaser(
-        9,
-        start_time=int(datetime.strptime('04.11.2025 00:00:00', '%d.%m.%Y %H:%M:%S').timestamp()),
-        end_time=int(datetime.strptime('05.11.2025 00:00:00', '%d.%m.%Y %H:%M:%S').timestamp())
-    )
-    print(laser_columns)
-    print(laser_data[0])
+    db_duckdb = DB(debug=True, db_type=DB.DBType.duckdb, no_setup=True)
+    db_duckdb.updateColumns()
     db_duckdb.close()

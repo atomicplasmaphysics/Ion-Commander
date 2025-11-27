@@ -86,20 +86,28 @@ class PressureVBoxLayout(QVBoxLayout):
         self.group_box_2.setLayout(self.layout_2)
         self.addWidget(self.group_box_2)
 
-        # Pre-vacuum
-        self.group_box_3 = QGroupBox('Pre-Vacuum')
-        self.pressure_widget_3 = PressureWidget(input_range=(1E3, 5E-3))
+        # ESD
+        self.group_box_3 = QGroupBox('ESD')
+        self.pressure_widget_3 = PressureWidget()
         self.layout_3 = QVBoxLayout()
         self.layout_3.addWidget(self.pressure_widget_3)
         self.group_box_3.setLayout(self.layout_3)
         self.addWidget(self.group_box_3)
+
+        # Pre-vacuum
+        self.group_box_4 = QGroupBox('Pre-Vacuum')
+        self.pressure_widget_4 = PressureWidget(input_range=(1E3, 5E-3))
+        self.layout_4 = QVBoxLayout()
+        self.layout_4.addWidget(self.pressure_widget_4)
+        self.group_box_4.setLayout(self.layout_4)
+        self.addWidget(self.group_box_4)
 
         # grouped items
         self.pressure_widgets = [
             self.pressure_widget_1,
             self.pressure_widget_2,
             self.pressure_widget_3,
-            None
+            self.pressure_widget_4
         ]
 
         self.reset()
@@ -145,8 +153,8 @@ class PressureVBoxLayout(QVBoxLayout):
             self.connection = MixedPressureConnection(comport, [
                 thyracontVoltageToPressure,
                 thyracontVoltageToPressure,
+                thyracontVoltageToPressure,
                 lambda voltage: tpg300VoltageToPressure(voltage, TPG300Type.Pirani),
-                lambda voltage: 0
             ])
             try:
                 self.connection.open()
@@ -223,7 +231,7 @@ class PressureVBoxLayout(QVBoxLayout):
 
         self.pressure_widget_1.setPressure(0)
         self.pressure_widget_2.setPressure(0)
-        self.pressure_widget_3.setPressure(0)
+        self.pressure_widget_4.setPressure(0)
 
         self.combobox_connection.setEnabled(True)
         self.button_connection_refresh.setEnabled(True)
@@ -265,4 +273,5 @@ class PressureVBoxLayout(QVBoxLayout):
                 self.pressure_widget_1.pressure,
                 self.pressure_widget_2.pressure,
                 self.pressure_widget_3.pressure,
+                self.pressure_widget_4.pressure,
             )
