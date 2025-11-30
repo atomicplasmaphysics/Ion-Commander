@@ -2,6 +2,8 @@ from os import path
 from ctypes import c_int, c_int16, c_uint16, c_uint32, c_long, c_double, c_char_p, c_bool, create_string_buffer, byref, cdll
 from enum import IntEnum
 
+from Config.GlobalConf import GlobalConf
+
 
 class TLPMxValues:
     """
@@ -1822,9 +1824,10 @@ def getResources() -> dict[bytearray, tuple[bytearray, bytearray, bytearray, int
                     continue
     except NameError:
         pass
+    except FileNotFoundError as e:
+        GlobalConf.logger.error(e)
 
-    finally:
-        return resource_list
+    return resource_list
 
 
 def main():
