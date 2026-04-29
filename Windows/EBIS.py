@@ -31,6 +31,7 @@ class EBISVBoxLayout(QVBoxLayout):
 
         self.active_message_box = False
 
+        # TODO: update to device_wrapper -> same as in PSU.py for Script controll
         self.connection: None | ISEGConnection = None
         self.threaded_connection: ThreadedDummyConnection | ThreadedISEGConnection = ThreadedDummyConnection()
 
@@ -109,94 +110,168 @@ class EBISVBoxLayout(QVBoxLayout):
             (QLabel('High Voltage'), 2)
         )
 
-        # Cathode Potential
-        self.label_1 = QLabel('Cathode')
-        self.spinbox_1 = DoubleSpinBox(default=0, step_size=50, input_range=(0, self.voltage_maximum), decimals=1, buttons=False)
-        self.spinbox_1.editingFinished.connect(lambda: self.setVoltage(0, self.spinbox_1.value()))
+        # Cathode
+        self.label_voltage_1 = QLabel('Cathode')
+        self.spinbox_voltage_1 = DoubleSpinBox(default=0, step_size=50, input_range=(0, self.voltage_maximum), decimals=1, buttons=False)
+        self.spinbox_voltage_1.editingFinished.connect(lambda: self.setVoltage(0, self.spinbox_voltage_1.value()))
         self.status_voltage_1 = DisplayLabel(value=0, unit='V', target_value=0, deviation=self.voltage_deviation)
         self.status_current_1 = DisplayLabel(value=0, unit='A', target_value=0, deviation=self.current_maximum, enable_prefix=True)
-        self.indicator_1 = IndicatorLed()
-        self.button_1 = QPushButton('Enable')
-        self.button_1.pressed.connect(lambda: self.setOutput(0, not self.indicator_1.value()))
+        self.indicator_voltage_1 = IndicatorLed()
+        self.button_enable_1 = QPushButton('Enable')
+        self.button_enable_1.pressed.connect(lambda: self.setOutput(0, not self.indicator_voltage_1.value()))
         self.potential_grid.addWidgets(
-            self.label_1,
-            self.spinbox_1,
+            self.label_voltage_1,
+            self.spinbox_voltage_1,
             self.status_voltage_1,
             self.status_current_1,
-            self.indicator_1,
-            self.button_1
+            self.indicator_voltage_1,
+            self.button_enable_1
         )
 
         # Drift Tube 1
-        self.label_2 = QLabel('Drift Tube 1')
-        self.spinbox_2 = DoubleSpinBox(default=0, step_size=50, input_range=(0, self.voltage_maximum), decimals=1, buttons=False)
-        self.spinbox_2.editingFinished.connect(lambda: self.setVoltage(1, self.spinbox_2.value()))
+        self.label_voltage_2 = QLabel('Drift Tube 1')
+        self.spinbox_voltage_2 = DoubleSpinBox(default=0, step_size=50, input_range=(0, self.voltage_maximum), decimals=1, buttons=False)
+        self.spinbox_voltage_2.editingFinished.connect(lambda: self.setVoltage(1, self.spinbox_voltage_2.value()))
         self.status_voltage_2 = DisplayLabel(value=0, unit='V', target_value=0, deviation=self.voltage_deviation)
         self.status_current_2 = DisplayLabel(value=0, unit='A', target_value=0, deviation=self.current_maximum, enable_prefix=True)
-        self.indicator_2 = IndicatorLed()
-        self.button_2 = QPushButton('Enable')
-        self.button_2.pressed.connect(lambda: self.setOutput(1, not self.indicator_2.value()))
+        self.indicator_voltage_2 = IndicatorLed()
+        self.button_enable_2 = QPushButton('Enable')
+        self.button_enable_2.pressed.connect(lambda: self.setOutput(1, not self.indicator_voltage_2.value()))
         self.potential_grid.addWidgets(
-            self.label_2,
-            self.spinbox_2,
+            self.label_voltage_2,
+            self.spinbox_voltage_2,
             self.status_voltage_2,
             self.status_current_2,
-            self.indicator_2,
-            self.button_2
+            self.indicator_voltage_2,
+            self.button_enable_2
         )
 
         # Drift Tube 2
-        self.label_3 = QLabel('Drift Tube 2')
-        self.spinbox_3 = DoubleSpinBox(default=0, step_size=50, input_range=(0, self.voltage_maximum), decimals=1, buttons=False)
-        self.spinbox_3.editingFinished.connect(lambda: self.setVoltage(2, self.spinbox_3.value()))
+        self.label_voltage_3 = QLabel('Drift Tube 2')
+        self.spinbox_voltage_3 = DoubleSpinBox(default=0, step_size=50, input_range=(0, self.voltage_maximum), decimals=1, buttons=False)
+        self.spinbox_voltage_3.editingFinished.connect(lambda: self.setVoltage(2, self.spinbox_voltage_3.value()))
         self.status_voltage_3 = DisplayLabel(value=0, unit='V', target_value=0, deviation=self.voltage_deviation)
         self.status_current_3 = DisplayLabel(value=0, unit='A', target_value=0, deviation=self.current_maximum, enable_prefix=True)
-        self.indicator_3 = IndicatorLed()
-        self.button_3 = QPushButton('Enable')
-        self.button_3.pressed.connect(lambda: self.setOutput(2, not self.indicator_3.value()))
+        self.indicator_voltage_3 = IndicatorLed()
+        self.button_enable_3 = QPushButton('Enable')
+        self.button_enable_3.pressed.connect(lambda: self.setOutput(2, not self.indicator_voltage_3.value()))
         self.potential_grid.addWidgets(
-            self.label_3,
-            self.spinbox_3,
+            self.label_voltage_3,
+            self.spinbox_voltage_3,
             self.status_voltage_3,
             self.status_current_3,
-            self.indicator_3,
-            self.button_3
+            self.indicator_voltage_3,
+            self.button_enable_3
         )
 
         # Drift Tube 3
-        self.label_4 = QLabel('Drift Tube 3')
-        self.spinbox_4 = DoubleSpinBox(default=0, step_size=50, input_range=(0, self.voltage_maximum), decimals=1, buttons=False)
-        self.spinbox_4.editingFinished.connect(lambda: self.setVoltage(3, self.spinbox_4.value()))
+        self.label_voltage_4 = QLabel('Drift Tube 3')
+        self.spinbox_voltage_4 = DoubleSpinBox(default=0, step_size=50, input_range=(0, self.voltage_maximum), decimals=1, buttons=False)
+        self.spinbox_voltage_4.editingFinished.connect(lambda: self.setVoltage(3, self.spinbox_voltage_4.value()))
         self.status_voltage_4 = DisplayLabel(value=0, unit='V', target_value=0, deviation=self.voltage_deviation)
         self.status_current_4 = DisplayLabel(value=0, unit='A', target_value=0, deviation=self.current_maximum, enable_prefix=True)
-        self.indicator_4 = IndicatorLed()
-        self.button_4 = QPushButton('Enable')
-        self.button_4.pressed.connect(lambda: self.setOutput(3, not self.indicator_4.value()))
+        self.indicator_voltage_4 = IndicatorLed()
+        self.button_enable_4 = QPushButton('Enable')
+        self.button_enable_4.pressed.connect(lambda: self.setOutput(3, not self.indicator_voltage_4.value()))
         self.potential_grid.addWidgets(
-            self.label_4,
-            self.spinbox_4,
+            self.label_voltage_4,
+            self.spinbox_voltage_4,
             self.status_voltage_4,
             self.status_current_4,
-            self.indicator_4,
-            self.button_4
+            self.indicator_voltage_4,
+            self.button_enable_4
         )
 
         # Repeller
-        self.label_5 = QLabel('Repeller')
-        self.spinbox_5 = DoubleSpinBox(default=0, step_size=50, input_range=(0, self.voltage_maximum), decimals=1, buttons=False)
-        self.spinbox_5.editingFinished.connect(lambda: self.setVoltage(4, self.spinbox_5.value()))
+        self.label_voltage_5 = QLabel('Repeller')
+        self.spinbox_voltage_5 = DoubleSpinBox(default=0, step_size=50, input_range=(0, self.voltage_maximum), decimals=1, buttons=False)
+        self.spinbox_voltage_5.editingFinished.connect(lambda: self.setVoltage(4, self.spinbox_voltage_5.value()))
         self.status_voltage_5 = DisplayLabel(value=0, unit='V', target_value=0, deviation=self.voltage_deviation)
         self.status_current_5 = DisplayLabel(value=0, unit='A', target_value=0, deviation=self.current_maximum, enable_prefix=True)
-        self.indicator_5 = IndicatorLed()
-        self.button_5 = QPushButton('Enable')
-        self.button_5.pressed.connect(lambda: self.setOutput(4, not self.indicator_5.value()))
+        self.indicator_voltage_5 = IndicatorLed()
+        self.button_enable_5 = QPushButton('Enable')
+        self.button_enable_5.pressed.connect(lambda: self.setOutput(4, not self.indicator_voltage_5.value()))
         self.potential_grid.addWidgets(
-            self.label_5,
-            self.spinbox_5,
+            self.label_voltage_5,
+            self.spinbox_voltage_5,
             self.status_voltage_5,
             self.status_current_5,
-            self.indicator_5,
-            self.button_5
+            self.indicator_voltage_5,
+            self.button_enable_5
+        )
+
+        # Limits Group Box
+        self.limits_group_box = QGroupBox('Limits')
+        self.addWidget(self.limits_group_box)
+
+        self.limits_hbox = QHBoxLayout()
+        self.limits_hbox.setAlignment(Qt.AlignmentFlag.AlignLeft)
+        self.limits_group_box.setLayout(self.limits_hbox)
+
+        self.limits_grid = InsertingGridLayout()
+        self.limits_hbox.addLayout(self.limits_grid)
+
+        # Labels
+        self.limits_grid.addWidgets(
+            None,
+            QLabel('Current [mA]'),
+            QLabel('Reached')
+        )
+
+        # TODO: global values for input ranges
+        # Cathode
+        self.label_limit_1 = QLabel('Cathode')
+        self.spinbox_limit_current_1 = DoubleSpinBox(default=0.002, step_size=0.001, input_range=(0.002, 2), decimals=3, buttons=False)
+        self.spinbox_limit_current_1.editingFinished.connect(lambda: self.setCurrent(0, self.spinbox_limit_current_1.value()))
+        self.indicator_current_limit_1 = IndicatorLed(on_color=Colors.color_red)
+        self.limits_grid.addWidgets(
+            self.label_limit_1,
+            self.spinbox_limit_current_1,
+            self.indicator_current_limit_1
+        )
+
+        # Drift Tube 1
+        self.label_limit_2 = QLabel('Drift Tube 1')
+        self.spinbox_limit_current_2 = DoubleSpinBox(default=0.002, step_size=0.001, input_range=(0.002, 1), decimals=3, buttons=False)
+        self.spinbox_limit_current_2.editingFinished.connect(lambda: self.setCurrent(1, self.spinbox_limit_current_2.value()))
+        self.indicator_current_limit_2 = IndicatorLed(on_color=Colors.color_red)
+        self.limits_grid.addWidgets(
+            self.label_limit_2,
+            self.spinbox_limit_current_2,
+            self.indicator_current_limit_2
+        )
+
+        # Drift Tube 2
+        self.label_limit_3 = QLabel('Drift Tube 2')
+        self.spinbox_limit_current_3 = DoubleSpinBox(default=0.002, step_size=0.001, input_range=(0.002, 1), decimals=3, buttons=False)
+        self.spinbox_limit_current_3.editingFinished.connect(lambda: self.setCurrent(2, self.spinbox_limit_current_3.value()))
+        self.indicator_current_limit_3 = IndicatorLed(on_color=Colors.color_red)
+        self.limits_grid.addWidgets(
+            self.label_limit_3,
+            self.spinbox_limit_current_3,
+            self.indicator_current_limit_3
+        )
+
+        # Drift Tube 3
+        self.label_limit_4 = QLabel('Drift Tube 3')
+        self.spinbox_limit_current_4 = DoubleSpinBox(default=0.002, step_size=0.001, input_range=(0.002, 1), decimals=3, buttons=False)
+        self.spinbox_limit_current_4.editingFinished.connect(lambda: self.setCurrent(3, self.spinbox_limit_current_4.value()))
+        self.indicator_current_limit_4 = IndicatorLed(on_color=Colors.color_red)
+        self.limits_grid.addWidgets(
+            self.label_limit_4,
+            self.spinbox_limit_current_4,
+            self.indicator_current_limit_4
+        )
+
+        # Repeller
+        self.label_limit_5 = QLabel('Repeller')
+        self.spinbox_limit_current_5 = DoubleSpinBox(default=0.002, step_size=0.001, input_range=(0.002, 1), decimals=3, buttons=False)
+        self.spinbox_limit_current_5.editingFinished.connect(lambda: self.setCurrent(4, self.spinbox_limit_current_5.value()))
+        self.indicator_current_limit_5 = IndicatorLed(on_color=Colors.color_red)
+        self.limits_grid.addWidgets(
+            self.label_limit_5,
+            self.spinbox_limit_current_5,
+            self.indicator_current_limit_5
         )
 
         # Heating Group Box
@@ -224,16 +299,16 @@ class EBISVBoxLayout(QVBoxLayout):
         self.spinbox_voltage_6 = DoubleSpinBox(default=0, step_size=0.1, input_range=(0, 5), decimals=1, buttons=False)
         self.spinbox_voltage_6.editingFinished.connect(lambda: self.setVoltage(5, self.spinbox_voltage_6.value()))
         self.status_voltage_6 = DisplayLabel(value=0, unit='V', target_value=0, deviation=self.voltage_deviation)
-        self.indicator_6 = IndicatorLed()
-        self.button_6 = QPushButton('Enable')
-        self.button_6.pressed.connect(lambda: self.setOutput(5, not self.indicator_6.value()))
+        self.indicator_voltage_6 = IndicatorLed()
+        self.button_enable_6 = QPushButton('Enable')
+        self.button_enable_6.pressed.connect(lambda: self.setOutput(5, not self.indicator_voltage_6.value()))
         self.heating_grid.addWidgets(
             self.label_voltage_6,
             self.spinbox_voltage_6,
             self.status_voltage_6,
             None,
-            self.indicator_6,
-            self.button_6
+            self.indicator_voltage_6,
+            self.button_enable_6
         )
 
         # Cathode Heating Current
@@ -263,7 +338,7 @@ class EBISVBoxLayout(QVBoxLayout):
         self.label_hard_pmax = QLabel('Hard limit max pressure [10^-8 mbar]') # Not great but I dont want to make a new SpinBox class for scientific notation
         self.hard_pmax_val = 10
         self.spinbox_hard_pmax = DoubleSpinBox(default=self.hard_pmax_val, step_size=1, input_range=(0.1, 1000), decimals=1, buttons=False)
-        self.spinbox_hard_pmax.editingFinished.connect(lambda: setattr(self, 'hard_pmax_val', self.spinbox_hard_pmax.value()*1E-8)) # set pressure in 10^-8mbar
+        self.spinbox_hard_pmax.editingFinished.connect(lambda: setattr(self, 'hard_pmax_val', self.spinbox_hard_pmax.value() * 1E-8)) # set pressure in 10^-8mbar
         self.pressure_grid.addWidgets(
             self.label_hard_pmax,
             self.spinbox_hard_pmax
@@ -283,7 +358,7 @@ class EBISVBoxLayout(QVBoxLayout):
         self.label_soft_pmax = QLabel('Soft limit max pressure [10^-8 mbar]')
         self.soft_pmax_val = 10
         self.spinbox_soft_pmax = DoubleSpinBox(default=self.soft_pmax_val, step_size=1, input_range=(0.11, 1000), decimals=1, buttons=False)
-        self.spinbox_soft_pmax.editingFinished.connect(lambda: setattr(self, 'soft_pmax_val', self.spinbox_soft_pmax.value()*1E-8)) # set pressure in 10^-8mbar
+        self.spinbox_soft_pmax.editingFinished.connect(lambda: setattr(self, 'soft_pmax_val', self.spinbox_soft_pmax.value() * 1E-8)) # set pressure in 10^-8mbar
         self.pressure_grid.addWidgets(
             self.label_soft_pmax,
             self.spinbox_soft_pmax
@@ -320,11 +395,11 @@ class EBISVBoxLayout(QVBoxLayout):
         }
         self.all_channels_selector = [channel for _, channel in self.channel_dict.items()]
         self.spinbox_voltages = [
-            self.spinbox_1,
-            self.spinbox_2,
-            self.spinbox_3,
-            self.spinbox_4,
-            self.spinbox_5,
+            self.spinbox_voltage_1,
+            self.spinbox_voltage_2,
+            self.spinbox_voltage_3,
+            self.spinbox_voltage_4,
+            self.spinbox_voltage_5,
             self.spinbox_voltage_6
         ]
         self.status_voltages = [
@@ -343,21 +418,37 @@ class EBISVBoxLayout(QVBoxLayout):
             self.status_current_5,
             self.status_current_6
         ]
-        self.indicators = [
-            self.indicator_1,
-            self.indicator_2,
-            self.indicator_3,
-            self.indicator_4,
-            self.indicator_5,
-            self.indicator_6
+        self.indicators_voltage = [
+            self.indicator_voltage_1,
+            self.indicator_voltage_2,
+            self.indicator_voltage_3,
+            self.indicator_voltage_4,
+            self.indicator_voltage_5,
+            self.indicator_voltage_6
         ]
-        self.buttons = [
-            self.button_1,
-            self.button_2,
-            self.button_3,
-            self.button_4,
-            self.button_5,
-            self.button_6
+        self.buttons_enable = [
+            self.button_enable_1,
+            self.button_enable_2,
+            self.button_enable_3,
+            self.button_enable_4,
+            self.button_enable_5,
+            self.button_enable_6
+        ]
+        self.spinbox_limit_currents = [
+            self.spinbox_limit_current_1,
+            self.spinbox_limit_current_2,
+            self.spinbox_limit_current_3,
+            self.spinbox_limit_current_4,
+            self.spinbox_limit_current_5,
+            None
+        ]
+        self.indicator_current_limits = [
+            self.indicator_current_limit_1,
+            self.indicator_current_limit_2,
+            self.indicator_current_limit_3,
+            self.indicator_current_limit_4,
+            self.indicator_current_limit_5,
+            None
         ]
 
         self.reset()
@@ -385,11 +476,11 @@ class EBISVBoxLayout(QVBoxLayout):
         self.threaded_connection.callback(checkHighVoltageOn, self.threaded_connection.configureMiccGet())
 
         def checkVoltageOn(states: list[float]):
-            if len(states) != len(self.indicators) != len(self.buttons) != len(self.status_voltages):
-                GlobalConf.logger.error(f'High voltage indicators cannot be set, non matching length: expected len = {len(self.indicators)}, got len = {len(states)}')
+            if len(states) != len(self.indicators_voltage) != len(self.buttons_enable) != len(self.status_voltages):
+                GlobalConf.logger.error(f'High voltage indicators cannot be set, non matching length: expected len = {len(self.indicators_voltage)}, got len = {len(states)}')
                 return
 
-            for indicator, status_voltage, state, button in zip(self.indicators, self.status_voltages, states, self.buttons):
+            for indicator, status_voltage, state, button in zip(self.indicators_voltage, self.status_voltages, states, self.buttons_enable):
                 state = bool(state)
                 indicator.setValue(state)
                 button.setText('Disable' if state else 'Enable')
@@ -414,8 +505,14 @@ class EBISVBoxLayout(QVBoxLayout):
                 GlobalConf.logger.error(f'Measured currents cannot be set, non matching length: expected len = {len(self.status_currents)}, got len = {len(currents)}')
                 return
 
-            for status_current, current in zip(self.status_currents, currents):
+            if any([0 if isinstance(current, float) else 1 for current in currents]):
+                GlobalConf.logger.error(f'Measured currents cannot be set, types of currents are: {[type(current) for current in currents]}, expected only <float>s')
+                return
+
+            for status_current, indicator_limit, spinbox_limit_current, current in zip(self.status_currents, self.indicator_current_limits, self.spinbox_limit_currents, currents):
                 status_current.setValue(current)
+                if indicator_limit is not None and spinbox_limit_current is not None:
+                    indicator_limit.setValue(current >= spinbox_limit_current.value() / 1000)
 
         self.threaded_connection.callback(measureCurrent, self.threaded_connection.measureCurrent(self.all_channels_selector))
 
@@ -447,6 +544,17 @@ class EBISVBoxLayout(QVBoxLayout):
             self.status_current_6.setTargetValue(current)
 
         self.threaded_connection.callback(readCurrent, self.threaded_connection.readCurrent(10))
+
+        def readCurrentLimit(currents: list[float]):
+            if len(currents) != len(self.spinbox_limit_currents):
+                GlobalConf.logger.error(f'Set currents cannot be set, non matching length: expected len = {len(self.spinbox_limit_currents)}, got len = {len(currents)}')
+                return
+
+            for (spinbox_limit_current, current) in zip(self.spinbox_limit_currents, currents):
+                if spinbox_limit_current is not None:
+                    spinbox_limit_current.setValue(current * 1000)
+
+        self.threaded_connection.callback(readCurrentLimit, self.threaded_connection.readCurrent(self.all_channels_selector))
 
     def setVoltage(self, channel: int, voltage: float):
         """
@@ -639,22 +747,30 @@ class EBISVBoxLayout(QVBoxLayout):
         self.status_high_voltage.setText('Disabled')
         self.button_high_voltage.setText('Enable')
 
-        for indicator in self.indicators:
+        for indicator in self.indicators_voltage:
             indicator.setValue(False)
 
-        for button in self.buttons:
+        for button in self.buttons_enable:
             button.setText('Enable')
 
-        for spinbox_voltage in self.spinbox_voltages:
-            spinbox_voltage.reset()
+        for spinbox in self.spinbox_voltages:
+            spinbox.reset()
 
-        for status_voltage in self.status_voltages:
-            status_voltage.setValue(0)
-            status_voltage.setTargetValue(0)
+        for status in self.status_voltages:
+            status.setValue(0)
+            status.setTargetValue(0)
 
-        for status_current in self.status_currents:
-            status_current.setValue(0)
-            status_current.setTargetValue(0)
+        for status in self.status_currents:
+            status.setValue(0)
+            status.setTargetValue(0)
+
+        for indicator in self.indicator_current_limits:
+            if indicator is not None:
+                indicator.setValue(False)
+
+        for spinbox in self.spinbox_limit_currents:
+            if spinbox is not None:
+                spinbox.reset()
 
         self.spinbox_current_6.reset()
 

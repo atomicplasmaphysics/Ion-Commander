@@ -208,7 +208,7 @@ class PSUVBoxLayout(QVBoxLayout):
 
         # MCP
         self.label_limit_1 = QLabel('MCP Front/Back')
-        self.spinbox_limit_current_1 = DoubleSpinBox(default=0.002, step_size=0.001, input_range=(0.002, 2), decimals=5, buttons=False)
+        self.spinbox_limit_current_1 = DoubleSpinBox(default=0.002, step_size=0.001, input_range=(0.002, 2), decimals=3, buttons=False)
         self.spinbox_limit_current_1.editingFinished.connect(lambda: self.setCurrentLimit(0, self.spinbox_limit_current_1.value()))
         self.indicator_limit_1 = IndicatorLed(on_color=Colors.color_red)
         self.limits_grid.addWidgets(
@@ -219,7 +219,7 @@ class PSUVBoxLayout(QVBoxLayout):
 
         # Anode
         self.label_limit_2 = QLabel('Anode')
-        self.spinbox_limit_current_2 = DoubleSpinBox(default=0.002, step_size=0.001, input_range=(0.002, 2), decimals=5, buttons=False)
+        self.spinbox_limit_current_2 = DoubleSpinBox(default=0.002, step_size=0.001, input_range=(0.002, 2), decimals=3, buttons=False)
         self.spinbox_limit_current_2.editingFinished.connect(lambda: self.setCurrentLimit(1, self.spinbox_limit_current_2.value()))
         self.indicator_limit_2 = IndicatorLed(on_color=Colors.color_red)
         self.limits_grid.addWidgets(
@@ -230,7 +230,7 @@ class PSUVBoxLayout(QVBoxLayout):
 
         # Cathode LSD
         self.label_limit_3 = QLabel('Cathode LSD')
-        self.spinbox_limit_current_3 = DoubleSpinBox(default=0.002, step_size=0.001, input_range=(0.002, 2), decimals=5, buttons=False)
+        self.spinbox_limit_current_3 = DoubleSpinBox(default=0.002, step_size=0.001, input_range=(0.002, 2), decimals=3, buttons=False)
         self.spinbox_limit_current_3.editingFinished.connect(lambda: self.setCurrentLimit(2, self.spinbox_limit_current_3.value()))
         self.indicator_limit_3 = IndicatorLed(on_color=Colors.color_red)
         self.limits_grid.addWidgets(
@@ -241,7 +241,7 @@ class PSUVBoxLayout(QVBoxLayout):
 
         # Focus LSD
         self.label_limit_4 = QLabel('Focus LSD')
-        self.spinbox_limit_current_4 = DoubleSpinBox(default=0.002, step_size=0.001, input_range=(0.002, 2), decimals=5, buttons=False)
+        self.spinbox_limit_current_4 = DoubleSpinBox(default=0.002, step_size=0.001, input_range=(0.002, 2), decimals=3, buttons=False)
         self.spinbox_limit_current_4.editingFinished.connect(lambda: self.setCurrentLimit(3, self.spinbox_limit_current_4.value()))
         self.indicator_limit_4 = IndicatorLed(on_color=Colors.color_red)
         self.limits_grid.addWidgets(
@@ -473,7 +473,7 @@ class PSUVBoxLayout(QVBoxLayout):
 
         def readCurrentLimit(currents: list[float]):
             if len(currents) != len(self.spinbox_limit_currents):
-                GlobalConf.logger.error(f'Set voltages cannot be set, non matching length: expected len = {len(self.spinbox_limit_currents)}, got len = {len(currents)}')
+                GlobalConf.logger.error(f'Set currents cannot be set, non matching length: expected len = {len(self.spinbox_limit_currents)}, got len = {len(currents)}')
                 return
 
             for (spinbox_limit_current, current) in zip(self.spinbox_limit_currents, currents):

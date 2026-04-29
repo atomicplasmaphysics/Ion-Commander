@@ -214,6 +214,7 @@ class GlobalConf:
                     GlobalConf.settings.value(GlobalConf.connection_laser_ip3_name, defaultValue=-1, type=int),
                     GlobalConf.settings.value(GlobalConf.connection_laser_ip4_name, defaultValue=-1, type=int),
                     GlobalConf.settings.value(GlobalConf.connection_laser_port_name, defaultValue=-1, type=int))
+        raise NotImplementedError(f'Connection type {connection_type} not implemented')
 
     @staticmethod
     def updatePowerMeterDisplayParameter(display_parameter: int):
