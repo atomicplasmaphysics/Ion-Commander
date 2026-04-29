@@ -943,13 +943,7 @@ def main():
         print(f'{iseg.readCurrentLimit(2) = }')
         print(f'{iseg.readCurrentLimit(3) = }')
         print(f'{iseg.readCurrentLimit(4) = }')
-        print(f'{iseg.readCurrentLimit(5) = }')
-        print(f'{iseg.readCurrentLimit(6) = }')
-        print(f'{iseg.readCurrentLimit(7) = }')
-        print(f'{iseg.readCurrentLimit(8) = }')
-        print(f'{iseg.readCurrentLimit(9) = }')
         print(f'{iseg.readCurrentLimit(10) = }')
-        print(f'{iseg.readCurrentLimit(11) = }')
 
 
 if __name__ == '__main__':

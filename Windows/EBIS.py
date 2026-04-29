@@ -323,6 +323,27 @@ class EBISVBoxLayout(QVBoxLayout):
             self.status_current_6,
         )
 
+        # Advanced Settings Group Box
+        self.advanced_settings_group_box = QGroupBox('Advanced Settings')
+        self.addWidget(self.advanced_settings_group_box)
+
+        self.advanced_settings_hbox = QHBoxLayout()
+        self.advanced_settings_hbox.setAlignment(Qt.AlignmentFlag.AlignLeft)
+        self.advanced_settings_group_box.setLayout(self.advanced_settings_hbox)
+
+        self.advanced_settings_grid = InsertingGridLayout()
+        self.advanced_settings_hbox.addLayout(self.advanced_settings_grid)
+
+        # Speed
+        # TODO: get limits, unit and number of decimals right
+        self.label_advanced_settings_ramp = QLabel('Ramp speed [%/s]')
+        self.spinbox_advanced_settings_ramp = DoubleSpinBox(default=0, step_size=0.01, input_range=(0, 20), decimals=2, buttons=False)
+        self.spinbox_advanced_settings_ramp.editingFinished.connect(lambda: self.setRampSpeed(self.spinbox_advanced_settings_ramp.value()))
+        self.advanced_settings_grid.addWidgets(
+            self.label_advanced_settings_ramp,
+            self.spinbox_advanced_settings_ramp
+        )
+
         # Pressure safety
         self.pressure_group_box = QGroupBox('Pressure Control')
         self.addWidget(self.pressure_group_box)
@@ -556,6 +577,8 @@ class EBISVBoxLayout(QVBoxLayout):
 
         self.threaded_connection.callback(readCurrentLimit, self.threaded_connection.readCurrent(self.all_channels_selector))
 
+        self.threaded_connection.callback(self.spinbox_advanced_settings_ramp.setValue, self.threaded_connection.configureRampVoltageGet())
+
     def setVoltage(self, channel: int, voltage: float):
         """
         Sets voltage to specified channel
@@ -638,6 +661,18 @@ class EBISVBoxLayout(QVBoxLayout):
             return
 
         self.threaded_connection.configureMiccSet(state)
+
+    def setRampSpeed(self, speed: float):
+        """
+        Sets ramp speed
+
+        :param speed: ramp speed in %/min
+        """
+
+        if not self.checkConnection():
+            return
+
+        self.threaded_connection.configureRampVoltageSet(speed)
 
     def checkConnection(self, messagebox: bool = True) -> bool:
         """
@@ -786,6 +821,8 @@ class EBISVBoxLayout(QVBoxLayout):
                 spinbox.reset()
 
         self.spinbox_current_6.reset()
+
+        self.spinbox_advanced_settings_ramp.reset()
 
         self.combobox_connection.setEnabled(True)
         self.button_connection_refresh.setEnabled(True)
