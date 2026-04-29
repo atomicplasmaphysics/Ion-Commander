@@ -22,6 +22,8 @@ def getPrefix(number: float | int, use_latex: bool = False) -> tuple[float | int
     if not isinstance(number, float) and not isinstance(number, int):
         raise ValueError(f'Provided argument is of type {type(number)} not <float> or <int>')
 
+    # TODO: check if number is a sane number (not inf, nan, ..)
+
     prefixes = ['Z', 'E', 'P', 'T', 'G', 'M', 'k', '', 'm', 'μ', 'n', 'p', 'f', 'a', 'z', 'y']
     if use_latex:
         prefixes = ['Z', 'E', 'P', 'T', 'G', 'M', 'k', '', 'm', r'\mu', 'n', 'p', 'f', 'a', 'z', 'y']

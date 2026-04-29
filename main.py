@@ -19,6 +19,8 @@ from Utility.Layouts import SplashPixmap
 
 from Log.Logger import setupLogging
 
+# TODO: no focus on any button (especially not the "disconnect"/"connect" button on popped out panels
+
 
 def main():
     """
@@ -47,7 +49,7 @@ def main():
     splash_size = QSize(int(min(766., screen.width() * 0.5)), int(min(383., screen.height() * 0.5)))
 
     # show splashscreen on startup
-    pixmap = SplashPixmap('icons/splash.png', 'v0.1.48', QRect(0, 1000, 2250, 150), font_size=100, color=Qt.GlobalColor.white)
+    pixmap = SplashPixmap('icons/splash.png', 'v0.1.49', QRect(0, 1000, 2250, 150), font_size=100, color=Qt.GlobalColor.white)
     pixmap = pixmap.scaled(splash_size, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
     splash = QSplashScreen(pixmap)
     splash.show()

@@ -100,13 +100,19 @@ class PowerMeterVBoxLayout(QVBoxLayout):
 
         # device wavelength
         self.label_wavelength = QLabel('Wavelength [nm]')
-        self.spinbox_wavelength = SpinBox(default=0, input_range=(0, 1024), buttons=False)
+        self.spinbox_wavelength = SpinBox(default=0, input_range=(0, 2000), buttons=False)
         self.spinbox_wavelength.editingFinished.connect(lambda: self.setWavelength(self.spinbox_wavelength.value()))
         self.status_wavelength = DisplayLabel(value=0, unit='nm', target_value=0, deviation=0.1, decimals=0)
+        self.button_wavelength_ir = QPushButton('IR preset')
+        self.button_wavelength_ir.pressed.connect(lambda: self.setWavelength(DefaultParams.laser_ir_wavelength, update_spinbox=True))
+        self.button_wavelength_uv = QPushButton('UV preset')
+        self.button_wavelength_uv.pressed.connect(lambda: self.setWavelength(DefaultParams.laser_uv_wavelength, update_spinbox=True))
         self.settings_grid.addWidgets(
             self.label_wavelength,
             self.spinbox_wavelength,
-            self.status_wavelength
+            self.status_wavelength,
+            self.button_wavelength_ir,
+            self.button_wavelength_uv
         )
 
         # device attenuation
@@ -337,11 +343,12 @@ class PowerMeterVBoxLayout(QVBoxLayout):
         self.display_power = None
         self.reset_min_max_next_update = True
 
-    def setWavelength(self, wavelength: int):
+    def setWavelength(self, wavelength: int, update_spinbox: bool = False):
         """
         Sets the laser wavelength
 
         :param wavelength: wavelength in nm
+        :param update_spinbox: update the according spinbox
         """
 
         if not self.checkConnection():
@@ -349,6 +356,9 @@ class PowerMeterVBoxLayout(QVBoxLayout):
 
         self.status_wavelength.setTargetValue(wavelength)
         self.device_wrapper.threaded_connection.setWavelength(wavelength)
+
+        if update_spinbox:
+            self.spinbox_wavelength.setValue(wavelength)
 
     def setAttenuation(self, attenuation: float):
         """

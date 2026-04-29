@@ -222,7 +222,7 @@ class EBISVBoxLayout(QVBoxLayout):
         # Cathode
         self.label_limit_1 = QLabel('Cathode')
         self.spinbox_limit_current_1 = DoubleSpinBox(default=0.002, step_size=0.001, input_range=(0.002, 2), decimals=3, buttons=False)
-        self.spinbox_limit_current_1.editingFinished.connect(lambda: self.setCurrent(0, self.spinbox_limit_current_1.value()))
+        self.spinbox_limit_current_1.editingFinished.connect(lambda: self.setCurrentLimit(0, self.spinbox_limit_current_1.value()))
         self.indicator_current_limit_1 = IndicatorLed(on_color=Colors.color_red)
         self.limits_grid.addWidgets(
             self.label_limit_1,
@@ -233,7 +233,7 @@ class EBISVBoxLayout(QVBoxLayout):
         # Drift Tube 1
         self.label_limit_2 = QLabel('Drift Tube 1')
         self.spinbox_limit_current_2 = DoubleSpinBox(default=0.002, step_size=0.001, input_range=(0.002, 1), decimals=3, buttons=False)
-        self.spinbox_limit_current_2.editingFinished.connect(lambda: self.setCurrent(1, self.spinbox_limit_current_2.value()))
+        self.spinbox_limit_current_2.editingFinished.connect(lambda: self.setCurrentLimit(1, self.spinbox_limit_current_2.value()))
         self.indicator_current_limit_2 = IndicatorLed(on_color=Colors.color_red)
         self.limits_grid.addWidgets(
             self.label_limit_2,
@@ -244,7 +244,7 @@ class EBISVBoxLayout(QVBoxLayout):
         # Drift Tube 2
         self.label_limit_3 = QLabel('Drift Tube 2')
         self.spinbox_limit_current_3 = DoubleSpinBox(default=0.002, step_size=0.001, input_range=(0.002, 1), decimals=3, buttons=False)
-        self.spinbox_limit_current_3.editingFinished.connect(lambda: self.setCurrent(2, self.spinbox_limit_current_3.value()))
+        self.spinbox_limit_current_3.editingFinished.connect(lambda: self.setCurrentLimit(2, self.spinbox_limit_current_3.value()))
         self.indicator_current_limit_3 = IndicatorLed(on_color=Colors.color_red)
         self.limits_grid.addWidgets(
             self.label_limit_3,
@@ -255,7 +255,7 @@ class EBISVBoxLayout(QVBoxLayout):
         # Drift Tube 3
         self.label_limit_4 = QLabel('Drift Tube 3')
         self.spinbox_limit_current_4 = DoubleSpinBox(default=0.002, step_size=0.001, input_range=(0.002, 1), decimals=3, buttons=False)
-        self.spinbox_limit_current_4.editingFinished.connect(lambda: self.setCurrent(3, self.spinbox_limit_current_4.value()))
+        self.spinbox_limit_current_4.editingFinished.connect(lambda: self.setCurrentLimit(3, self.spinbox_limit_current_4.value()))
         self.indicator_current_limit_4 = IndicatorLed(on_color=Colors.color_red)
         self.limits_grid.addWidgets(
             self.label_limit_4,
@@ -266,7 +266,7 @@ class EBISVBoxLayout(QVBoxLayout):
         # Repeller
         self.label_limit_5 = QLabel('Repeller')
         self.spinbox_limit_current_5 = DoubleSpinBox(default=0.002, step_size=0.001, input_range=(0.002, 1), decimals=3, buttons=False)
-        self.spinbox_limit_current_5.editingFinished.connect(lambda: self.setCurrent(4, self.spinbox_limit_current_5.value()))
+        self.spinbox_limit_current_5.editingFinished.connect(lambda: self.setCurrentLimit(4, self.spinbox_limit_current_5.value()))
         self.indicator_current_limit_5 = IndicatorLed(on_color=Colors.color_red)
         self.limits_grid.addWidgets(
             self.label_limit_5,
@@ -585,6 +585,19 @@ class EBISVBoxLayout(QVBoxLayout):
         self.status_currents[channel].setTargetValue(current)
         phys_channel = self.channel_dict[channel]
         self.threaded_connection.currentSet(phys_channel, current)
+
+    def setCurrentLimit(self, channel: int, current: float):
+        """
+        Sets current limit to specified channel
+
+        :param channel: channel to be set
+        :param current: current to be set
+        """
+
+        if not self.checkConnection():
+            return
+
+        self.threaded_connection.currentSet(channel, current / 1000)
 
     def setOutput(self, channel: int, state: bool):
         """

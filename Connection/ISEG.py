@@ -904,11 +904,11 @@ def assertionTest():
 
 def main():
     with ISEGConnection(
-        comport='COM4',
+        comport='COM5',
         echo=ISEGConnection.EchoMode.ECHO_AUTO,
         cleaning=True,
-        #strict='iseg Spezialelektronik GmbH,MICCETH,5200180,4.28'  # EBIS PSU
-        strict='iseg Spezialelektronik GmbH,NR040060r4050000200,8200005,1.74'  # 4er PSU
+        strict='iseg Spezialelektronik GmbH,MICCETH,5200180,4.28'  # EBIS PSU
+        #strict='iseg Spezialelektronik GmbH,NR040060r4050000200,8200005,1.74'  # 4er PSU
     ) as iseg:
         print('***** GENERAL VALUES *****')
         print(f'{iseg.echo = }')
@@ -936,6 +936,20 @@ def main():
         print(f'{iseg.voltageSet(0, 10) = }')
         print(f'{iseg.currentSet(0, 5E-6) = }')
         print('\n')
+
+        print('***** CURRENT LIMITS *****')
+        print(f'{iseg.readCurrentLimit(0) = }')
+        print(f'{iseg.readCurrentLimit(1) = }')
+        print(f'{iseg.readCurrentLimit(2) = }')
+        print(f'{iseg.readCurrentLimit(3) = }')
+        print(f'{iseg.readCurrentLimit(4) = }')
+        print(f'{iseg.readCurrentLimit(5) = }')
+        print(f'{iseg.readCurrentLimit(6) = }')
+        print(f'{iseg.readCurrentLimit(7) = }')
+        print(f'{iseg.readCurrentLimit(8) = }')
+        print(f'{iseg.readCurrentLimit(9) = }')
+        print(f'{iseg.readCurrentLimit(10) = }')
+        print(f'{iseg.readCurrentLimit(11) = }')
 
 
 if __name__ == '__main__':

@@ -57,6 +57,9 @@ class DefaultParams:
     laser_baseplate_temperature_off = 27.5
     laser_baseplate_temperature_on = 28
 
+    laser_ir_wavelength = 1035
+    laser_uv_wavelength = 259
+
     # power meter parameters
     TLPMx_encoding = 'utf-8'
 

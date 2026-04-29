@@ -193,6 +193,7 @@ class ThreadedConnection(QObject):
         :param error: exception that occurred
         """
 
+        # TODO: include which device had the error
         GlobalConf.logger.error(error)
 
         if isinstance(error, ConnectionAbortedError) or isinstance(error, ConnectionResetError):

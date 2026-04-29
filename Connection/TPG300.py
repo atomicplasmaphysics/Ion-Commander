@@ -162,6 +162,11 @@ class TPG300Type(Enum):
 
 def tpg300VoltageToPressure(voltage: float, sensor_type: TPG300Type) -> float:
     """Convert voltage to pressure in mbar"""
+
+    # return 0 if unconnected
+    if voltage < 0.01:
+        return 0
+
     return float(np.interp(voltage, sensor_type.value[0], sensor_type.value[1]))
 
 
