@@ -18,6 +18,8 @@ from Connection.USBPorts import getComports
 from Connection.ISEG import ISEGConnection
 from Connection.Threaded import ThreadedISEGConnection, ThreadedDummyConnection
 
+from Windows.Pressure import PressureVBoxLayout
+
 
 class EBISVBoxLayout(QVBoxLayout):
     def __init__(self, *args, **kwargs):
@@ -112,7 +114,7 @@ class EBISVBoxLayout(QVBoxLayout):
 
         # Cathode
         self.label_voltage_1 = QLabel('Cathode')
-        self.spinbox_voltage_1 = DoubleSpinBox(default=0, step_size=50, input_range=(0, self.voltage_maximum), decimals=1, buttons=False)
+        self.spinbox_voltage_1 = DoubleSpinBox(default=0, step_size=0.1, input_range=(0, self.voltage_maximum), decimals=1, buttons=False)
         self.spinbox_voltage_1.editingFinished.connect(lambda: self.setVoltage(0, self.spinbox_voltage_1.value()))
         self.status_voltage_1 = DisplayLabel(value=0, unit='V', target_value=0, deviation=self.voltage_deviation)
         self.status_current_1 = DisplayLabel(value=0, unit='A', target_value=0, deviation=self.current_maximum, enable_prefix=True)
@@ -130,7 +132,7 @@ class EBISVBoxLayout(QVBoxLayout):
 
         # Drift Tube 1
         self.label_voltage_2 = QLabel('Drift Tube 1')
-        self.spinbox_voltage_2 = DoubleSpinBox(default=0, step_size=50, input_range=(0, self.voltage_maximum), decimals=1, buttons=False)
+        self.spinbox_voltage_2 = DoubleSpinBox(default=0, step_size=0.1, input_range=(0, self.voltage_maximum), decimals=1, buttons=False)
         self.spinbox_voltage_2.editingFinished.connect(lambda: self.setVoltage(1, self.spinbox_voltage_2.value()))
         self.status_voltage_2 = DisplayLabel(value=0, unit='V', target_value=0, deviation=self.voltage_deviation)
         self.status_current_2 = DisplayLabel(value=0, unit='A', target_value=0, deviation=self.current_maximum, enable_prefix=True)
@@ -148,7 +150,7 @@ class EBISVBoxLayout(QVBoxLayout):
 
         # Drift Tube 2
         self.label_voltage_3 = QLabel('Drift Tube 2')
-        self.spinbox_voltage_3 = DoubleSpinBox(default=0, step_size=50, input_range=(0, self.voltage_maximum), decimals=1, buttons=False)
+        self.spinbox_voltage_3 = DoubleSpinBox(default=0, step_size=0.1, input_range=(0, self.voltage_maximum), decimals=1, buttons=False)
         self.spinbox_voltage_3.editingFinished.connect(lambda: self.setVoltage(2, self.spinbox_voltage_3.value()))
         self.status_voltage_3 = DisplayLabel(value=0, unit='V', target_value=0, deviation=self.voltage_deviation)
         self.status_current_3 = DisplayLabel(value=0, unit='A', target_value=0, deviation=self.current_maximum, enable_prefix=True)
@@ -166,7 +168,7 @@ class EBISVBoxLayout(QVBoxLayout):
 
         # Drift Tube 3
         self.label_voltage_4 = QLabel('Drift Tube 3')
-        self.spinbox_voltage_4 = DoubleSpinBox(default=0, step_size=50, input_range=(0, self.voltage_maximum), decimals=1, buttons=False)
+        self.spinbox_voltage_4 = DoubleSpinBox(default=0, step_size=0.1, input_range=(0, self.voltage_maximum), decimals=1, buttons=False)
         self.spinbox_voltage_4.editingFinished.connect(lambda: self.setVoltage(3, self.spinbox_voltage_4.value()))
         self.status_voltage_4 = DisplayLabel(value=0, unit='V', target_value=0, deviation=self.voltage_deviation)
         self.status_current_4 = DisplayLabel(value=0, unit='A', target_value=0, deviation=self.current_maximum, enable_prefix=True)
@@ -184,7 +186,7 @@ class EBISVBoxLayout(QVBoxLayout):
 
         # Repeller
         self.label_voltage_5 = QLabel('Repeller')
-        self.spinbox_voltage_5 = DoubleSpinBox(default=0, step_size=50, input_range=(0, self.voltage_maximum), decimals=1, buttons=False)
+        self.spinbox_voltage_5 = DoubleSpinBox(default=0, step_size=0.1, input_range=(0, self.voltage_maximum), decimals=1, buttons=False)
         self.spinbox_voltage_5.editingFinished.connect(lambda: self.setVoltage(4, self.spinbox_voltage_5.value()))
         self.status_voltage_5 = DisplayLabel(value=0, unit='V', target_value=0, deviation=self.voltage_deviation)
         self.status_current_5 = DisplayLabel(value=0, unit='A', target_value=0, deviation=self.current_maximum, enable_prefix=True)
@@ -354,6 +356,16 @@ class EBISVBoxLayout(QVBoxLayout):
 
         self.pressure_grid = InsertingGridLayout()
         self.pressure_hbox.addLayout(self.pressure_grid)
+
+        # Pressure gauge selection
+        self.label_pressure_gauge = QLabel('Pressure Gauge')
+        self.combobox_pressure_gauge = ComboBox(
+            entries=PressureVBoxLayout.pressure_gauges.keys()
+        )
+        self.pressure_grid.addWidgets(
+            self.label_pressure_gauge,
+            self.combobox_pressure_gauge
+        )
 
         # Hard pressure limit (turns off immediately)
         self.label_hard_pmax = QLabel('Hard limit max pressure [10^-8 mbar]') # Not great but I dont want to make a new SpinBox class for scientific notation

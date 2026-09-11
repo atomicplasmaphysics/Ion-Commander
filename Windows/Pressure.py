@@ -24,6 +24,16 @@ from Connection.Threaded import ThreadedMixedPressureConnection, ThreadedDummyCo
 
 
 class PressureVBoxLayout(QVBoxLayout):
+
+    # list of pressure gauges
+    pressure_gauges = {
+        # Name: ({pressure_widget_params}, voltage_to_pressure_function)
+        'PITBUL': ({}, thyracontVoltageToPressure),
+        'LSD': ({}, thyracontVoltageToPressure),
+        'ESD': ({}, thyracontVoltageToPressure),
+        'Pre-Vacuum': ({'input_range': (1E3, 5E-3)}, lambda voltage: tpg300VoltageToPressure(voltage, TPG300Type.Pirani)),
+    }
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
@@ -70,45 +80,19 @@ class PressureVBoxLayout(QVBoxLayout):
         self.button_connection_refresh.pressed.connect(self.setComportsComboBox)
         self.connection_hbox_selection.addWidget(self.button_connection_refresh)
 
-        # PITBUL
-        self.group_box_1 = QGroupBox('PITBUL')
-        self.pressure_widget_1 = PressureWidget()
-        self.layout_1 = QVBoxLayout()
-        self.layout_1.addWidget(self.pressure_widget_1)
-        self.group_box_1.setLayout(self.layout_1)
-        self.addWidget(self.group_box_1)
-
-        # LSD
-        self.group_box_2 = QGroupBox('LSD')
-        self.pressure_widget_2 = PressureWidget()
-        self.layout_2 = QVBoxLayout()
-        self.layout_2.addWidget(self.pressure_widget_2)
-        self.group_box_2.setLayout(self.layout_2)
-        self.addWidget(self.group_box_2)
-
-        # ESD
-        self.group_box_3 = QGroupBox('ESD')
-        self.pressure_widget_3 = PressureWidget()
-        self.layout_3 = QVBoxLayout()
-        self.layout_3.addWidget(self.pressure_widget_3)
-        self.group_box_3.setLayout(self.layout_3)
-        self.addWidget(self.group_box_3)
-
-        # Pre-vacuum
-        self.group_box_4 = QGroupBox('Pre-Vacuum')
-        self.pressure_widget_4 = PressureWidget(input_range=(1E3, 5E-3))
-        self.layout_4 = QVBoxLayout()
-        self.layout_4.addWidget(self.pressure_widget_4)
-        self.group_box_4.setLayout(self.layout_4)
-        self.addWidget(self.group_box_4)
-
-        # grouped items
-        self.pressure_widgets = [
-            self.pressure_widget_1,
-            self.pressure_widget_2,
-            self.pressure_widget_3,
-            self.pressure_widget_4
-        ]
+        self.pressure_group_boxes = []
+        self.pressure_widgets = []
+        self.pressure_layouts = []
+        for pressure_gauge_name, (pressure_widget_params, _) in self.pressure_gauges.items():
+            group_box = QGroupBox(pressure_gauge_name)
+            self.pressure_group_boxes.append(group_box)
+            pressure_widget = PressureWidget(**pressure_widget_params)
+            self.pressure_widgets.append(pressure_widget)
+            layout = QVBoxLayout()
+            self.pressure_layouts.append(layout)
+            layout.addWidget(pressure_widget)
+            group_box.setLayout(layout)
+            self.addWidget(group_box)
 
         self.reset()
 
@@ -123,7 +107,7 @@ class PressureVBoxLayout(QVBoxLayout):
             return
 
         def setPressures(pressures: list[float]):
-            if len(pressures) != 4:
+            if len(pressures) != len(self.pressure_widgets):
                 GlobalConf.logger.error(f'Pressures cannot be set, non matching length: expected len = {len(self.pressure_widgets)}, got len = {len(pressures)}')
                 return
             for pressure_widget, pressure in zip(self.pressure_widgets, pressures):
@@ -150,12 +134,7 @@ class PressureVBoxLayout(QVBoxLayout):
         self.unconnect()
 
         if connect:
-            self.connection = MixedPressureConnection(comport, [
-                thyracontVoltageToPressure,
-                thyracontVoltageToPressure,
-                thyracontVoltageToPressure,
-                lambda voltage: tpg300VoltageToPressure(voltage, TPG300Type.Pirani),
-            ])
+            self.connection = MixedPressureConnection(comport, [voltage_func for _, voltage_func in self.pressure_gauges.values()])
             try:
                 self.connection.open()
                 self.device_wrapper.threaded_connection = ThreadedMixedPressureConnection(
@@ -229,9 +208,8 @@ class PressureVBoxLayout(QVBoxLayout):
         self.status_connection.setText('Not connected')
         self.button_connection.setText('Connect')
 
-        self.pressure_widget_1.setPressure(0)
-        self.pressure_widget_2.setPressure(0)
-        self.pressure_widget_4.setPressure(0)
+        for pressure_widget in self.pressure_widgets:
+            pressure_widget.setPressure(0)
 
         self.combobox_connection.setEnabled(True)
         self.button_connection_refresh.setEnabled(True)
@@ -269,9 +247,4 @@ class PressureVBoxLayout(QVBoxLayout):
         """
 
         if self.connection is not None:
-            db.insertPressure(
-                self.pressure_widget_1.pressure,
-                self.pressure_widget_2.pressure,
-                self.pressure_widget_3.pressure,
-                self.pressure_widget_4.pressure,
-            )
+            db.insertPressure(*[pressure_widget.pressure for pressure_widget in self.pressure_widgets])
