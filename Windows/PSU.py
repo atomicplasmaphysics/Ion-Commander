@@ -811,6 +811,15 @@ class PSUVBoxLayout(QVBoxLayout):
 
         GlobalConf.updateConnections(psu=last_connection)
 
+    def databaseLabels(self) -> dict[str, tuple[str, str]]:
+        """Returns the labels of the channels for the database as {database_column: (label, unit)}"""
+
+        labels = {}
+        for channel, label in enumerate([self.label_1, self.label_2, self.label_3, self.label_4]):
+            labels[f'Channel{channel}_Voltage'] = (f'{label.text()} Voltage', 'V')
+            labels[f'Channel{channel}_Current'] = (f'{label.text()} Current', 'A')
+        return labels
+
     def log(self, db: DB):
         """
         Called to log all important value

@@ -1,5 +1,5 @@
-from PyQt6.QtCore import QCoreApplication, QPoint, QTimer, QSize, Qt
-from PyQt6.QtGui import QCloseEvent, QPixmap
+from PyQt6.QtCore import QCoreApplication, QPoint, QTimer, QSize, Qt, QUrl
+from PyQt6.QtGui import QCloseEvent, QPixmap, QDesktopServices
 from PyQt6.QtWidgets import QMainWindow, QTabWidget, QApplication, QSplashScreen
 
 
@@ -41,7 +41,8 @@ class MainWindow(QMainWindow):
         QCoreApplication.setOrganizationDomain('www.tuwien.at')
         QCoreApplication.setApplicationName(GlobalConf.title)
 
-        self.window_title = GlobalConf.title
+        self.window_title = f'{GlobalConf.title} v{GlobalConf.version}'
+        self.setWindowTitle(self.window_title)
 
         self.database = DB()
 
@@ -95,6 +96,26 @@ class MainWindow(QMainWindow):
         })
         self.server.startServer()
 
+        # store the current labels of the logged columns (rename-proof history)
+        self.updateDatabaseLabels()
+
+        #
+        # MENU BAR
+        #
+
+        self.menu_database = self.menuBar().addMenu('Database')
+        self.menu_database.setToolTipsVisible(True)
+        self.action_database_size = self.menu_database.addAction('Size: -')
+        self.action_database_size.setEnabled(False)
+        self.action_database_size.setToolTip('Size of the database file (including write-ahead log)')
+        self.action_database_folder = self.menu_database.addAction('Open database folder')
+        self.action_database_folder.setToolTip('Opens the folder of the database file in the file explorer')
+        self.action_database_folder.triggered.connect(
+            lambda: QDesktopServices.openUrl(QUrl.fromLocalFile(str(self.database.database_path.parent)))
+        )
+        self.menu_database.aboutToShow.connect(self.updateDatabaseSize)
+        self.updateDatabaseSize()
+
         #
         # STATUS BAR
         #
@@ -123,6 +144,24 @@ class MainWindow(QMainWindow):
         self.move(frame_geometry.topLeft())
         if maximized:
             self.showMaximized()
+
+    def updateDatabaseLabels(self):
+        """Stores the current labels of the logged columns in the database (only changed labels are written)"""
+
+        from Windows.Pressure import PressureVBoxLayout
+
+        self.database.updateLabels(self.database.pressure_table.name, PressureVBoxLayout.databaseLabels())
+        self.database.updateLabels(self.database.psu_table.name, self.control_window.psu_group_vbox.databaseLabels())
+
+    def updateDatabaseSize(self):
+        """Updates the size of the database shown in the menu"""
+
+        size = float(self.database.getSize())
+        for unit in ['B', 'kB', 'MB', 'GB', 'TB']:
+            if size < 1024 or unit == 'TB':
+                break
+            size /= 1024
+        self.action_database_size.setText(f'Size: {size:.1f} {unit}')
 
     def logTabs(self):
         """Loggs all tabs"""
@@ -198,6 +237,8 @@ class MainWindow(QMainWindow):
 
         self.database.close()
         self.server.stopServer()
+
+        GlobalConf.logger.info('Shutting down')
 
         splash.close()
         event.accept()

@@ -72,7 +72,8 @@ class HistoryWindow(TabWidget):
             selection_groupbox_vbox.addWidget(selection_listwidget)
 
             for attribute in list(table.structure.keys())[1:]:
-                list_item = QListWidgetItem(attribute)
+                list_item = QListWidgetItem(self.columnLabel(table.name, attribute))
+                list_item.setToolTip(self.columnToolTip(table.name, attribute))
                 list_item.setFlags(list_item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
                 list_item.setCheckState(Qt.CheckState.Unchecked)
                 selection_listwidget.addItem(list_item)
@@ -162,6 +163,37 @@ class HistoryWindow(TabWidget):
         self.splitter.setStretchFactor(0, 5)
         self.splitter.setStretchFactor(0, 95)
 
+    def columnLabel(self, table_name: str, column_name: str, with_unit: bool = True) -> str:
+        """
+        Returns the current label of a database column (falls back to the column name)
+
+        :param table_name: name of table
+        :param column_name: name of column
+        :param with_unit: append unit in brackets
+        """
+
+        label, unit = self.database.getLabels(table_name).get(column_name, (column_name, ''))
+        if with_unit and unit:
+            return f'{label} [{unit}]'
+        return label
+
+    def columnToolTip(self, table_name: str, column_name: str) -> str:
+        """
+        Returns tooltip of a database column with its stable id and all previous labels
+
+        :param table_name: name of table
+        :param column_name: name of column
+        """
+
+        tooltip = f'Database column: {table_name}.{column_name}'
+        label_history = self.database.getLabelHistory(table_name, column_name)
+        if len(label_history) > 1:
+            tooltip += '\nPrevious names:'
+            # every label is valid from its timestamp until the timestamp of the next label
+            for (_, label, _), (next_timestamp, _, _) in zip(label_history[:-1], label_history[1:]):
+                tooltip += f'\n  {label} (until {datetime.fromtimestamp(next_timestamp):%Y-%m-%d %H:%M})'
+        return tooltip
+
     def selectAll(self, listwidget_index: int, state: Qt.CheckState):
         """
         Selects all inside given listwidget
@@ -206,7 +238,7 @@ class HistoryWindow(TabWidget):
                 continue
             column_names, column_values = data
 
-            labels.extend(column_names[1:])
+            labels.extend([f'{table.name}: {self.columnLabel(table.name, column_name)}' for column_name in column_names[1:]])
             datas.append(column_values)
 
         if not labels:

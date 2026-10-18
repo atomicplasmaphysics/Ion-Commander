@@ -115,13 +115,19 @@ class Tables:
 
         return f'''INSERT INTO {self.name} ({','.join(self.variables)}) VALUES ({','.join([str(arg) for arg in args])});'''
 
-    def get(self, column_ids: tuple[int], start_time: int | None, end_time: int | None) -> tuple[list, str]:
+    def insert_parameterized(self) -> str:
+        """SQL query to insert with placeholders (use for strings, values are passed separately)"""
+
+        return f'''INSERT INTO {self.name} ({','.join(self.variables)}) VALUES ({','.join(['?'] * len(self.variables))});'''
+
+    def get(self, column_ids: tuple[int], start_time: int | None, end_time: int | None, bucket_seconds: int | None = None) -> tuple[list, str]:
         """
         SQL query to get columns of data within given timeframe
 
         :param column_ids: ids of columns
         :param start_time: start time as timestamp
         :param end_time: end time as timestamp
+        :param bucket_seconds: if > 1 and the first column is "Time", the data is averaged in time buckets of this size (downsampling)
 
         :returns: list of columns, sql query
         """
@@ -143,6 +149,12 @@ class Tables:
         condition = ' AND '.join(conditions)
         if condition:
             condition = f' WHERE {condition}'
+
+        if bucket_seconds is not None and int(bucket_seconds) > 1 and column_names[0] == 'Time':
+            bucket_seconds = int(bucket_seconds)
+            # "Time - Time % x" works for sqlite3 and duckdb (integer division differs between them)
+            selection = [f'Time - (Time % {bucket_seconds}) AS Time'] + [f'avg({column_name}) AS {column_name}' for column_name in column_names[1:]]
+            return column_names, f'''SELECT {', '.join(selection)} FROM {self.name}{condition} GROUP BY 1 ORDER BY 1;'''
 
         return column_names, f'''SELECT {', '.join(column_names)} FROM {self.name}{condition};'''
 
@@ -242,6 +254,47 @@ class EBISTable(Tables):
         super().__init__()
 
 
+class EventsTable(Tables):
+    """
+    Events like interlock trips, (lost) connections or script starts.
+    Not shown as plottable data, but marked in the History plots.
+    """
+
+    name = 'Events'
+    structure = {
+        'Time': '''BIGINT DEFAULT CAST(EXTRACT(EPOCH FROM now()) AS BIGINT)''',
+        'Source': 'VARCHAR',
+        'Type': 'VARCHAR',
+        'Message': 'VARCHAR',
+        'Value': 'DOUBLE',
+    }
+
+    def __init__(self):
+        super().__init__()
+
+
+class LabelsTable(Tables):
+    """
+    Human readable labels (and units) of the data columns.
+
+    The column names of the data tables are stable ids that should never change. If something is renamed in the GUI
+    (e.g. a pressure gauge), only a new row with the new label is added here (valid from <Time> on).
+    This keeps the old data usable and the History tab shows the current label.
+    """
+
+    name = 'Labels'
+    structure = {
+        'Time': '''BIGINT DEFAULT CAST(EXTRACT(EPOCH FROM now()) AS BIGINT)''',
+        'TableName': 'VARCHAR',
+        'ColumnName': 'VARCHAR',
+        'Label': 'VARCHAR',
+        'Unit': 'VARCHAR',
+    }
+
+    def __init__(self):
+        super().__init__()
+
+
 class DB:
     """
     Database class for storing and accessing data in the database
@@ -313,6 +366,17 @@ class DB:
             self.ebis_table
         ]
 
+        # tables with meta information (not plottable in the History tab)
+        self.events_table = EventsTable()
+        self.labels_table = LabelsTable()
+        self.meta_tables = [
+            self.events_table,
+            self.labels_table
+        ]
+
+        # cache of the latest labels {table_name: {column_name: (label, unit)}}
+        self.labels_cache: dict[str, dict[str, tuple[str, str]]] = {}
+
         if not no_setup:
             self.setUp()
 
@@ -336,6 +400,29 @@ class DB:
         if not force_commit:
             if now <= self.new_commit_time:
                 return
+        self.connection.commit()
+        self.new_commit_time = now + timedelta(seconds=self.commit_time_interval)
+
+    def _execute_parameterized(self, query: str, parameters: list | tuple, force_commit: bool = False):
+        """
+        Executes the SQL query with parameters (needed for strings) and writes to database if timer is reached
+
+        :param query: SQL query with "?" placeholders
+        :param parameters: values for the placeholders
+        :param force_commit: forces a commit
+        """
+
+        if self.connection is None or self.cursor is None:
+            GlobalConf.logger.error(f'DB: connection or cursor is None')
+            return
+
+        if self.debug:
+            GlobalConf.logger.debug(f'DB query: {query} with {parameters}')
+        self.cursor.execute(query, parameters)
+
+        now = datetime.now()
+        if not force_commit and now <= self.new_commit_time:
+            return
         self.connection.commit()
         self.new_commit_time = now + timedelta(seconds=self.commit_time_interval)
 
@@ -363,7 +450,7 @@ class DB:
             return
 
         self.connection.commit()
-        self.new_commit_time = datetime.now() + timedelta(self.commit_time_interval)
+        self.new_commit_time = datetime.now() + timedelta(seconds=self.commit_time_interval)
 
     def deleteAllTables(self):
         """Deletes all tables on the database"""
@@ -383,7 +470,7 @@ class DB:
     def setUp(self):
         """Sets up all tables"""
 
-        for table in self.tables:
+        for table in self.tables + self.meta_tables:
             # check if table exists and if not create it
             try:
                 self._execute(table.exists_table())
@@ -456,7 +543,8 @@ class DB:
         table_idx: int,
         columns: int | tuple[int] | list[str] | None = None,
         start_time: int | None = None,
-        end_time: int | None = None
+        end_time: int | None = None,
+        bucket_seconds: int | None = None
     ) -> bool | tuple[list, np.ndarray]:
         """
         Get values from table with table_idx
@@ -465,6 +553,7 @@ class DB:
         :param table_idx: index of table
         :param start_time: start time as timestamp
         :param end_time: end time as timestamp
+        :param bucket_seconds: average data in time buckets of this size (None or <= 1: raw data)
         """
 
         columns_all = list(self.tables[table_idx].structure.keys())
@@ -482,7 +571,7 @@ class DB:
                 column_ids.append(columns_all.index(column))
             column_ids = tuple(column_ids)
 
-        column_names, query = self.tables[table_idx].get(column_ids, start_time, end_time)
+        column_names, query = self.tables[table_idx].get(column_ids, start_time, end_time, bucket_seconds)
         results = self._execute_return(query)
         if not results:
             return False
@@ -717,6 +806,169 @@ class DB:
         """
 
         return self.getData(self.tables.index(self.ebis_table), columns, start_time, end_time)
+
+    def insertEvent(self, source: str, event_type: str, message: str = '', value: float = 0., force_commit: bool = True):
+        """
+        Inserts an event (committed immediately by default, so it is not lost on a crash)
+
+        :param source: source of event (e.g. "EBIS", "PSU", "Pressure")
+        :param event_type: type of event (e.g. "interlock_hard", "connection_lost")
+        :param message: human readable message
+        :param value: optional value (e.g. pressure at the time of the trip)
+        :param force_commit: commit immediately
+        """
+
+        try:
+            self._execute_parameterized(
+                self.events_table.insert_parameterized(),
+                (str(source), str(event_type), str(message), float(value)),
+                force_commit=force_commit
+            )
+        except Exception as error:
+            # logging an event must never crash the caller (e.g. the interlock)
+            GlobalConf.logger.error(f'DB: Could not insert event ({source}, {event_type}, {message}, {value}): {error}')
+
+    def getEvents(
+        self,
+        start_time: int | None = None,
+        end_time: int | None = None,
+        source: str | None = None
+    ) -> list[tuple[int, str, str, str, float]]:
+        """
+        Get events within given timeframe
+
+        :param start_time: start time as timestamp
+        :param end_time: end time as timestamp
+        :param source: only events of this source (None = all)
+        :returns: list of (time, source, type, message, value)
+        """
+
+        if self.connection is None or self.cursor is None:
+            GlobalConf.logger.error(f'DB: connection or cursor is None')
+            return []
+
+        conditions = []
+        parameters = []
+        if start_time is not None:
+            conditions.append('Time >= ?')
+            parameters.append(int(start_time))
+        if end_time is not None:
+            conditions.append('Time <= ?')
+            parameters.append(int(end_time))
+        if source is not None:
+            conditions.append('Source = ?')
+            parameters.append(source)
+        condition = f' WHERE {" AND ".join(conditions)}' if conditions else ''
+
+        try:
+            self.cursor.execute(f'''SELECT Time, Source, Type, Message, Value FROM {self.events_table.name}{condition} ORDER BY Time, rowid;''', parameters)
+            return self.cursor.fetchall()
+        except Exception as error:
+            GlobalConf.logger.error(f'DB: Could not read events: {error}')
+            return []
+
+    def getLabels(self, table_name: str) -> dict[str, tuple[str, str]]:
+        """
+        Returns the latest labels of the columns of a table
+
+        :param table_name: name of the data table
+        :returns: dictionary of {column_name: (label, unit)}
+        """
+
+        if table_name in self.labels_cache:
+            return dict(self.labels_cache[table_name])
+
+        labels = {}
+        if self.connection is None or self.cursor is None:
+            return labels
+
+        try:
+            self.cursor.execute(
+                f'''SELECT ColumnName, Label, Unit FROM {self.labels_table.name} WHERE TableName = ? ORDER BY Time, rowid;''',
+                (table_name, )
+            )
+            for column_name, label, unit in self.cursor.fetchall():
+                labels[column_name] = (label, unit)
+        except Exception as error:
+            GlobalConf.logger.error(f'DB: Could not read labels of table "{table_name}": {error}')
+
+        self.labels_cache[table_name] = labels
+        return dict(labels)
+
+    def getLabelHistory(self, table_name: str, column_name: str) -> list[tuple[int, str, str]]:
+        """
+        Returns all labels a column ever had
+
+        :param table_name: name of the data table
+        :param column_name: name of the column
+        :returns: list of (time, label, unit)
+        """
+
+        if self.connection is None or self.cursor is None:
+            return []
+
+        try:
+            self.cursor.execute(
+                f'''SELECT Time, Label, Unit FROM {self.labels_table.name} WHERE TableName = ? AND ColumnName = ? ORDER BY Time, rowid;''',
+                (table_name, column_name)
+            )
+            return self.cursor.fetchall()
+        except Exception as error:
+            GlobalConf.logger.error(f'DB: Could not read label history of "{table_name}.{column_name}": {error}')
+            return []
+
+    def updateLabels(self, table_name: str, labels: dict[str, str | tuple[str, str]]):
+        """
+        Stores the labels of the columns of a table, but only if they changed (rename-proof logging)
+
+        :param table_name: name of the data table
+        :param labels: dictionary of {column_name: label} or {column_name: (label, unit)}
+        """
+
+        tables = {table.name: table for table in self.tables}
+        if table_name not in tables:
+            GlobalConf.logger.error(f'DB: Can not set labels, table "{table_name}" does not exist')
+            return
+
+        old_labels = self.getLabels(table_name)
+        changed = False
+        for column_name, label in labels.items():
+            if column_name not in tables[table_name].structure:
+                GlobalConf.logger.error(f'DB: Can not set label "{label}", column "{column_name}" does not exist in table "{table_name}"')
+                continue
+
+            unit = ''
+            if isinstance(label, (tuple, list)):
+                label, unit = label
+
+            if old_labels.get(column_name) == (label, unit):
+                continue
+
+            if column_name in old_labels:
+                GlobalConf.logger.info(f'DB: Label of "{table_name}.{column_name}" changed from "{old_labels[column_name][0]}" to "{label}"')
+            try:
+                self._execute_parameterized(
+                    self.labels_table.insert_parameterized(),
+                    (table_name, column_name, str(label), str(unit))
+                )
+                changed = True
+            except Exception as error:
+                GlobalConf.logger.error(f'DB: Could not store label "{label}" of "{table_name}.{column_name}": {error}')
+
+        if changed:
+            self.labels_cache.pop(table_name, None)
+            self._commit()
+
+    def getSize(self) -> int:
+        """Returns the size of the database files (including the write-ahead log) in bytes"""
+
+        size = 0
+        for path in [self.database_path, self.database_path.with_name(self.database_path.name + '.wal')]:
+            try:
+                size += path.stat().st_size
+            except OSError:
+                pass
+        return size
 
     def close(self):
         """Must be called on close"""

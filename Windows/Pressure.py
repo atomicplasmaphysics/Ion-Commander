@@ -1,3 +1,6 @@
+from time import monotonic
+
+
 from serial import SerialException
 
 
@@ -25,13 +28,15 @@ from Connection.Threaded import ThreadedMixedPressureConnection, ThreadedDummyCo
 
 class PressureVBoxLayout(QVBoxLayout):
 
-    # list of pressure gauges
+    # list of pressure gauges (in the order of the ADC channels)
     pressure_gauges = {
-        # Name: ({pressure_widget_params}, voltage_to_pressure_function)
-        'PITBUL': ({}, thyracontVoltageToPressure),
-        'LSD': ({}, thyracontVoltageToPressure),
-        'ESD': ({}, thyracontVoltageToPressure),
-        'Pre-Vacuum': ({'input_range': (1E3, 5E-3)}, lambda voltage: tpg300VoltageToPressure(voltage, TPG300Type.Pirani)),
+        # Name: ({pressure_widget_params}, voltage_to_pressure_function, database_column)
+        # The name can be changed freely (it is only a label, the history stays intact),
+        # but the database column is a stable id and must not be changed for an existing gauge
+        'PITBUL': ({}, thyracontVoltageToPressure, 'PITBUL'),
+        'LSD': ({}, thyracontVoltageToPressure, 'LSD'),
+        'ESD': ({}, thyracontVoltageToPressure, 'ESD'),
+        'Pre-Vacuum': ({'input_range': (1E3, 5E-3)}, lambda voltage: tpg300VoltageToPressure(voltage, TPG300Type.Pirani), 'Prevac'),
     }
 
     def __init__(self, *args, **kwargs):
@@ -45,6 +50,9 @@ class PressureVBoxLayout(QVBoxLayout):
 
         self.device_wrapper = DeviceMixedPressureWrapper()
         self.connection: None | MixedPressureConnection = None
+
+        # time (monotonic) of the last successful reading, None if there was no reading since connecting
+        self.last_update_time: float | None = None
 
         # Connection
         self.connection_group_box = QGroupBox('Connection')
@@ -83,7 +91,7 @@ class PressureVBoxLayout(QVBoxLayout):
         self.pressure_group_boxes = []
         self.pressure_widgets = []
         self.pressure_layouts = []
-        for pressure_gauge_name, (pressure_widget_params, _) in self.pressure_gauges.items():
+        for pressure_gauge_name, (pressure_widget_params, _, _) in self.pressure_gauges.items():
             group_box = QGroupBox(pressure_gauge_name)
             self.pressure_group_boxes.append(group_box)
             pressure_widget = PressureWidget(**pressure_widget_params)
@@ -114,6 +122,7 @@ class PressureVBoxLayout(QVBoxLayout):
                 if pressure_widget is None:
                     continue
                 pressure_widget.setPressure(pressure)
+            self.last_update_time = monotonic()
 
         self.device_wrapper.threaded_connection.callback(setPressures, self.device_wrapper.threaded_connection.getPressureAll())
 
@@ -134,7 +143,7 @@ class PressureVBoxLayout(QVBoxLayout):
         self.unconnect()
 
         if connect:
-            self.connection = MixedPressureConnection(comport, [voltage_func for _, voltage_func in self.pressure_gauges.values()])
+            self.connection = MixedPressureConnection(comport, [voltage_func for _, voltage_func, _ in self.pressure_gauges.values()])
             try:
                 self.connection.open()
                 self.device_wrapper.threaded_connection = ThreadedMixedPressureConnection(
@@ -210,6 +219,7 @@ class PressureVBoxLayout(QVBoxLayout):
 
         for pressure_widget in self.pressure_widgets:
             pressure_widget.setPressure(0)
+        self.last_update_time = None
 
         self.combobox_connection.setEnabled(True)
         self.button_connection_refresh.setEnabled(True)
@@ -227,6 +237,32 @@ class PressureVBoxLayout(QVBoxLayout):
             entries=comport_ports,
             tooltips=comport_description
         )
+
+    def secondsSinceLastUpdate(self) -> float | None:
+        """Returns the seconds since the last successful reading, None if there was no reading since connecting"""
+
+        if self.last_update_time is None:
+            return None
+        return monotonic() - self.last_update_time
+
+    def getPressure(self, gauge_name: str) -> float:
+        """
+        Returns last pressure of gauge
+
+        :param gauge_name: name of the pressure gauge (key of <pressure_gauges>)
+        :returns: pressure in mbar (0 if not available)
+        """
+
+        gauge_names = list(self.pressure_gauges.keys())
+        if gauge_name not in gauge_names:
+            return 0
+        return self.pressure_widgets[gauge_names.index(gauge_name)].pressure
+
+    @classmethod
+    def databaseLabels(cls) -> dict[str, tuple[str, str]]:
+        """Returns the labels of the pressure gauges for the database as {database_column: (name, unit)}"""
+
+        return {db_column: (name, 'mbar') for name, (_, _, db_column) in cls.pressure_gauges.items()}
 
     def closeEvent(self):
         """Must be called when application is closed"""
@@ -247,4 +283,6 @@ class PressureVBoxLayout(QVBoxLayout):
         """
 
         if self.connection is not None:
-            db.insertPressure(*[pressure_widget.pressure for pressure_widget in self.pressure_widgets])
+            # insert by database column, so the order of the gauges does not matter
+            pressures = {db_column: pressure_widget.pressure for (_, _, db_column), pressure_widget in zip(self.pressure_gauges.values(), self.pressure_widgets)}
+            db.insertPressure(*[pressures.get(column, 0) for column in db.pressure_table.variables])

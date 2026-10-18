@@ -30,6 +30,21 @@ For further information read the description of the `compile\pyinstaller.py` fil
 You are a big boy 🐶, there is no manual needed, you can figure it out yourself.
 Maybe get some popcorn while figuring it out 🍿
 
+## Database
+All values are logged once per second into a [DuckDB](https://duckdb.org/) file (`DB/Laserlab.duckdb`).
+- **Data tables** (`Pressure`, `PSU`, `Laser`, `PowerMeter`, `EBIS`): one row per second, one column per value. The column names are
+  *stable ids* - never rename them, otherwise the old data does not match anymore.
+- **`Labels`**: the human readable name (and unit) of every column, with the time from which it is valid. If something is renamed in the
+  GUI (e.g. a pressure gauge in `PressureVBoxLayout.pressure_gauges` - only the name, not the database column), a new label row is
+  written at the next start. The History tab always shows the current name and lists the previous names in the tooltip.
+- **`Events`**: things that happen once (interlock trips, lost connections, ...) with source, type, message and a value.
+
+New tables are created automatically at startup, existing tables are never changed automatically.
+Adding a new column to an existing table needs `DB.addNewColumns()` (make a copy of the database file first and close the GUI,
+DuckDB allows only one process to open the file).
+
+The size of the database is shown in the menu `Database`.
+
 ## TODOs
 - [x] Make LogNorm stuff working
 - [x] Better fitting routine and better starting parameters
@@ -95,9 +110,11 @@ Maybe get some popcorn while figuring it out 🍿
 
 ### History / Database
 - [ ] Downsample data for long time ranges in the History tab (faster plots), but show the full density when zooming in
-- [ ] Show the database size
-- [ ] Rename-proof logging: stable column ids plus a label table, so renaming e.g. a pressure gauge does not break the history
-- [ ] Event log table (connect/disconnect, interlock trips, script start/end) and mark these events in the History plots
+- [x] Show the database size (menu `Database`)
+- [x] Rename-proof logging: stable column ids plus a `Labels` table, so renaming e.g. a pressure gauge does not break the history
+- [ ] Use the label valid at the time of the data for exports (currently the latest label is used)
+- [x] `Events` table for one-time events (interlock trips, lost connections, ...)
+- [ ] Log more events (connect/disconnect, script start/end) and mark the events in the History plots
 - [ ] Database maintenance: archive or thin out old data (e.g. keep 1 s data for 30 days, 1 min averages afterwards)
 - [ ] Make the splitter of the History tab work as intended (stretch factors)
 
