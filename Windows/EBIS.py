@@ -14,6 +14,8 @@ from Config.StylesConf import Colors
 
 from DB.db import DB
 
+from Socket.CommandServer import DeviceISEGWrapper
+
 from Utility.Layouts import InsertingGridLayout, IndicatorLed, DoubleSpinBox, DisplayLabel, ComboBox, ScientificDoubleSpinBox, ReadingAgeLabel
 from Utility.Dialogs import showMessageBox
 from Utility.Interlock import PressureInterlock, InterlockLimits, InterlockResult
@@ -37,9 +39,10 @@ class EBISVBoxLayout(QVBoxLayout):
 
         self.active_message_box = False
 
-        # TODO: update to device_wrapper -> same as in PSU.py for Script controll
+        # device wrapper, so the EBIS can be controlled via the CommandServer/Scripts (device name "EBIS")
+        self.device_wrapper = DeviceISEGWrapper()
         self.connection: None | ISEGConnection = None
-        self.threaded_connection: ThreadedDummyConnection | ThreadedISEGConnection = ThreadedDummyConnection()
+        self.threaded_connection = ThreadedDummyConnection()
 
         self.voltage_deviation = DefaultParams.ebis_voltage_deviation
         self.voltage_maximum = DefaultParams.ebis_voltage_maximum
@@ -543,6 +546,15 @@ class EBISVBoxLayout(QVBoxLayout):
         if last_connection:
             self.connect(last_connection, False)
 
+    @property
+    def threaded_connection(self) -> ThreadedDummyConnection | ThreadedISEGConnection:
+        """Threaded connection of the device wrapper (shared with the CommandServer)"""
+        return self.device_wrapper.threaded_connection
+
+    @threaded_connection.setter
+    def threaded_connection(self, threaded_connection: ThreadedDummyConnection | ThreadedISEGConnection):
+        self.device_wrapper.threaded_connection = threaded_connection
+
     def updateLoop(self):
         """Called by timer; Updates actual voltages"""
 
@@ -886,7 +898,10 @@ class EBISVBoxLayout(QVBoxLayout):
             )
             try:
                 self.connection.open()
-                self.threaded_connection = ThreadedISEGConnection(self.connection)
+                self.threaded_connection = ThreadedISEGConnection(
+                    self.connection,
+                    self.unconnect
+                )
                 self.indicator_connection.setValue(True)
                 self.status_connection.setText('Connected')
                 self.combobox_connection.setEnabled(False)

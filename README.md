@@ -76,8 +76,9 @@ The size of the database is shown in the menu `Database`.
 - [ ] Keithley PicoAmp meter: set instrument back to local mode on close (`KeithleyPAmeter.py`)
 - [ ] Keithley PicoAmp meter: check return values of `setCurrentRange`/`getLastData` (`KeithleyPAmeter.py`)
 - [ ] Implement camera in the Monitor tab
-- [ ] EBIS: use a `DeviceWrapper` like the PSU so it can be controlled via CommandServer/Scripts
-- [ ] Add EBIS to the CommandServer
+- [x] EBIS: use a `DeviceWrapper` like the PSU so it can be controlled via CommandServer/Scripts
+- [x] Add EBIS to the CommandServer (device name `EBIS`, the pressure interlock still limits the heating current)
+- [ ] EBIS via CommandServer: map logical channels (Cathode, DT1, ...) to the physical MICC channels, like the GUI does
 - [ ] Automatic reconnect on lost connection and remember/auto-connect last used ports on startup
 - [ ] Monaco: cleaner return types for faults/IP/help (see TODOs in `Monaco.py`)
 - [ ] Monaco: parse `?DATA` (datalogger) output
@@ -99,6 +100,7 @@ The size of the database is shown in the menu `Database`.
 - [ ] Allow multiple commands at each timestep (see TODO in `ScriptServer.py`)
 - [ ] Write a short documentation of the script language and the CommandServer protocol (plus a small python client example)
 - [ ] Optional access control for the CommandServer (it currently accepts every local client and can switch high voltages)
+- [ ] Restart button for the CommandServer if it could not be started (e.g. port in use)
 
 ### Measurement / Analysis
 - [ ] Combine Scripts + Delay Stage + TDC into automated pump-probe scans (move stage, acquire, save with metadata)
@@ -124,7 +126,7 @@ The size of the database is shown in the menu `Database`.
 - [ ] Add tooltips to everything
 - [ ] Reduce code duplication of the channel rows in `PSU.py`/`EBIS.py` (one channel widget class)
 - [ ] Settings dialog for `DefaultParams` (update interval, limits, laser IP, server port) instead of editing the code
-- [ ] Show CommandServer status (running, connected clients) in the status bar
+- [x] Show CommandServer status (running, connected clients) in the status bar
 - [ ] Start CoboldPC from the GUI
 - [ ] Remember popped out panels and their positions (move back to default if they would appear outside of the screen)
 - [ ] Window geometry handling should also be implemented in the BCA-GUIDE (see `GlobalConf.py`)

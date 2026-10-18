@@ -1,4 +1,4 @@
-from threading import Thread
+from threading import Thread, Lock
 from socket import socket, AF_INET, SOCK_STREAM
 from ast import parse, Module, Expr, Call, Name, literal_eval
 
@@ -167,11 +167,31 @@ class CommandServer(QObject):
         self.debug = debug
         self.daemonic = daemonic
 
-        self.server_socket = socket(AF_INET, SOCK_STREAM)
-        self.server_socket.bind((self.host, self.port))
-        self.server_socket.listen(self.max_connections)
+        self.server_socket: socket | None = None
 
         self.is_running = False
+        self.last_error = ''
+
+        # connected clients (accessed from several threads)
+        self.clients_lock = Lock()
+        self.clients: set = set()
+
+    def clientCount(self) -> int:
+        """Returns the number of connected clients"""
+
+        with self.clients_lock:
+            return len(self.clients)
+
+    def status(self) -> str:
+        """Returns a short human readable status of the server"""
+
+        if not self.is_running:
+            if self.last_error:
+                return f'CommandServer not running ({self.last_error})'
+            return 'CommandServer not running'
+
+        client_count = self.clientCount()
+        return f'CommandServer on {self.host}:{self.port}, {client_count} client{"" if client_count == 1 else "s"}'
 
     def startServer(self):
         """Start the server and accept incoming connections in separate threads"""
@@ -179,6 +199,20 @@ class CommandServer(QObject):
         if self.is_running:
             return
 
+        try:
+            self.server_socket = socket(AF_INET, SOCK_STREAM)
+            self.server_socket.bind((self.host, self.port))
+            self.server_socket.listen(self.max_connections)
+        except OSError as error:
+            # e.g. port already in use by a second instance - the GUI must still work without the server
+            self.last_error = f'port {self.port}: {error.strerror or error}'
+            GlobalConf.logger.error(f'CommandServer could not be started on "{self.host}:{self.port}": {error}')
+            if self.server_socket is not None:
+                self.server_socket.close()
+            self.server_socket = None
+            return
+
+        self.last_error = ''
         self.is_running = True
 
         if self.debug:
@@ -216,6 +250,18 @@ class CommandServer(QObject):
     def handleClient(self, client_socket: socket, client_address):
         """Handle client commands"""
 
+        with self.clients_lock:
+            self.clients.add(client_address)
+
+        try:
+            self._handleClient(client_socket, client_address)
+        finally:
+            with self.clients_lock:
+                self.clients.discard(client_address)
+
+    def _handleClient(self, client_socket: socket, client_address):
+        """Handle client commands (loop until the client disconnects)"""
+
         with client_socket:
             while True:
                 try:
@@ -235,7 +281,7 @@ class CommandServer(QObject):
                         if self.debug:
                             GlobalConf.logger.debug(f'CommandServer instantly answers')
                         self.answerCmd(result_str, client_socket, state=result_state)
-                except ConnectionResetError:
+                except (ConnectionResetError, ConnectionAbortedError):
                     break
             if self.debug:
                 GlobalConf.logger.debug(f'CommandServer closed connection from {client_address}')
@@ -296,6 +342,7 @@ class CommandServer(QObject):
         """Stop the server and close all connections"""
 
         self.is_running = False
-        self.server_socket.close()
+        if self.server_socket is not None:
+            self.server_socket.close()
         if self.debug:
             GlobalConf.logger.debug('CommandServer is stopped')

@@ -1,6 +1,6 @@
 from PyQt6.QtCore import QCoreApplication, QPoint, QTimer, QSize, Qt, QUrl
 from PyQt6.QtGui import QCloseEvent, QPixmap, QDesktopServices
-from PyQt6.QtWidgets import QMainWindow, QTabWidget, QApplication, QSplashScreen
+from PyQt6.QtWidgets import QMainWindow, QTabWidget, QApplication, QSplashScreen, QLabel
 
 
 from Config.GlobalConf import GlobalConf, DefaultParams
@@ -86,14 +86,15 @@ class MainWindow(QMainWindow):
         self.simulation_window = SimulationWindow(self)
         self.addTab(self.simulation_window, 'Simulation')
 
-        # TODO: PowerMeter not implemented yet
-        # TODO: EBIS not implemented yet - probably not needed anyways
-        self.server = CommandServer({
+        devices = {
             'PSU': self.control_window.psu_group_vbox.device_wrapper,
             'LASER': self.control_window.laser_group_vbox.device_wrapper,
             'PRESSURE': self.control_window.pressure_group_vbox.device_wrapper,
             'POWER': self.monitor_window.power_meter_group_vbox.device_wrapper
-        })
+        }
+        if self.control_window.ebis_enabled:
+            devices['EBIS'] = self.control_window.ebis_group_vbox.device_wrapper
+        self.server = CommandServer(devices)
         self.server.startServer()
 
         # store the current labels of the logged columns (rename-proof history)
@@ -122,12 +123,22 @@ class MainWindow(QMainWindow):
 
         self.statusBar()
 
+        # permanent CommandServer status (running, connected clients)
+        self.label_server_status = QLabel()
+        self.label_server_status.setToolTip(
+            'Status of the CommandServer that forwards commands from scripts/other programs to the devices\n'
+            f'Devices: {", ".join(self.server.devices.keys())}'
+        )
+        self.statusBar().addPermanentWidget(self.label_server_status)
+        self.updateServerStatus()
+
         #
         # Setup logging for tabs
         #
 
         self.logging_timer = QTimer()
         self.logging_timer.timeout.connect(self.logTabs)
+        self.logging_timer.timeout.connect(self.updateServerStatus)
         self.logging_timer.setInterval(DefaultParams.update_timer_time)
         self.logging_timer.start()
 
@@ -152,6 +163,11 @@ class MainWindow(QMainWindow):
 
         self.database.updateLabels(self.database.pressure_table.name, PressureVBoxLayout.databaseLabels())
         self.database.updateLabels(self.database.psu_table.name, self.control_window.psu_group_vbox.databaseLabels())
+
+    def updateServerStatus(self):
+        """Updates the CommandServer status in the status bar"""
+
+        self.label_server_status.setText(self.server.status())
 
     def updateDatabaseSize(self):
         """Updates the size of the database shown in the menu"""
