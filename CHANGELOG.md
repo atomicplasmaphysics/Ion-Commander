@@ -2,9 +2,53 @@
 
 *Automatically created from the commit messages with `python -m Utility.Changelog` - do not edit by hand.*
 
+## v0.1.71 (2026-10-18)
+
+**Measure tab: timed CoboldPC measurements with naming format and metadata**
+
+CoboldPC remote control (new Connection/Cobold.py):
+- Uses CoboldPCCMD.exe of the installed CoboldPC (found automatically in
+  "C:/Program Files*/RoentDek Handels GmbH/CoboldPC*"), which sends a
+  command to the command line of the running CoboldPC (see CoboldPC help).
+- isRunning() checks the process list first, because CoboldPCCMD blocks if
+  CoboldPC is not running (tested: it did not return within 15 s); every
+  command has a timeout (30 s).
+- startCobold(), command(), daqState() (-DAqState: 1 stopped, 2 paused,
+  3 running), startMeasurement(lmf, comment) = stop if running +
+  "new hardware,<lmf>,ANALYSIS" + "start", stopMeasurement() = "stop" (+
+  optional configurable save command).
+- buildMeasurementPath(): folder/file patterns with {name}, {date}, {time},
+  {datetime}, {counter:03d}; "," and characters not allowed in file names
+  are replaced; existing files are never overwritten (counter or suffix).
+- ThreadedCoboldConnection, DeviceCoboldWrapper: CommandServer device
+  "COBOLD", so scripts can start/stop measurements (e.g. for scans).
+
+Measure tab (new Windows/Measure.py):
+- CoboldPC state (polled every 2 s, one request at a time), "Start CoboldPC".
+- Measurement: name, duration in min (0 = until stopped), measurement
+  folder (remembered), comment, preview of the next file, start/stop,
+  progress bar with remaining time, open folder. The measurement is
+  stopped automatically after the duration (and when the GUI is closed).
+- A JSON file next to the .lmf contains name, comment, file, start/stop,
+  planned/real duration, stop reason, software version and the settings of
+  all devices at start and stop (MainWindow.deviceSettings(): PSU and EBIS
+  channels, heating, interlock state, pressures, laser, power meter).
+- Start/stop are logged as events (shown in the History plots).
+
+Settings: naming patterns and the CoboldPC commands are editable in
+Settings > Preferences > CoboldPC (save command may be empty).
+README: section "Measurements with CoboldPC"; TODOs updated (measure tab
+TDC, start CoboldPC, measurement metadata).
+
+Tested: naming patterns (python -m Connection.Cobold); offscreen with the
+real installation (CoboldPC not running -> "Not running", start disabled,
+CoboldPCCMD not called) and with a simulated CoboldPC (command sequence
+new/start/stop, automatic stop after 6 s, JSON content); full main window.
+CoboldPC itself was not started (its Startup.ccf starts an acquisition).
+
 ## v0.1.70 (2026-10-18)
 
-**Camera (SpinView/FLIR) in the Monitor tab**
+**Camera (SpinView/FLIR) in the Monitor tab** (68e6f56)
 
 Connection (new Connection/Camera.py):
 - CameraConnection for FLIR/Teledyne cameras with the first available

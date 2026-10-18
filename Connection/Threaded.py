@@ -17,6 +17,7 @@ from Connection.MixedPressure import MixedPressureConnection
 from Connection.Monaco import MonacoConnection
 from Connection.TLPMx import TLPMxConnection
 from Connection.Camera import CameraConnection
+from Connection.Cobold import CoboldConnection
 
 
 if TYPE_CHECKING:
@@ -27,6 +28,7 @@ if TYPE_CHECKING:
     base_monaco = MonacoConnection
     base_tlpmx = TLPMxConnection
     base_camera = CameraConnection
+    base_cobold = CoboldConnection
 else:
     base_iseg = object
     base_thyracont = object
@@ -35,6 +37,7 @@ else:
     base_monaco = object
     base_tlpmx = object
     base_camera = object
+    base_cobold = object
 
 
 class CallbackId:
@@ -366,6 +369,17 @@ class ThreadedMonacoConnection(ThreadedConnection, base_monaco):
     """
 
     def __init__(self, connection: MonacoConnection, *args, **kwargs):
+        super().__init__(connection, *args, **kwargs)
+
+
+class ThreadedCoboldConnection(ThreadedConnection, base_cobold):
+    """
+    Threaded connection for <CoboldConnection>
+
+    :param connection: CoboldConnection
+    """
+
+    def __init__(self, connection: CoboldConnection, *args, **kwargs):
         super().__init__(connection, *args, **kwargs)
 
 

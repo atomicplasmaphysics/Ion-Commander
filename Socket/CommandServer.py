@@ -10,7 +10,7 @@ from Config.GlobalConf import GlobalConf, DefaultParams
 
 from Connection.Threaded import (
     ThreadedISEGConnection, ThreadedThyracontConnection, ThreadedTPG300Connection, ThreadedMixedPressureConnection,
-    ThreadedMonacoConnection, ThreadedTLPMxConnection, ThreadedCameraConnection, ThreadedDummyConnection
+    ThreadedMonacoConnection, ThreadedTLPMxConnection, ThreadedCameraConnection, ThreadedCoboldConnection, ThreadedDummyConnection
 )
 
 
@@ -137,6 +137,17 @@ class DeviceCameraWrapper(DeviceWrapper):
     """
 
     def __init__(self, threaded_connection: ThreadedCameraConnection | ThreadedDummyConnection = None):
+        super().__init__(threaded_connection)
+
+
+class DeviceCoboldWrapper(DeviceWrapper):
+    """
+    Simple wrapper for <ThreadedCoboldConnection>
+
+    :param threaded_connection: ThreadedCoboldConnection
+    """
+
+    def __init__(self, threaded_connection: ThreadedCoboldConnection | ThreadedDummyConnection = None):
         super().__init__(threaded_connection)
 
 

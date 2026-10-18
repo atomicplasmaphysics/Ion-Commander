@@ -89,6 +89,13 @@ class DefaultParams:
     cs_encoding = 'utf-8'
     cs_max_connections = 10
 
+    # CoboldPC parameters (measurement naming: {name}, {date}, {time}, {datetime}, {counter} / {counter:03d})
+    cobold_folder_pattern = '{date}_{name}'
+    cobold_file_pattern = '{name}_{datetime}_{counter:03d}'
+    cobold_new_command = 'new hardware,{lmf},ANALYSIS'
+    cobold_save_command = ''
+    cobold_state_interval = 2000
+
     # Camera parameters
     camera_folder = 'Images'
     camera_live_interval = 100
@@ -128,7 +135,14 @@ class DefaultParams:
         'cs_host': ('CommandServer', 'Host of the CommandServer', '', None, None),
         'cs_port': ('CommandServer', 'Port of the CommandServer', '', 1, 65535),
         'cs_max_connections': ('CommandServer', 'Maximum number of simultaneous clients', '', 1, 1000),
+        'cobold_folder_pattern': ('CoboldPC', 'Folder of a measurement ({name}, {date}, {time}, {datetime}, {counter:03d})', '', None, None),
+        'cobold_file_pattern': ('CoboldPC', 'File name of a measurement (.lmf is added)', '', None, None),
+        'cobold_new_command': ('CoboldPC', 'CoboldPC command to prepare a measurement ({lmf}, {comment})', '', None, None),
+        'cobold_save_command': ('CoboldPC', 'Optional CoboldPC command after stopping ({dcf}, {lmf}), empty: none', '', None, None),
     }
+
+    # string parameters that may be empty
+    allow_empty = {'cobold_save_command'}
 
     # original values of the editable parameters (filled by <loadOverrides>)
     original = {}
@@ -163,7 +177,7 @@ class DefaultParams:
             return converted
 
         converted = str(value).strip()
-        if not converted:
+        if not converted and name not in cls.allow_empty:
             raise ValueError(f'{name}: empty value is not allowed')
         return converted
 
@@ -227,7 +241,7 @@ class GlobalConf:
     title = 'Ion Commander'
 
     # version (single source of truth - update only here)
-    version = '0.1.70'
+    version = '0.1.71'
 
     # logger
     logger = logging.getLogger(title)
@@ -253,6 +267,7 @@ class GlobalConf:
     connection_laser_port_name = 'connection_laser_port'
     connection_power_meter_port_name = 'connection_power_meter_port'
     connection_camera_name = 'connection_camera'
+    cobold_measurement_folder_name = 'cobold_measurement_folder'
 
     # popped out panels
     popout_group_name = 'popouts'

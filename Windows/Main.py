@@ -1,3 +1,6 @@
+from datetime import datetime
+
+
 from PyQt6.QtCore import QCoreApplication, QPoint, QTimer, QSize, Qt, QUrl
 from PyQt6.QtGui import QCloseEvent, QPixmap, QDesktopServices
 from PyQt6.QtWidgets import QMainWindow, QTabWidget, QApplication, QSplashScreen, QLabel
@@ -14,6 +17,7 @@ from Utility.AutoReconnect import EventLog
 
 from Windows.Control import ControlWindow
 from Windows.Monitor import MonitorWindow
+from Windows.Measure import MeasureWindow
 from Windows.History import HistoryWindow
 from Windows.Scripts import ScriptsWindow
 from Windows.Tips import TipsWindow
@@ -26,8 +30,6 @@ class MainWindow(QMainWindow):
     """
     Class used for main layout
     """
-
-    # TODO: start CoboldPC
 
     def __init__(self):
         super().__init__()
@@ -58,7 +60,6 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(self.tabs)
 
         # TODO: Add measure tab TAC
-        # TODO: Add measure tab TDC
         # TODO: Add measure tab NDIGO
 
         # Add control tab
@@ -68,6 +69,10 @@ class MainWindow(QMainWindow):
         # Add monitor tab
         self.monitor_window = MonitorWindow(self)
         self.addTab(self.monitor_window, 'Monitor', 'Monitoring devices (power meter, camera)')
+
+        # Add measure tab (CoboldPC)
+        self.measure_window = MeasureWindow(self, metadata_function=self.deviceSettings)
+        self.addTab(self.measure_window, 'Measure', 'Measurements with CoboldPC (fixed duration, measurement folder, device settings saved as JSON)')
 
         # Add history tab
         self.history_window = HistoryWindow(self, self.database)
@@ -94,7 +99,8 @@ class MainWindow(QMainWindow):
             'LASER': self.control_window.laser_group_vbox.device_wrapper,
             'PRESSURE': self.control_window.pressure_group_vbox.device_wrapper,
             'POWER': self.monitor_window.power_meter_group_vbox.device_wrapper,
-            'CAMERA': self.monitor_window.camera_group_vbox.device_wrapper
+            'CAMERA': self.monitor_window.camera_group_vbox.device_wrapper,
+            'COBOLD': self.measure_window.cobold_group_vbox.device_wrapper
         }
         if self.control_window.ebis_enabled:
             devices['EBIS'] = self.control_window.ebis_group_vbox.device_wrapper
@@ -181,6 +187,51 @@ class MainWindow(QMainWindow):
         """Stores which panels are popped out (and where)"""
 
         GlobalConf.updatePopouts({layout.title_str: layout.popoutGeometry() for layout in VBoxTitleLayout.popout_instances})
+
+    def deviceSettings(self) -> dict:
+        """Returns the current values of all devices (stored with every measurement)"""
+
+        control = self.control_window
+        settings = {'time': datetime.now().isoformat(timespec='seconds')}
+
+        psu = control.psu_group_vbox
+        settings['PSU'] = {
+            'connected': psu.indicator_connection.value(),
+            'channels': {row.name: {'set_V': row.spinbox_voltage.value(), 'voltage_V': row.status_voltage.value, 'current_A': row.status_current.value, 'on': row.indicator.value()} for row in psu.channel_rows}
+        }
+
+        if control.ebis_enabled:
+            ebis = control.ebis_group_vbox
+            settings['EBIS'] = {
+                'connected': ebis.indicator_connection.value(),
+                'high_voltage': ebis.indicator_high_voltage.value(),
+                'channels': {row.name: {'set_V': row.spinbox_voltage.value(), 'voltage_V': row.status_voltage.value, 'current_A': row.status_current.value if row.status_current is not None else None, 'on': row.indicator.value()} for row in ebis.channel_rows},
+                'heating_current_set_A': ebis.spinbox_current_6.value(),
+                'heating_current_A': ebis.status_current_6.value,
+                'interlock': ebis.interlock.state.text(),
+            }
+
+        pressure = control.pressure_group_vbox
+        settings['Pressure_mbar'] = {name: pressure.getPressure(name) for name in pressure.pressure_gauges}
+
+        laser = control.laser_group_vbox
+        settings['Laser'] = {
+            'connected': laser.indicator_connection.value(),
+            'shutter_open': laser.indicator_shutter.value(),
+            'pulsing': laser.indicator_pulsing.value(),
+            'repetition_rate_set_Hz': laser.status_repetition_rate_set.value,
+            'repetition_rate_measured_Hz': laser.status_repetition_rate_measured.value,
+            'rf_level_percent': laser.status_settings_rflevel.value,
+            'pulse_width_fs': laser.status_settings_pulsewidth.value,
+        }
+
+        power_meter = self.monitor_window.power_meter_group_vbox
+        settings['PowerMeter'] = {
+            'connected': power_meter.indicator_connection.value(),
+            'power_W': power_meter.state_display_parameters[0],
+            'wavelength_nm': power_meter.status_wavelength.value,
+        }
+        return settings
 
     def updateDatabaseLabels(self):
         """Stores the current labels of the logged columns in the database (only changed labels are written)"""

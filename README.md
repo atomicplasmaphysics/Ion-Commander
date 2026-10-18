@@ -32,6 +32,18 @@ If one wishes to execute the GUI without calling it from the console, [PyInstall
 After executing the `compile\pyinstaller.py` file (same packages and package PyInstaller are needed), a `Ion Commander.exe` will be created in the main folder.
 For further information read the description of the `compile\pyinstaller.py` file.
 
+## Measurements with CoboldPC
+The tab `Measure` controls CoboldPC (RoentDek) with `CoboldPCCMD.exe`, which sends commands to the command line of the running CoboldPC:
+1. Start CoboldPC (button `Start CoboldPC` - CoboldPC executes its `Startup.ccf`, which may already start an acquisition)
+2. Select the measurement folder, enter name, duration (0 = until stopped) and comment
+3. `Start measurement` sends `new hardware,<file>.lmf,ANALYSIS` and `start`; after the duration `stop` is sent
+
+Folder and file names are built from patterns (Settings > Preferences > CoboldPC), default
+`<folder>/{date}_{name}/{name}_{datetime}_{counter:03d}.lmf`, existing files are never overwritten.
+Next to every list mode file a `.json` file with name, comment, start/stop time and the settings of all devices (PSU, EBIS,
+pressures, laser, power meter) at start and stop is written. Start and stop are logged as events.
+Scripts can use the device `COBOLD` of the CommandServer (e.g. `COBOLD:startMeasurement('D:/data/test.lmf')`, `COBOLD:stopMeasurement()`).
+
 ## Changelog
 All changes are listed in [CHANGELOG.md](CHANGELOG.md), which is created from the commit messages with
 ```bash
@@ -69,11 +81,13 @@ The size of the database is shown in the menu `Database`.
 - [x] Build a control subtab (Pressure, Voltage, Laser)
 - [x] Logg everything in the control-tab
 - [ ] Build a measure subtab (for TAC)
-- [ ] Build a measure subtab (for TDC)
+- [x] Build a measure subtab (for TDC) - tab `Measure` with CoboldPC
 - [ ] Build a measure subtab (for NDIGO - if NDIGO is built)
 - [x] Build a laser subtab
 - [x] Make better logo and splash screen
-- [ ] Start TDC software automatic with a button press and safe it automatically
+- [x] Start TDC software automatic with a button press and safe it automatically (CoboldPC: start, timed measurement, naming format)
+- [ ] CoboldPC: test with the real TDC (only tested with a simulated CoboldPC) and check the return value of `CoboldPCCMD -DAqState`
+- [ ] CoboldPC: save the Cobold document (.dcf) after a measurement (command not documented for the command line, configurable in the preferences)
 - [x] No focus on any button (especially not the "connect"/"disconnect" button on popped out panels)
 
 ### Safety (EBIS interlock)
@@ -124,7 +138,7 @@ The size of the database is shown in the menu `Database`.
 
 ### Measurement / Analysis
 - [ ] Combine Scripts + Delay Stage + TDC into automated pump-probe scans (move stage, acquire, save with metadata)
-- [ ] Save measurement metadata (laser, PSU/EBIS voltages, pressure) automatically next to measured files
+- [x] Save measurement metadata (laser, PSU/EBIS voltages, pressure) automatically next to measured files (JSON next to the .lmf)
 - [x] Improve LogNorm fitting and finish `FitLogNormRange` (shifted log-normal, several start values, copy button)
 - [x] Better limiting of fit parameters (`Fitting.py`: `estimateGauss`, `gaussBounds`, adaptive window for Gauss (center))
 - [ ] LogNorm/Gauss fits with constant background (offset) as additional parameter
@@ -155,7 +169,7 @@ The size of the database is shown in the menu `Database`.
 - [x] Settings dialog for `DefaultParams` (update interval, limits, laser IP, server port) instead of editing the code (menu `Settings > Preferences...`)
 - [ ] Apply changed preferences without restarting the application
 - [x] Show CommandServer status (running, connected clients) in the status bar
-- [ ] Start CoboldPC from the GUI
+- [x] Start CoboldPC from the GUI
 - [x] Remember popped out panels and their positions (move back to default if they would appear outside of the screen)
 
 ### Code quality / Project
