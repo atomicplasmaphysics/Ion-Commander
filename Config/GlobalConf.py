@@ -94,6 +94,125 @@ class DefaultParams:
     script_extension = 'lsd'
     script_encoding = 'utf-8'
 
+    # parameters that can be changed in the settings dialog (stored in QSettings, applied at startup)
+    # name: (group, description, unit, minimum, maximum)
+    editable = {
+        'update_timer_time': ('General', 'Update interval of the devices and of the logging', 'ms', 100, 60000),
+        'ramp_timer_time': ('General', 'Update interval of the PSU voltage ramp', 'ms', 100, 600000),
+        'reconnect_interval_time': ('General', 'Time between reconnect attempts after a lost connection', 'ms', 1000, 600000),
+        'reconnect_interval_time_laser': ('General', 'Time between reconnect attempts of the laser', 'ms', 1000, 600000),
+        'psu_voltage_deviation': ('PSU', 'Allowed deviation of the measured voltage', 'V', 0, 1000),
+        'psu_voltage_maximum': ('PSU', 'Maximum voltage of the input fields', 'V', 0, 100000),
+        'psu_current_maximum': ('PSU', 'Allowed current (shown in red above)', 'A', 0, 1),
+        'psu_time_ramp_default': ('PSU', 'Default duration of the voltage ramp', 'min', 0, 600),
+        'ebis_voltage_deviation': ('EBIS', 'Allowed deviation of the measured voltage', 'V', 0, 1000),
+        'ebis_voltage_maximum': ('EBIS', 'Maximum voltage of the input fields', 'V', 0, 100000),
+        'ebis_current_maximum': ('EBIS', 'Allowed current (shown in red above)', 'A', 0, 1),
+        'ebis_current_deviation': ('EBIS', 'Allowed deviation of the heating current', 'A', 0, 10),
+        'laser_ip': ('Laser', 'Default IP address of the laser', '', None, None),
+        'laser_port': ('Laser', 'Default port of the laser', '', 1, 65535),
+        'laser_chiller_temperature_low': ('Laser', 'Lower limit of the chiller temperature', '°C', -50, 100),
+        'laser_chiller_temperature_high': ('Laser', 'Upper limit of the chiller temperature', '°C', -50, 100),
+        'laser_chiller_flow_low': ('Laser', 'Lower limit of the chiller flow', 'lpm', 0, 100),
+        'laser_chiller_flow_high': ('Laser', 'Upper limit of the chiller flow', 'lpm', 0, 100),
+        'laser_chiller_pressure_low': ('Laser', 'Lower limit of the chiller pressure', '', 0, 1000),
+        'laser_chiller_pressure_high': ('Laser', 'Upper limit of the chiller pressure', '', 0, 1000),
+        'laser_baseplate_temperature_off': ('Laser', 'Baseplate temperature limit (off)', '°C', -50, 100),
+        'laser_baseplate_temperature_on': ('Laser', 'Baseplate temperature limit (on)', '°C', -50, 100),
+        'laser_ir_wavelength': ('Laser', 'IR wavelength', 'nm', 1, 100000),
+        'laser_uv_wavelength': ('Laser', 'UV wavelength', 'nm', 1, 100000),
+        'cs_host': ('CommandServer', 'Host of the CommandServer', '', None, None),
+        'cs_port': ('CommandServer', 'Port of the CommandServer', '', 1, 65535),
+        'cs_max_connections': ('CommandServer', 'Maximum number of simultaneous clients', '', 1, 1000),
+    }
+
+    # original values of the editable parameters (filled by <loadOverrides>)
+    original = {}
+
+    @classmethod
+    def convert(cls, name: str, value):
+        """
+        Converts a value (e.g. a string from QSettings) to the type of the default value and checks the range.
+        Raises ValueError if it is not valid.
+
+        :param name: name of parameter
+        :param value: new value
+        """
+
+        default = cls.original.get(name, getattr(cls, name))
+        _, _, _, minimum, maximum = cls.editable[name]
+
+        if isinstance(default, tuple):
+            parts = value if isinstance(value, (tuple, list)) else str(value).replace(',', '.').split('.')
+            converted = tuple(int(part) for part in parts)
+            if len(converted) != len(default) or not all(0 <= part <= 255 for part in converted):
+                raise ValueError(f'{name}: "{value}" is not a valid IP address')
+            return converted
+
+        if isinstance(default, bool):
+            return str(value).lower() in ['1', 'true', 'yes']
+
+        if isinstance(default, (int, float)):
+            converted = type(default)(float(value)) if isinstance(default, int) else float(value)
+            if (minimum is not None and converted < minimum) or (maximum is not None and converted > maximum):
+                raise ValueError(f'{name}: {converted} is not in the range [{minimum}, {maximum}]')
+            return converted
+
+        converted = str(value).strip()
+        if not converted:
+            raise ValueError(f'{name}: empty value is not allowed')
+        return converted
+
+    @classmethod
+    def toString(cls, value) -> str:
+        """Converts a value to a string for the settings/dialog"""
+
+        if isinstance(value, tuple):
+            return '.'.join(str(part) for part in value)
+        return str(value)
+
+    @classmethod
+    def loadOverrides(cls, settings: QSettings, group: str = 'default_params'):
+        """
+        Applies the values stored in the settings (invalid values are ignored and logged)
+
+        :param settings: settings object
+        :param group: group in the settings
+        """
+
+        for name in cls.editable:
+            cls.original.setdefault(name, getattr(cls, name))
+
+        settings.beginGroup(group)
+        keys = settings.childKeys()
+        settings.endGroup()
+
+        for name in keys:
+            if name not in cls.editable:
+                continue
+            try:
+                setattr(cls, name, cls.convert(name, settings.value(f'{group}/{name}', type=str)))
+            except (TypeError, ValueError) as error:
+                logging.getLogger('Ion Commander').error(f'Stored parameter is invalid and ignored: {error}')
+
+    @classmethod
+    def saveOverrides(cls, settings: QSettings, values: dict[str, str], group: str = 'default_params'):
+        """
+        Stores the values that differ from the original values (takes effect after restarting the application)
+
+        :param settings: settings object
+        :param values: dictionary of {name: value}, values are converted and checked (ValueError if invalid)
+        :param group: group in the settings
+        """
+
+        converted = {name: cls.convert(name, value) for name, value in values.items() if name in cls.editable}
+
+        settings.remove(group)
+        for name, value in converted.items():
+            if value != cls.original.get(name, getattr(cls, name)):
+                settings.setValue(f'{group}/{name}', cls.toString(value))
+        settings.sync()
+
 
 class GlobalConf:
     """
@@ -104,7 +223,7 @@ class GlobalConf:
     title = 'Ion Commander'
 
     # version (single source of truth - update only here)
-    version = '0.1.59'
+    version = '0.1.60'
 
     # logger
     logger = logging.getLogger(title)
@@ -142,6 +261,9 @@ class GlobalConf:
 
     # simulation parameters
     simulation_paths_parameter_name = 'simulation_paths_parameter'
+
+    # parameters changed in the settings dialog
+    default_params_group_name = 'default_params'
 
     @staticmethod
     def updateWindowSizeCenter(width: int, height: int, center_x: int, center_y: int):
@@ -323,3 +445,7 @@ class GlobalConf:
     def getSimulationPathsParameter() -> list[str]:
         """Returns simulation paths parameter"""
         return GlobalConf.settings.value(GlobalConf.simulation_paths_parameter_name, defaultValue=[], type=list)
+
+
+# apply the values of the settings dialog before any other module uses DefaultParams (e.g. as default arguments)
+DefaultParams.loadOverrides(GlobalConf.settings, GlobalConf.default_params_group_name)

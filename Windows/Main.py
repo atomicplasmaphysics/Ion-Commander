@@ -19,6 +19,7 @@ from Windows.Scripts import ScriptsWindow
 from Windows.Tips import TipsWindow
 from Windows.Analyse import AnalyseWindow
 from Windows.Simulation import SimulationWindow
+from Windows.Settings import SettingsDialog
 
 
 class MainWindow(QMainWindow):
@@ -120,6 +121,12 @@ class MainWindow(QMainWindow):
         )
         self.menu_database.aboutToShow.connect(self.updateDatabaseSize)
         self.updateDatabaseSize()
+
+        self.menu_settings = self.menuBar().addMenu('Settings')
+        self.menu_settings.setToolTipsVisible(True)
+        self.action_settings = self.menu_settings.addAction('Preferences...')
+        self.action_settings.setToolTip('Change update intervals, limits, laser address, CommandServer port, ...')
+        self.action_settings.triggered.connect(lambda: SettingsDialog(self).exec())
 
         #
         # STATUS BAR
