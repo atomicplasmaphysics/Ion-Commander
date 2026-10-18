@@ -104,7 +104,7 @@ class GlobalConf:
     title = 'Ion Commander'
 
     # version (single source of truth - update only here)
-    version = '0.1.58'
+    version = '0.1.59'
 
     # logger
     logger = logging.getLogger(title)
@@ -129,6 +129,9 @@ class GlobalConf:
     connection_laser_ip4_name = 'connection_laser_ip4'
     connection_laser_port_name = 'connection_laser_port'
     connection_power_meter_port_name = 'connection_power_meter_port'
+
+    # popped out panels
+    popout_group_name = 'popouts'
 
     # EBIS interlock parameters
     ebis_interlock_group_name = 'ebis_interlock'
@@ -235,6 +238,38 @@ class GlobalConf:
                     GlobalConf.settings.value(GlobalConf.connection_laser_ip4_name, defaultValue=-1, type=int),
                     GlobalConf.settings.value(GlobalConf.connection_laser_port_name, defaultValue=-1, type=int))
         raise NotImplementedError(f'Connection type {connection_type} not implemented')
+
+    @staticmethod
+    def updatePopouts(popouts: dict[str, tuple[int, int, int, int] | None]):
+        """
+        Updates and saves settings object with the popped out panels
+
+        :param popouts: dictionary of {panel title: geometry (x, y, width, height) or None if not popped out}
+        """
+
+        GlobalConf.settings.remove(GlobalConf.popout_group_name)
+        for title, geometry in popouts.items():
+            if geometry is not None:
+                GlobalConf.settings.setValue(f'{GlobalConf.popout_group_name}/{title}', ','.join(str(value) for value in geometry))
+        GlobalConf.settings.sync()
+
+    @staticmethod
+    def getPopouts() -> dict[str, tuple[int, int, int, int] | None]:
+        """Returns the popped out panels as {panel title: geometry (x, y, width, height) or None if invalid}"""
+
+        GlobalConf.settings.beginGroup(GlobalConf.popout_group_name)
+        keys = GlobalConf.settings.childKeys()
+        GlobalConf.settings.endGroup()
+
+        popouts = {}
+        for key in keys:
+            value = GlobalConf.settings.value(f'{GlobalConf.popout_group_name}/{key}', defaultValue='', type=str)
+            try:
+                geometry = tuple(int(part) for part in value.split(','))
+            except ValueError:
+                geometry = None
+            popouts[key] = geometry if geometry is not None and len(geometry) == 4 else None
+        return popouts
 
     @staticmethod
     def updateEBISInterlock(limits: dict[str, float] = None, gauge: str = None):

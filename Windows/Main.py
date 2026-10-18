@@ -9,7 +9,7 @@ from DB.db import DB
 
 from Socket.CommandServer import CommandServer
 
-from Utility.Layouts import TabWidget
+from Utility.Layouts import TabWidget, VBoxTitleLayout
 from Utility.AutoReconnect import EventLog
 
 from Windows.Control import ControlWindow
@@ -160,6 +160,22 @@ class MainWindow(QMainWindow):
         if maximized:
             self.showMaximized()
 
+        # restore popped out panels after the main window is shown
+        QTimer.singleShot(0, self.restorePopouts)
+
+    def restorePopouts(self):
+        """Pops out the panels that were popped out when the application was closed"""
+
+        popouts = GlobalConf.getPopouts()
+        for layout in VBoxTitleLayout.popout_instances:
+            if layout.title_str in popouts:
+                layout.restorePopout(popouts[layout.title_str])
+
+    def savePopouts(self):
+        """Stores which panels are popped out (and where)"""
+
+        GlobalConf.updatePopouts({layout.title_str: layout.popoutGeometry() for layout in VBoxTitleLayout.popout_instances})
+
     def updateDatabaseLabels(self):
         """Stores the current labels of the logged columns in the database (only changed labels are written)"""
 
@@ -243,6 +259,9 @@ class MainWindow(QMainWindow):
         splash = QSplashScreen(pixmap)
         splash.show()
         QApplication.processEvents()
+
+        # must be stored before the tabs (and with them the popped out panels) are closed
+        self.savePopouts()
 
         # send closing signal to all tabs
         for index in range(self.tabs.count()):

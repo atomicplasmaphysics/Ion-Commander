@@ -133,7 +133,7 @@ The size of the database is shown in the menu `Database`.
 - [ ] Settings dialog for `DefaultParams` (update interval, limits, laser IP, server port) instead of editing the code
 - [x] Show CommandServer status (running, connected clients) in the status bar
 - [ ] Start CoboldPC from the GUI
-- [ ] Remember popped out panels and their positions (move back to default if they would appear outside of the screen)
+- [x] Remember popped out panels and their positions (move back to default if they would appear outside of the screen)
 - [ ] Window geometry handling should also be implemented in the BCA-GUIDE (see `GlobalConf.py`)
 
 ### Code quality / Project

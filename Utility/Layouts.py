@@ -12,7 +12,7 @@ import logging
 
 import numpy as np
 
-from PyQt6.QtCore import Qt, pyqtSignal, QByteArray, QSize, QRect, QRectF, QPointF, QObject, QEvent
+from PyQt6.QtCore import Qt, pyqtSignal, QByteArray, QSize, QRect, QRectF, QPoint, QPointF, QObject, QEvent
 from PyQt6.QtGui import (
     QIcon, QPainter, QPixmap, QColor, QBrush, QLinearGradient, QPainterPath, QAction, QFont, QFontMetrics, QTextCursor,
     QPen, QTextFormat, QPalette
@@ -186,6 +186,9 @@ class VBoxTitleLayout(QVBoxLayout):
                         if integer: addSpacing(addStretch) after title
     """
 
+    # all layouts that can be popped out (to store/restore popped out panels)
+    popout_instances: list[VBoxTitleLayout] = []
+
     def __init__(
         self,
         title: str,
@@ -216,8 +219,9 @@ class VBoxTitleLayout(QVBoxLayout):
         self.popout_widget: PopoutWidget | None = None
 
         if self.popout_enable:
+            VBoxTitleLayout.popout_instances.append(self)
             self.popout_button = QPushButton(self.parent)
-            self.popout_button.setToolTip('Popout widget')
+            self.popout_button.setToolTip('Pop out the panel into its own window (click again to put it back)')
             self.popout_button.setIcon(QIcon('icons/open_external.png'))
             self.popout_button.setStyleSheet(title_style)
             self.popout_button.clicked.connect(self._popout)
@@ -278,6 +282,40 @@ class VBoxTitleLayout(QVBoxLayout):
 
         else:
             self.restoreMainWidget()
+
+    def popoutGeometry(self) -> tuple[int, int, int, int] | None:
+        """Returns geometry (x, y, width, height) of the popped out window, None if not popped out"""
+
+        if self.popout_widget is None:
+            return None
+        geometry = self.popout_widget.geometry()
+        return geometry.x(), geometry.y(), geometry.width(), geometry.height()
+
+    def restorePopout(self, geometry: tuple[int, int, int, int] | list[int] | None = None):
+        """
+        Pops out the panel and moves it to the given geometry, if the window would be visible there.
+        Otherwise the default position is used (e.g. the monitor was removed).
+
+        :param geometry: (x, y, width, height) of the popped out window
+        """
+
+        if self.popout_widget is None:
+            self._popout()
+
+        if geometry is None or len(geometry) != 4:
+            return
+
+        rect = QRect(*[int(value) for value in geometry])
+        if rect.width() < 50 or rect.height() < 50:
+            return
+
+        # the title bar (top left part of the window) must be on one of the screens
+        title_point = rect.topLeft() + QPoint(min(50, rect.width() // 2), 10)
+        if not any(screen.availableGeometry().contains(title_point) for screen in QApplication.screens()):
+            GlobalConf.logger.info(f'Popped out panel "{self.title_str}" would be outside of the screens, using default position')
+            return
+
+        self.popout_widget.setGeometry(rect)
 
     def restoreMainWidget(self):
         """Restores all widgets inside this VBoxTitleLayout"""
