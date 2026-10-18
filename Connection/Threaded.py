@@ -227,8 +227,10 @@ class ThreadedConnection(QObject):
             raise NotImplementedError('There should not be a callback happening')
 
         if isinstance(callback_id, list):
+            # queue was too long and the oldest tasks were deleted - remove their callbacks too
             for i in callback_id:
-                del self.callbacks[i]
+                self.callbacks.pop(i, None)
+            return
 
         if not isinstance(callback_id, int):
             raise ValueError(f'Callback id must be <int>, received {type(callback_id)}')

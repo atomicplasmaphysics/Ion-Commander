@@ -23,3 +23,11 @@ Scripts/*
 
 desktop.ini
 
+
+# python / IDE / tool caches
+__pycache__/
+*.py[cod]
+.vs/
+.vscode/
+.mcp.json
+.claude/
