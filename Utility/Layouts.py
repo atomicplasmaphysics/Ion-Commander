@@ -2553,6 +2553,21 @@ class StackedVBoxLayout(QVBoxLayout):
     :param click_copy: (optional) copies its contents
     """
 
+    # descriptions of the fit parameter symbols (shown as tooltip)
+    descriptions = {
+        'σ': 'σ: standard deviation (Gauss) or skewness (LogNorm)',
+        'μ': 'μ: center of the peak (Gauss) or logarithm of the scale (LogNorm)',
+        'c': 'c: height of the peak',
+        'FWHM': 'FWHM: full width at half maximum',
+        'x0': 'x0: onset of the peak (LogNorm is 0 before)',
+        'A': 'A: area of the peak',
+        'mode': 'mode: position of the maximum',
+        'Counts': 'Counts: sum of all counts in the range',
+        'x₁': 'x₁: position of the first bar',
+        'x₂': 'x₂: position of the second bar',
+        '∆x': '∆x: distance between the bars',
+    }
+
     def __init__(
         self,
         labels: dict[tuple[int, int], str],
@@ -2584,12 +2599,16 @@ class StackedVBoxLayout(QVBoxLayout):
             self.addLayout(hbox)
 
             for label, pos in sorted(row.items(), key=lambda v: v[1]):
-                hbox.addWidget(QLabel(label))
+                description = self.descriptions.get(label, label)
+                label_widget = QLabel(label)
+                label_widget.setToolTip(description)
+                hbox.addWidget(label_widget)
                 spinbox = DoubleSpinBox(
                     input_range=SpinBoxRange.INF_INF,
                     decimals=4,
                     click_copy=click_copy
                 )
+                spinbox.setToolTip(f'{description}' + (' - click to copy' if click_copy else ''))
                 self.mapping[pos] = spinbox
                 hbox.addWidget(spinbox)
 
@@ -2835,53 +2854,64 @@ class TextEdit(QWidget):
             self.main_layout.setMenuBar(self.menu)
 
             self.menu_file = self.menu.addMenu('File')
+            self.menu_file.setToolTipsVisible(True)
 
             if save_button:
                 self.menu_file_save = QAction('Save', self)
                 self.menu_file_save.setShortcut('Ctrl+S')
+                self.menu_file_save.setToolTip('Save the tip (Ctrl+S)')
                 self.menu_file_save.triggered.connect(self.saveFile)
                 self.menu_file.addAction(self.menu_file_save)
 
             if load_button:
                 self.menu_file_load = QAction('Open', self)
                 self.menu_file_load.setShortcut('Ctrl+O')
+                self.menu_file_load.setToolTip('Open a tip file (Ctrl+O)')
                 self.menu_file_load.triggered.connect(self.openFile)
                 self.menu_file.addAction(self.menu_file_load)
 
             self.menu_file_insert_image = QAction('Insert Image', self)
             self.menu_file_insert_image.setShortcut('Ctrl+G')
+            self.menu_file_insert_image.setToolTip('Insert an image at the cursor (Ctrl+G)')
             self.menu_file_insert_image.triggered.connect(self.insertImage)
             self.menu_file.addAction(self.menu_file_insert_image)
 
             self.menu_format = self.menu.addMenu('Format')
+            self.menu_format.setToolTipsVisible(True)
 
             self.menu_format_bold = QAction('Bold', self)
             self.menu_format_bold.setShortcut('Ctrl+B')
+            self.menu_format_bold.setToolTip('Selected text bold (Ctrl+B)')
             self.menu_format_bold.triggered.connect(self.setBold)
             self.menu_format.addAction(self.menu_format_bold)
 
             self.menu_format_italic = QAction('Italic', self)
             self.menu_format_italic.setShortcut('Ctrl+I')
+            self.menu_format_italic.setToolTip('Selected text italic (Ctrl+I)')
             self.menu_format_italic.triggered.connect(self.setItalic)
             self.menu_format.addAction(self.menu_format_italic)
 
             self.menu_format_underline = QAction('Underline', self)
             self.menu_format_underline.setShortcut('Ctrl+U')
+            self.menu_format_underline.setToolTip('Selected text underlined (Ctrl+U)')
             self.menu_format_underline.triggered.connect(self.setUnderline)
             self.menu_format.addAction(self.menu_format_underline)
 
             self.menu_format_increase_font = QAction('Increase Font', self)
             self.menu_format_increase_font.setShortcut('Ctrl++')
+            self.menu_format_increase_font.setToolTip('Increase font size of the selected text (Ctrl++)')
             self.menu_format_increase_font.triggered.connect(lambda: self.increaseFontSize(1))
             self.menu_format.addAction(self.menu_format_increase_font)
 
             self.menu_format_decrease_font = QAction('Decrease Font', self)
             self.menu_format_decrease_font.setShortcut('Ctrl+-')
+            self.menu_format_decrease_font.setToolTip('Decrease font size of the selected text (Ctrl+-)')
             self.menu_format_decrease_font.triggered.connect(lambda: self.increaseFontSize(-1))
             self.menu_format.addAction(self.menu_format_decrease_font)
 
             self.menu_format_red = QAction('Change Color', self)
             self.menu_format_red.setShortcut('Ctrl+Q')
+            self.menu_format_red.setToolTip('Change the color of the selected text (Ctrl+Q)')
             self.menu_format_red.triggered.connect(self.changeColor)
             self.menu_format.addAction(self.menu_format_red)
 

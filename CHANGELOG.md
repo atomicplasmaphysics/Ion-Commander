@@ -2,9 +2,27 @@
 
 *Automatically created from the commit messages with `python -m Utility.Changelog` - do not edit by hand.*
 
+## v0.1.69 (2026-10-18)
+
+**Tooltips for Scripts, Tips, Simulation, Analyse and fit parameters**
+
+- Fit parameter fields (StackedVBoxLayout/FittingWidget): label and value
+  explain the symbol (σ, μ, c, FWHM, x0, A, mode, Counts, x₁, x₂, ∆x),
+  e.g. "x0: onset of the peak (LogNorm is 0 before) - click to copy".
+- Tips editor (TextEdit): all File/Format menu actions describe what they
+  do incl. shortcut, tooltips are shown in the menus.
+- Scripts: script list (with folder) and output.
+- Simulation: list of selected simulation folders.
+- Analyse: list of selected files and the histogram plot.
+
+Checked offscreen: every button, spinbox, combobox and list of the
+Scripts, Tips, Simulation and Analyse tabs has a (possibly inherited)
+tooltip; only the Qt-internal toolbar overflow button and the menu titles
+have none.
+
 ## v0.1.68 (2026-10-18)
 
-**History: pressure prediction fit, min/max envelope, working splitter**
+**History: pressure prediction fit, min/max envelope, working splitter** (77b83ac)
 
 Prediction fit (new Utility/PressureFit.py, new row in the History tab):
 - Fits the visible part of a selected curve (pressures are preselected)

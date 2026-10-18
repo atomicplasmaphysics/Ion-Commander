@@ -67,6 +67,7 @@ class ScriptsWindow(TabWidget):
 
         # Scripts grid
         self.script_selection_list = FilesList(folder=self.path_scripts, extensions=self.extension_scripts)
+        self.script_selection_list.setToolTip(f'Scripts in the folder "{self.path_scripts}" - select one to edit it')
         self.script_selection_group_vbox.addWidget(self.script_selection_list)
         self.script_selection_list.currentRowChanged.connect(self.editScript)
 
@@ -137,6 +138,7 @@ class ScriptsWindow(TabWidget):
 
         # Script output
         self.script_output = FileEditor(self, line_numbering=False, highlighting=False)
+        self.script_output.setToolTip('Output (log) of the running script')
         self.script_output.setPlaceholderText('Output of the script is here')
         self.script_editor_bottom_vbox.addWidget(self.script_output)
 

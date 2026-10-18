@@ -77,6 +77,7 @@ class AnalyseWindow(TabWidget):
         self.grid_buttons.addWidget(self.button_uncheck, 1, 1, alignment=Qt.AlignmentFlag.AlignTop)
 
         self.list_files = DeleteWidgetList(self, placeholder='Select files first')
+        self.list_files.setToolTip('Selected data files (remove one with its delete button)')
         self.list_files.setMaximumHeight(100)
         self.list_files.currentRowChanged.connect(self.loadDataSelected)
         self.list_files.checkedChanged.connect(self.loadDataChecked)
@@ -149,6 +150,7 @@ class AnalyseWindow(TabWidget):
         #
 
         self.graph = TOFCanvas(parent=self, data=self.data, fit_class=self.fit_function_class, grid=True)
+        self.graph.setToolTip('Histogram of the data: drag the bars to select the fit range, zoom with the mouse')
         self.main_layout.addWidget(self.graph)
 
     def openFiles(self, files: list[str] = None):

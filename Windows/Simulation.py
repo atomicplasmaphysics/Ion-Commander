@@ -60,6 +60,7 @@ class SimulationWindow(TabWidget):
         self.grid_buttons.addWidget(self.button_update, 1, 0, alignment=Qt.AlignmentFlag.AlignTop)
 
         self.list_folders = DeleteWidgetList(self, placeholder='Select folders first')
+        self.list_folders.setToolTip('Selected simulation folders (remove one with its delete button)')
         self.list_folders.setMaximumHeight(100)
         self.list_folders.itemDeleted.connect(self.updateFolders)
 
