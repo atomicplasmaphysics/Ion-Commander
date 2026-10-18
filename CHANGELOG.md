@@ -2,9 +2,48 @@
 
 *Automatically created from the commit messages with `python -m Utility.Changelog` - do not edit by hand.*
 
+## v0.1.65 (2026-10-18)
+
+**Sane numbers, power meter out of range, robust laser telnet connection**
+
+Sane numbers (Utility/Functions.py):
+- New isSaneNumber() (int/float/numpy number, finite, not bool) and
+  saneOrDefault().
+- getPrefix() returns (value, '') for nan/inf instead of crashing
+  (formatting nan with an exponent raised an IndexError), and accepts numpy
+  numbers.
+
+Database: Tables.insert() writes None, nan and inf as NULL. Before, such a
+value was written as the text "nan"/"inf" into the SQL query, which made
+the insert fail (e.g. for an overranged power meter).
+
+Power meter (Windows/PowerMeter.py):
+- Powers above 100 W / currents above 0.1 A (e.g. the overrange value
+  9.9E37), nan and inf are treated as out of range: the display shows
+  "Out of range" (with tooltip), min/max are not updated and the value is
+  logged as NULL.
+- Power in dBm is only calculated for positive powers (log10 of 0 or a
+  negative value crashed the update callback before).
+- Invalid measurement results are logged instead of raising.
+
+Laser / telnet (Connection/Telnet.py, Windows/Laser.py):
+- TELNET_ERRORS = (OSError, EOFError, ValueError, UnicodeDecodeError)
+  covers refused connections, timeouts, unknown hosts (gaierror), closed
+  connections and invalid answers; used for connect and disconnect.
+- Bug fix: readline() looped forever (100 % CPU in the worker thread) if
+  the laser closed the connection, because recv() returns b'' then. Now a
+  ConnectionResetError is raised, which also triggers the automatic
+  reconnect. read() does the same.
+- Bug fix: a failed connect kept the unconnected socket, so a later
+  open() never connected again.
+
+Tested: sane numbers/prefixes, NULL logging in a scratch DB, power meter
+display parameters for normal/negative/overrange/nan values, refused
+connection and server-side close with local test sockets.
+
 ## v0.1.64 (2026-10-18)
 
-**Automatic changelog, labels valid for old data, remove BCA-GUIDE TODO** (next)
+**Automatic changelog, labels valid for old data, remove BCA-GUIDE TODO** (59aadda)
 
 Changelog:
 - New Utility/Changelog.py: "python -m Utility.Changelog" creates

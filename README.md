@@ -101,8 +101,8 @@ The size of the database is shown in the menu `Database`.
 - [ ] EBIS heating current: enable button directly at the current row (currently blocked by the warning message box on `editingFinished`)
 - [ ] PSU: decide if all other channels must be switched on again after a polarity switch
 - [ ] Laser: verify units of the chiller pressure and the RF level / output frequency calculation (see TODOs in `Laser.py`)
-- [ ] Laser: catch more socket errors on connect
-- [ ] Power meter: handle values outside of the valid range
+- [x] Laser: catch more socket errors on connect (`TELNET_ERRORS`)
+- [x] Power meter: handle values outside of the valid range (shown as "Out of range", logged as NULL)
 
 ### Scripts / CommandServer
 - [ ] Add message framing to the socket protocol (e.g. newline-terminated), so multiple commands sent quickly are not merged into one `recv`
@@ -120,7 +120,7 @@ The size of the database is shown in the menu `Database`.
 - [ ] Save measurement metadata (laser, PSU/EBIS voltages, pressure) automatically next to measured files
 - [ ] Improve LogNorm fitting and finish `FitLogNormRange` (see TODOs in `Fitting.py`)
 - [ ] Better limiting of fit parameters (`Fitting.py`)
-- [ ] Check for sane numbers (no `inf`/`nan`) in `Functions.py`
+- [x] Check for sane numbers (no `inf`/`nan`) in `Functions.py` (`isSaneNumber`, `saneOrDefault`)
 - [ ] LMF reader: read more header parameters and full event data (see TODOs in `LMFConvert.py`)
 - [ ] Export of fit results (CSV) and plots (PNG/PDF) in the Analyse tab
 - [ ] Mass axis calibration in the Analyse tab using the Simulation calculators
@@ -160,6 +160,8 @@ The size of the database is shown in the menu `Database`.
 
 
 ## BUGs
+- [x] Laser: `TelnetConnection.readline()` looped forever when the laser closed the connection
+- [x] Values `nan`/`inf` broke the SQL insert of the logging (now stored as `NULL`)
 - [ ] Pack images in executable - otherwise not shown (icon paths are relative to the working directory - resolve them relative to the project folder)
 - [x] EBIS interlock: `hard_pmax_val`/`soft_pmax_val` start at `10` (= 10 mbar) and are only converted to `10 * 10^-8 mbar` after the spinbox was edited - the interlock is effectively off until then
 - [x] `ConnectionWorker.execute` (`Threaded.py`): `work.append(work)` in the queue overflow branch should be `self.work.append(work)`

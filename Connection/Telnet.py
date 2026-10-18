@@ -6,6 +6,11 @@ from Config.GlobalConf import GlobalConf
 from Connection.VirtualDevice import VirtualSocket
 
 
+# all errors that can occur when connecting/talking to a telnet device
+# (socket.timeout, socket.gaierror, ConnectionRefusedError, ... are subclasses of OSError)
+TELNET_ERRORS = (OSError, EOFError, ValueError, UnicodeDecodeError)
+
+
 class TelnetConnection:
     """
     Context manager for Telnet connection
@@ -43,7 +48,13 @@ class TelnetConnection:
             if self.host != 'virtual':
                 self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                 self.socket.settimeout(self.timeout)
-                self.socket.connect((self.host, self.port))
+                try:
+                    self.socket.connect((self.host, self.port))
+                except TELNET_ERRORS:
+                    # do not keep a socket that is not connected, otherwise the next open() would not connect again
+                    self.socket.close()
+                    self.socket = None
+                    raise
             else:
                 self.socket = VirtualSocket()
 
@@ -88,7 +99,11 @@ class TelnetConnection:
 
         line = ''
         while True:
-            new_char = self.socket.recv(1).decode(self.encoding)
+            data = self.socket.recv(1)
+            if not data:
+                # recv returns nothing if the other side closed the connection - without this check it would loop forever
+                raise ConnectionResetError(f'Connection closed by {self.host}:{self.port}')
+            new_char = data.decode(self.encoding)
             if new_char != '\n':
                 line += new_char
             else:
@@ -105,7 +120,10 @@ class TelnetConnection:
         if self.socket is None:
             raise ConnectionError('Connection has not been established')
 
-        return self.socket.recv(count).decode(self.encoding)
+        data = self.socket.recv(count)
+        if not data and count > 0:
+            raise ConnectionResetError(f'Connection closed by {self.host}:{self.port}')
+        return data.decode(self.encoding)
 
 
 def main():

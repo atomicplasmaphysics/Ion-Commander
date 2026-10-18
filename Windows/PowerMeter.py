@@ -1,4 +1,4 @@
-from math import log10, sqrt, pi
+from math import log10, sqrt, pi, nan
 
 
 from PyQt6.QtCore import Qt, QTimer
@@ -14,7 +14,7 @@ from DB.db import DB
 from Socket.CommandServer import DeviceTLPMxWrapper
 
 from Utility.Layouts import InsertingGridLayout, IndicatorLed, DoubleSpinBox, DisplayLabel, SpinBox, ComboBox, LatexLabel
-from Utility.Functions import getPrefix
+from Utility.Functions import getPrefix, isSaneNumber
 from Utility.AutoReconnect import AutoReconnect
 from Utility.Dialogs import showMessageBox
 
@@ -182,6 +182,10 @@ class PowerMeterVBoxLayout(QVBoxLayout):
 
         self.display_power = 0
         self.state_display_parameters = [0, 0, 0, 0]
+
+        # larger values are treated as out of range (e.g. 9.9E37 is returned for overrange)
+        self.power_maximum = 100
+        self.current_maximum = 0.1
         self.display_power_label = LatexLabel(
             font_size=QFont().pointSizeF() * 4.5,
             font_color='white'
@@ -245,15 +249,23 @@ class PowerMeterVBoxLayout(QVBoxLayout):
         # 2: Current
         # 3: Irradiance
 
+        power, current = values
+
+        # values outside of the valid range (nan, inf, overrange) are stored as nan
+        if not isSaneNumber(power) or abs(power) > self.power_maximum:
+            power = nan
+        if not isSaneNumber(current) or abs(current) > self.current_maximum:
+            current = nan
+
         irradiance = 0
         beam_area = (self.status_beam_diameter.value / sqrt(2) / 10) ** 2 / 4 * pi
         if beam_area != 0:
-            irradiance = values[0] / beam_area
+            irradiance = power / beam_area
 
         self.state_display_parameters = [
-            values[0],
-            10 * log10(1000 * values[0]),
-            values[1],
+            power,
+            10 * log10(1000 * power) if isSaneNumber(power) and power > 0 else nan,  # dBm only defined for positive powers
+            current,
             irradiance
         ]
 
@@ -316,12 +328,19 @@ class PowerMeterVBoxLayout(QVBoxLayout):
 
         # get display value
         def setDisplayValue(values: [float, float]):
-            # TODO: value might not be in valid range or something
+            if not isinstance(values, (tuple, list)) or len(values) != 2:
+                GlobalConf.logger.error(f'Power meter: invalid measurement {values}')
+                return
+
             value = self.getDisplayParameter(values)
-            self.status_display_power_min.setValue(min(self.status_display_power_min.value, value))
-            self.status_display_power_max.setValue(max(self.status_display_power_max.value, value))
             self.display_power = value
             self.updateDisplayPowerLabel()
+
+            # invalid/out of range values are not used for min/max
+            if not isSaneNumber(value):
+                return
+            self.status_display_power_min.setValue(min(self.status_display_power_min.value, value))
+            self.status_display_power_max.setValue(max(self.status_display_power_max.value, value))
             if self.reset_min_max_next_update:
                 self.reset_min_max_next_update = False
                 self.resetMinMax()
@@ -349,6 +368,11 @@ class PowerMeterVBoxLayout(QVBoxLayout):
 
         if self.display_power is None:
             return
+        if not isSaneNumber(self.display_power):
+            self.display_power_label.setText(r'$\mathrm{Out\ of\ range}$')
+            self.display_power_label.setToolTip('The power meter returned an invalid or out of range value (e.g. sensor saturated, negative power for dBm)')
+            return
+        self.display_power_label.setToolTip('')
         display_power, prefix = getPrefix(self.display_power, use_latex=True)
         display_parameter_unit = f'{prefix} {self.display_parameter_unit}'
         if '/' in display_parameter_unit:

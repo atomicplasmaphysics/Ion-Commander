@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 from enum import Enum, auto
+from math import isfinite
 
 import numpy as np
 
@@ -113,7 +114,17 @@ class Tables:
         if len(args) != len(self.variables):
             raise AttributeError(f'Table "{self.name}" expects {len(self.variables)} arguments, but {len(args)} arguments are provided')
 
-        return f'''INSERT INTO {self.name} ({','.join(self.variables)}) VALUES ({','.join([str(arg) for arg in args])});'''
+        return f'''INSERT INTO {self.name} ({','.join(self.variables)}) VALUES ({','.join([self.sqlValue(arg) for arg in args])});'''
+
+    @staticmethod
+    def sqlValue(value) -> str:
+        """Converts a value to SQL; None, nan and inf are stored as NULL (they would break the query)"""
+
+        if value is None:
+            return 'NULL'
+        if isinstance(value, float) and not isfinite(value):
+            return 'NULL'
+        return str(value)
 
     def insert_parameterized(self) -> str:
         """SQL query to insert with placeholders (use for strings, values are passed separately)"""

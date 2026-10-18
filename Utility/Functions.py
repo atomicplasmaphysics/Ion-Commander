@@ -1,3 +1,6 @@
+from math import isfinite
+
+
 import numpy as np
 
 
@@ -10,6 +13,29 @@ class CyclicList(list):
         return super().__getitem__(index % len(self))
 
 
+def isSaneNumber(number) -> bool:
+    """
+    Returns True if number is a real, finite number (int/float/numpy number, not bool, not nan, not +-inf)
+
+    :param number: input to check
+    """
+
+    if isinstance(number, bool) or not isinstance(number, (int, float, np.integer, np.floating)):
+        return False
+    return isfinite(number)
+
+
+def saneOrDefault(number, default=None):
+    """
+    Returns number if it is a sane number (see <isSaneNumber>), otherwise the default value
+
+    :param number: input number
+    :param default: value returned for nan, inf or non-numbers
+    """
+
+    return number if isSaneNumber(number) else default
+
+
 def getPrefix(number: float | int, use_latex: bool = False) -> tuple[float | int, str]:
     """
     Gets the prefix of a number and returns the converted number and the prefix
@@ -19,10 +45,12 @@ def getPrefix(number: float | int, use_latex: bool = False) -> tuple[float | int
     :return: tuple of converted number and prefix
     """
 
-    if not isinstance(number, float) and not isinstance(number, int):
+    if not isinstance(number, (float, int, np.integer, np.floating)):
         raise ValueError(f'Provided argument is of type {type(number)} not <float> or <int>')
 
-    # TODO: check if number is a sane number (not inf, nan, ..)
+    # nan and inf have no prefix (and can not be formatted with an exponent)
+    if not isSaneNumber(number):
+        return number, ''
 
     prefixes = ['Z', 'E', 'P', 'T', 'G', 'M', 'k', '', 'm', 'μ', 'n', 'p', 'f', 'a', 'z', 'y']
     if use_latex:

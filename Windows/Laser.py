@@ -15,6 +15,7 @@ from Utility.AutoReconnect import AutoReconnect
 from Utility.Dialogs import IPDialog, showMessageBox
 from Utility.Functions import getPrefix, getSignificantDigits, getIntIfInt
 
+from Connection.Telnet import TELNET_ERRORS
 from Connection.Monaco import MonacoConnection
 from Connection.Threaded import ThreadedMonacoConnection, ThreadedDummyConnection, ThreadedConnection
 
@@ -1033,11 +1034,11 @@ class LaserVBoxLayout(QVBoxLayout):
                 if clear_faults:
                     self.device_wrapper.threaded_connection.fackSet()
 
-            # TODO: probably add some more socket connection errors here
-            except (ConnectionError, TimeoutError, ConnectionAbortedError, UnicodeDecodeError, OSError) as error:
+            # e.g. ConnectionRefusedError, socket.timeout, socket.gaierror (wrong host), EOFError, invalid answers
+            except TELNET_ERRORS as error:
                 try:
                     self.connection.close()
-                except (ConnectionError, TimeoutError, ConnectionAbortedError, UnicodeDecodeError, OSError):
+                except TELNET_ERRORS:
                     pass
                 self.connection = None
                 self.reset()
@@ -1092,7 +1093,7 @@ class LaserVBoxLayout(QVBoxLayout):
         if self.connection is not None:
             try:
                 self.connection.close()
-            except (ConnectionError, ConnectionRefusedError, ConnectionResetError, ConnectionAbortedError):
+            except TELNET_ERRORS:
                 pass
             self.connection = None
 

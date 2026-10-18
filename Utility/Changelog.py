@@ -96,7 +96,8 @@ def createChangelog(commits: list[tuple[str, str, str, str]]) -> str:
             if isinstance(item, str):
                 text += f'{item}\n'
                 continue
-            text += f'**{item["title"]}** ({item["hash"]})\n'
+            commit_reference = f' ({item["hash"]})' if item['hash'] != 'next' else ''
+            text += f'**{item["title"]}**{commit_reference}\n'
             if item['body']:
                 text += '\n' + item['body'] + '\n'
         text += '\n'
