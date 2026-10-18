@@ -128,7 +128,8 @@ The size of the database is shown in the menu `Database`.
 - [ ] Make the splitter of the History tab work as intended (stretch factors)
 
 ### GUI
-- [ ] Add tooltips to everything
+- [x] Add tooltips to everything (all device panels, History, Analyse, tabs, menus, settings)
+- [ ] Tooltips for the Scripts/Tips/Simulation tabs and the fit parameter widgets (partly available)
 - [x] Reduce code duplication of the channel rows in `PSU.py`/`EBIS.py` (`Utility/ChannelRows.py`: `VoltageChannelRow`, `CurrentLimitRow`)
 - [x] Settings dialog for `DefaultParams` (update interval, limits, laser IP, server port) instead of editing the code (menu `Settings > Preferences...`)
 - [ ] Apply changed preferences without restarting the application

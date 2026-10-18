@@ -29,8 +29,6 @@ class MainWindow(QMainWindow):
 
     # TODO: start CoboldPC
 
-    # TODO: Add tooltips to everything
-
     def __init__(self):
         super().__init__()
         GlobalConf()
@@ -65,31 +63,31 @@ class MainWindow(QMainWindow):
 
         # Add control tab
         self.control_window = ControlWindow(self)
-        self.addTab(self.control_window, 'Control')
+        self.addTab(self.control_window, 'Control', 'Control of the power supplies (PSU, EBIS), the laser and the pressure gauges')
 
         # Add monitor tab
         self.monitor_window = MonitorWindow(self)
-        self.addTab(self.monitor_window, 'Monitor')
+        self.addTab(self.monitor_window, 'Monitor', 'Monitoring devices (power meter)')
 
         # Add history tab
         self.history_window = HistoryWindow(self, self.database)
-        self.addTab(self.history_window, 'History')
+        self.addTab(self.history_window, 'History', 'Plot and export the logged values of the database')
 
         # Add script tab
         self.scripts_window = ScriptsWindow(self)
-        self.addTab(self.scripts_window, 'Scripts')
+        self.addTab(self.scripts_window, 'Scripts', 'Write and run scripts that control the devices via the CommandServer')
 
         # Add tips tab
         self.tips_window = TipsWindow(self)
-        self.addTab(self.tips_window, 'Tips')
+        self.addTab(self.tips_window, 'Tips', 'Tips and notes for the lab')
 
         # Add analyse tab
         self.analyse_window = AnalyseWindow(self)
-        self.addTab(self.analyse_window, 'Analyse')
+        self.addTab(self.analyse_window, 'Analyse', 'Analyse measured TOF data (histograms, fits)')
 
         # Add simulation tab
         self.simulation_window = SimulationWindow(self)
-        self.addTab(self.simulation_window, 'Simulation')
+        self.addTab(self.simulation_window, 'Simulation', 'Mass/TOF calculators based on simulations')
 
         devices = {
             'PSU': self.control_window.psu_group_vbox.device_wrapper,
@@ -212,15 +210,18 @@ class MainWindow(QMainWindow):
         for index in range(self.tabs.count()):
             self.tabs.widget(index).log(self.database)
 
-    def addTab(self, widget: TabWidget, title: str):
+    def addTab(self, widget: TabWidget, title: str, tooltip: str = ''):
         """
-        Add simulation tab
+        Add tab
 
         :param widget: TabWidget to add in new tab
         :param title: title of tab
+        :param tooltip: tooltip of tab
         """
 
-        self.tabs.addTab(widget, title)
+        index = self.tabs.addTab(widget, title)
+        if tooltip:
+            self.tabs.setTabToolTip(index, tooltip)
         self.tabs.setCurrentIndex(0)
 
     def tabChanged(self, index: int):

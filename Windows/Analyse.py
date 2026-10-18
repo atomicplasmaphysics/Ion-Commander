@@ -102,11 +102,13 @@ class AnalyseWindow(TabWidget):
         self.column_fitting_selector.addWidget(self.fitting_selector_label)
 
         self.fitting_selector_widget = ComboBox()
+        self.fitting_selector_widget.setToolTip('Function that is fitted to the data')
         self.initializeFitFunctions()
         self.fitting_selector_widget.currentIndexChanged.connect(self.fittingSelectorChanged)
         self.column_fitting_selector.addWidget(self.fitting_selector_widget)
 
         self.button_reset_sliders = QPushButton('Reset sliders')
+        self.button_reset_sliders.setToolTip('Reset the sliders of the fit parameters')
         self.button_reset_sliders.clicked.connect(self.resetSliders)
         self.column_fitting_selector.addWidget(self.button_reset_sliders)
 
@@ -133,10 +135,12 @@ class AnalyseWindow(TabWidget):
         self.row_fitting.addLayout(self.column_axis_manipulation)
 
         self.button_log_y = IndicatorLedButton('Log-y')
+        self.button_log_y.setToolTip('Logarithmic y-axis')
         self.button_log_y.clicked.connect(self.logYAxis)
         self.column_axis_manipulation.addWidget(self.button_log_y, alignment=Qt.AlignmentFlag.AlignTop)
 
         self.button_fill_histo = IndicatorLedButton('Fill histogram', initial_state=True)
+        self.button_fill_histo.setToolTip('Fill the area below the histogram')
         self.button_fill_histo.clicked.connect(self.loadDataChecked)
         self.column_axis_manipulation.addWidget(self.button_fill_histo, alignment=Qt.AlignmentFlag.AlignTop)
 

@@ -79,9 +79,12 @@ class EBISVBoxLayout(QVBoxLayout):
         # Connection
         self.label_connection = QLabel('Connection')
         self.indicator_connection = IndicatorLed(off_color=Colors.color_red)
+        self.indicator_connection.setToolTip('Green if the device is connected')
         self.status_connection = QLabel('Not connected')
         self.combobox_connection = ComboBox()
+        self.combobox_connection.setToolTip('Port of the device (refresh the list with the button on the right)')
         self.button_connection = QPushButton('Connect')
+        self.button_connection.setToolTip('Connect to / disconnect from the selected port')
         self.button_connection.pressed.connect(self.manualConnect)
         self.button_connection_refresh = QPushButton()
         self.button_connection_refresh.setToolTip('Refresh connections list')
@@ -113,8 +116,10 @@ class EBISVBoxLayout(QVBoxLayout):
         # High Voltage
         self.label_high_voltage = QLabel('High Voltage')
         self.indicator_high_voltage = IndicatorLed()
+        self.indicator_high_voltage.setToolTip('Green if the general high voltage of the EBIS power supply is enabled')
         self.status_high_voltage = QLabel('Disabled')
         self.button_high_voltage = QPushButton('Enable')
+        self.button_high_voltage.setToolTip('Enable/disable the general high voltage of the EBIS power supply')
         self.button_high_voltage.pressed.connect(lambda: self.setGlobalOutput(not self.indicator_high_voltage.value()))
         self.highvoltage_hbox.addWidget(self.label_high_voltage)
         self.highvoltage_hbox.addWidget(self.indicator_high_voltage)
@@ -213,8 +218,10 @@ class EBISVBoxLayout(QVBoxLayout):
         self.label_current_6 = QLabel('Heating Current')
         # TODO: enable button here, but it will be stuck on the editingFinished if the warning label overtakes!
         self.spinbox_current_6 = DoubleSpinBox(default=0, step_size=0.01, input_range=(0, 5), decimals=2, buttons=False)
+        self.spinbox_current_6.setToolTip('Set current of the cathode heating in A (press enter to apply). Limited while the pressure interlock is tripped.')
         self.spinbox_current_6.editingFinished.connect(lambda: self.setCurrent(5, self.spinbox_current_6.value()))
         self.status_current_6 = DisplayLabel(value=0, unit='A', target_value=0, deviation=self.current_deviation, decimals=4)
+        self.status_current_6.setToolTip('Measured current of the cathode heating')
         self.heating_grid.addWidgets(
             self.label_current_6,
             self.spinbox_current_6,
@@ -236,6 +243,7 @@ class EBISVBoxLayout(QVBoxLayout):
         # TODO: get limits, unit and number of decimals right
         self.label_advanced_settings_ramp = QLabel('Ramp speed [%/s]')
         self.spinbox_advanced_settings_ramp = DoubleSpinBox(default=0, step_size=0.01, input_range=(0, 20), decimals=2, buttons=False)
+        self.spinbox_advanced_settings_ramp.setToolTip('Voltage ramp speed of the MICC in % of the nominal voltage per second (applies to all channels)')
         self.spinbox_advanced_settings_ramp.editingFinished.connect(lambda: self.setRampSpeed(self.spinbox_advanced_settings_ramp.value()))
         self.advanced_settings_grid.addWidgets(
             self.label_advanced_settings_ramp,

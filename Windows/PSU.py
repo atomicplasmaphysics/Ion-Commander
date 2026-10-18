@@ -72,9 +72,12 @@ class PSUVBoxLayout(QVBoxLayout):
         # Connection
         self.label_connection = QLabel('Connection')
         self.indicator_connection = IndicatorLed(off_color=Colors.color_red)
+        self.indicator_connection.setToolTip('Green if the device is connected')
         self.status_connection = QLabel('Not connected')
         self.combobox_connection = ComboBox()
+        self.combobox_connection.setToolTip('Port of the device (refresh the list with the button on the right)')
         self.button_connection = QPushButton('Connect')
+        self.button_connection.setToolTip('Connect to / disconnect from the selected port')
         self.button_connection.pressed.connect(self.manualConnect)
         self.button_connection_refresh = QPushButton()
         self.button_connection_refresh.setToolTip('Refresh connections list')
@@ -167,6 +170,7 @@ class PSUVBoxLayout(QVBoxLayout):
         # TODO: get limits, unit and number of decimals right
         self.label_advanced_settings_ramp = QLabel('Ramp speed [%/s]')
         self.spinbox_advanced_settings_ramp = DoubleSpinBox(default=0, step_size=0.01, input_range=(0, 20), decimals=2, buttons=False)
+        self.spinbox_advanced_settings_ramp.setToolTip('Voltage ramp speed of the ISEG crate in % of the nominal voltage per second (applies to all channels)')
         self.spinbox_advanced_settings_ramp.editingFinished.connect(lambda: self.setRampSpeed(self.spinbox_advanced_settings_ramp.value()))
         self.advanced_settings_grid.addWidgets(
             self.label_advanced_settings_ramp,
@@ -187,6 +191,7 @@ class PSUVBoxLayout(QVBoxLayout):
         # Time
         self.label_ramp_time = QLabel('Time [min]')
         self.spinbox_ramp_time = SpinBox(default=self.time_ramp_default, step_size=1, input_range=(0, 600), buttons=False)
+        self.spinbox_ramp_time.setToolTip('Duration of the software voltage ramp in minutes')
         self.ramp_grid.addWidgets(
             self.label_ramp_time,
             self.spinbox_ramp_time
@@ -195,6 +200,7 @@ class PSUVBoxLayout(QVBoxLayout):
         # Final Value
         self.label_ramp_final = QLabel('Target Voltage [V]')
         self.spinbox_ramp_voltage = DoubleSpinBox(default=0, step_size=0.1, input_range=(0, self.voltage_maximum), decimals=1, buttons=False)
+        self.spinbox_ramp_voltage.setToolTip('Final voltage of the software voltage ramp')
         self.ramp_grid.addWidgets(
             self.label_ramp_final,
             self.spinbox_ramp_voltage
@@ -203,6 +209,7 @@ class PSUVBoxLayout(QVBoxLayout):
         # Channel
         self.label_ramp_channel = QLabel('Channel')
         self.combobox_ramp_channel = ComboBox(default=0, entries=[row.name for row in self.channel_rows])
+        self.combobox_ramp_channel.setToolTip('Channel that is ramped')
         self.ramp_grid.addWidgets(
             self.label_ramp_channel,
             self.combobox_ramp_channel
@@ -211,8 +218,11 @@ class PSUVBoxLayout(QVBoxLayout):
         # Start
         self.status_ramp = QLabel('Remaining time:')
         self.status_remaining_ramp = DisplayLabel(value=0, target_value=0, deviation=1, unit='min')
+        self.status_remaining_ramp.setToolTip('Remaining time of the voltage ramp')
         self.indicator_ramp = IndicatorLed()
+        self.indicator_ramp.setToolTip('Green while a voltage ramp is running')
         self.button_ramp = QPushButton('Start ramp')
+        self.button_ramp.setToolTip('Start/stop the slow voltage ramp of the selected channel (voltage is changed step by step)')
         self.button_ramp.clicked.connect(self.startRampVoltage)
         self.ramp_grid.addWidgets(
             self.status_ramp,

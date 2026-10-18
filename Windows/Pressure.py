@@ -73,6 +73,7 @@ class PressureVBoxLayout(QVBoxLayout):
         self.label_connection = QLabel('Connection')
         self.connection_hbox.addWidget(self.label_connection)
         self.indicator_connection = IndicatorLed(off_color=Colors.color_red)
+        self.indicator_connection.setToolTip('Green if the device is connected')
         self.connection_hbox.addWidget(self.indicator_connection)
         self.status_connection = QLabel('Not connected')
         self.connection_hbox.addWidget(self.status_connection)
@@ -84,8 +85,10 @@ class PressureVBoxLayout(QVBoxLayout):
         self.connection_vbox.addLayout(self.connection_hbox_selection)
 
         self.combobox_connection = ComboBox()
+        self.combobox_connection.setToolTip('Port of the device (refresh the list with the button on the right)')
         self.connection_hbox_selection.addWidget(self.combobox_connection)
         self.button_connection = QPushButton('Connect')
+        self.button_connection.setToolTip('Connect to / disconnect from the selected port')
         self.button_connection.pressed.connect(self.manualConnect)
         self.connection_hbox_selection.addWidget(self.button_connection)
 

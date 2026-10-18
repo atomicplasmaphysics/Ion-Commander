@@ -1952,9 +1952,20 @@ class DisplayLabel(QLabel):
         self.color_bad = QColor(color_bad)
         self.color_grayed = QColor(color_grayed)
         self.tooltip = tooltip
+        self.description = ''
 
         self.setAlignment(alignment_flag)
         self.setContentsMargins(5, 5, 5, 5)
+        self._writeOwnText()
+
+    def setToolTip(self, text: str):
+        """
+        Sets a description that is shown in the tooltip (the target value is appended if enabled)
+
+        :param text: description
+        """
+
+        self.description = text
         self._writeOwnText()
 
     def _writeOwnText(self):
@@ -2001,7 +2012,13 @@ class DisplayLabel(QLabel):
                 if addon:
                     tooltip += ' ' + addon
 
-            self.setToolTip(f'Target value: {tooltip}')
+            tooltip = f'Target value: {tooltip}'
+            if self.description:
+                tooltip = f'{self.description}\n{tooltip}'
+            super().setToolTip(tooltip)
+
+        elif self.description:
+            super().setToolTip(self.description)
 
     def setValue(self, value: float):
         """

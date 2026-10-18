@@ -56,6 +56,7 @@ class PowerMeterVBoxLayout(QVBoxLayout):
         self.label_connection = QLabel('Connection')
         self.connection_hbox.addWidget(self.label_connection)
         self.indicator_connection = IndicatorLed(off_color=Colors.color_red)
+        self.indicator_connection.setToolTip('Green if the device is connected')
         self.connection_hbox.addWidget(self.indicator_connection)
         self.status_connection = QLabel('Not connected')
         self.connection_hbox.addWidget(self.status_connection)
@@ -65,8 +66,10 @@ class PowerMeterVBoxLayout(QVBoxLayout):
         self.connection_vbox.addLayout(self.connection_hbox_selection)
 
         self.combobox_connection = ComboBox()
+        self.combobox_connection.setToolTip('Port of the device (refresh the list with the button on the right)')
         self.connection_hbox_selection.addWidget(self.combobox_connection)
         self.button_connection = QPushButton('Connect')
+        self.button_connection.setToolTip('Connect to / disconnect from the selected port')
         self.button_connection.pressed.connect(self.manualConnect)
         self.connection_hbox_selection.addWidget(self.button_connection)
 
@@ -97,6 +100,7 @@ class PowerMeterVBoxLayout(QVBoxLayout):
         ]
         self.display_parameter_unit = self.combobox_display_parameter_table[0][1]
         self.combobox_display_parameter = ComboBox(entries=[cdp[0] for cdp in self.combobox_display_parameter_table])
+        self.combobox_display_parameter.setToolTip('Value that is shown in the large display')
         self.combobox_display_parameter.currentIndexChanged.connect(lambda: self.updateDisplayParameter())
         self.settings_grid.addWidgets(
             self.label_display_parameter,
@@ -106,11 +110,15 @@ class PowerMeterVBoxLayout(QVBoxLayout):
         # device wavelength
         self.label_wavelength = QLabel('Wavelength [nm]')
         self.spinbox_wavelength = SpinBox(default=0, input_range=(0, 2000), buttons=False)
+        self.spinbox_wavelength.setToolTip('Wavelength for the sensor calibration in nm (press enter to apply)')
         self.spinbox_wavelength.editingFinished.connect(lambda: self.setWavelength(self.spinbox_wavelength.value()))
         self.status_wavelength = DisplayLabel(value=0, unit='nm', target_value=0, deviation=0.1, decimals=0)
+        self.status_wavelength.setToolTip('Wavelength set in the power meter')
         self.button_wavelength_ir = QPushButton('IR preset')
+        self.button_wavelength_ir.setToolTip('Set the wavelength to the IR wavelength of the laser')
         self.button_wavelength_ir.pressed.connect(lambda: self.setWavelength(DefaultParams.laser_ir_wavelength, update_spinbox=True))
         self.button_wavelength_uv = QPushButton('UV preset')
+        self.button_wavelength_uv.setToolTip('Set the wavelength to the UV wavelength of the laser')
         self.button_wavelength_uv.pressed.connect(lambda: self.setWavelength(DefaultParams.laser_uv_wavelength, update_spinbox=True))
         self.settings_grid.addWidgets(
             self.label_wavelength,
@@ -123,8 +131,10 @@ class PowerMeterVBoxLayout(QVBoxLayout):
         # device attenuation
         self.label_attenuation = QLabel('Attenuation [dB]')
         self.spinbox_attenuation = DoubleSpinBox(default=0, step_size=0.01, decimals=2, input_range=(-60, 60), buttons=False)
+        self.spinbox_attenuation.setToolTip('Attenuation (e.g. of a filter) in dB that is corrected for (press enter to apply)')
         self.spinbox_attenuation.editingFinished.connect(lambda: self.setAttenuation(self.spinbox_attenuation.value()))
         self.status_attenuation = DisplayLabel(value=0, unit='dB', target_value=0, deviation=0.1, decimals=2)
+        self.status_attenuation.setToolTip('Attenuation set in the power meter')
         self.settings_grid.addWidgets(
             self.label_attenuation,
             self.spinbox_attenuation,
@@ -134,8 +144,10 @@ class PowerMeterVBoxLayout(QVBoxLayout):
         # device averaging
         self.label_averaging = QLabel('Averaging')
         self.spinbox_averaging = SpinBox(default=1, input_range=(1, 1024), buttons=False)
+        self.spinbox_averaging.setToolTip('Number of measurements that are averaged (press enter to apply)')
         self.spinbox_averaging.editingFinished.connect(lambda: self.setAveraging(self.spinbox_averaging.value()))
         self.status_averaging = DisplayLabel(value=1, target_value=1, deviation=0.1, decimals=0)
+        self.status_averaging.setToolTip('Averaging set in the power meter')
         self.settings_grid.addWidgets(
             self.label_averaging,
             self.spinbox_averaging,
@@ -148,6 +160,7 @@ class PowerMeterVBoxLayout(QVBoxLayout):
         self.spinbox_beam_diameter.editingFinished.connect(lambda: self.setBeamDiameter(self.spinbox_beam_diameter.value()))
         self.spinbox_beam_diameter.setToolTip('Assuming Gaussian profile')
         self.status_beam_diameter = DisplayLabel(value=0, unit='mm', target_value=0, deviation=0.1, decimals=2)
+        self.status_beam_diameter.setToolTip('Beam diameter set in the power meter (used for the irradiance)')
         self.settings_grid.addWidgets(
             self.label_beam_diameter,
             self.spinbox_beam_diameter,
@@ -194,7 +207,9 @@ class PowerMeterVBoxLayout(QVBoxLayout):
 
         self.reset_min_max_next_update = False
         self.status_display_power_min = DisplayLabel(value=0, unit='W', enable_prefix=True, deviation=0, decimals=2)
+        self.status_display_power_min.setToolTip('Minimum since the last reset')
         self.status_display_power_max = DisplayLabel(value=0, unit='W', enable_prefix=True, deviation=0, decimals=2)
+        self.status_display_power_max.setToolTip('Maximum since the last reset')
         self.display_grid_min_max.addWidgets(
             self.status_display_power_min,
             self.status_display_power_max
@@ -206,6 +221,7 @@ class PowerMeterVBoxLayout(QVBoxLayout):
         self.display_vbox.addLayout(self.display_hbox_reset)
 
         self.button_display_power_reset_min_max = QPushButton('Reset min/max')
+        self.button_display_power_reset_min_max.setToolTip('Reset the minimum and maximum values')
         self.button_display_power_reset_min_max.pressed.connect(lambda: self.resetMinMax())
         self.display_hbox_reset.addWidget(self.button_display_power_reset_min_max)
 

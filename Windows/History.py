@@ -126,6 +126,7 @@ class HistoryWindow(TabWidget):
             popup_title='Select date-time for start',
             timestamp=datetime.now() - timedelta(days=30)
         )
+        self.start_datetime_widget.setToolTip('Start of the time range')
         self.export_title_hbox.addWidget(self.start_datetime_widget, alignment=Qt.AlignmentFlag.AlignLeft)
 
         # End time widget
@@ -136,6 +137,7 @@ class HistoryWindow(TabWidget):
             timestamp=datetime.now(),
             now_button=True
         )
+        self.end_datetime_widget.setToolTip('End of the time range')
         self.export_title_hbox.addWidget(self.end_datetime_widget, alignment=Qt.AlignmentFlag.AlignLeft)
 
         self.export_title_hbox.addStretch()
@@ -178,6 +180,7 @@ class HistoryWindow(TabWidget):
                 file_filter='*.csv'
             )
         )
+        self.file_path.setToolTip('CSV file for the export')
         self.export_hbox.addWidget(self.file_path, alignment=Qt.AlignmentFlag.AlignLeft)
 
         # Exporting button
