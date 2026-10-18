@@ -118,8 +118,9 @@ The size of the database is shown in the menu `Database`.
 ### Measurement / Analysis
 - [ ] Combine Scripts + Delay Stage + TDC into automated pump-probe scans (move stage, acquire, save with metadata)
 - [ ] Save measurement metadata (laser, PSU/EBIS voltages, pressure) automatically next to measured files
-- [ ] Improve LogNorm fitting and finish `FitLogNormRange` (see TODOs in `Fitting.py`)
-- [ ] Better limiting of fit parameters (`Fitting.py`)
+- [x] Improve LogNorm fitting and finish `FitLogNormRange` (shifted log-normal, several start values, copy button)
+- [x] Better limiting of fit parameters (`Fitting.py`: `estimateGauss`, `gaussBounds`, adaptive window for Gauss (center))
+- [ ] LogNorm/Gauss fits with constant background (offset) as additional parameter
 - [x] Check for sane numbers (no `inf`/`nan`) in `Functions.py` (`isSaneNumber`, `saneOrDefault`)
 - [ ] LMF reader: read more header parameters and full event data (see TODOs in `LMFConvert.py`)
 - [ ] Export of fit results (CSV) and plots (PNG/PDF) in the Analyse tab

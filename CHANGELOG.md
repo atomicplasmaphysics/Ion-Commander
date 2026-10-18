@@ -2,9 +2,46 @@
 
 *Automatically created from the commit messages with `python -m Utility.Changelog` - do not edit by hand.*
 
+## v0.1.67 (2026-10-18)
+
+**Fitting: finished LogNorm fit, better start values and limits**
+
+Gauss fits (range, center, gauss + counts):
+- Bug fix: the start value of sigma was never estimated from the data
+  ("y > max" is never true), always a quarter of the range was used.
+  New estimateGauss(): sigma from the width at half maximum around the
+  maximum.
+- New gaussBounds(): sigma between a tenth of the bin width and the range
+  width (no division by zero for sigma = 0 anymore), mu inside the range,
+  c between 0 and 10 x maximum; clipToBounds() keeps start values inside
+  the bounds (curve_fit raised ValueError otherwise).
+- At least 4 data points are needed.
+- Gauss (center), "better limiting" TODO: the window is now +-3 FWHM of
+  the estimated peak around the bar (min. 1/4 of the old 10 % window,
+  max. half of the view), so wide peaks are not cut and neighbouring
+  peaks do not disturb narrow ones. Removed the wrong
+  "self.parameters = [0, 0, 0]" assignment.
+
+LogNorm (range), "unfinished/improve" TODOs:
+- Shifted log-normal with area A:
+  y = A/(sigma (x-x0) sqrt(2pi)) exp(-(ln(x-x0)-mu)^2/(2 sigma^2)), 0 for x<=x0
+  (computed without nan/warnings for x <= x0).
+- Start values from the peak (mode, FWHM, area) for several skewness
+  values sigma (0.05 ... 1.0); the result with the smallest squared
+  residuals is used. Before, the start values assumed x0 = 0 and the
+  bounds of mu were invalid for negative mu.
+- Bounds: 0.001 < sigma < 5, mu +-10 around the start, x0 before the
+  peak maximum, 0 < A < 20 x estimated area.
+- Mode and FWHM as separate functions; copy button returns (mode, A, fwhm)
+  (was missing).
+
+Tested with synthetic Poisson data: Gauss mu/sigma within 0.1 of the true
+values (also next to a second peak), LogNorm recovers mode 34.24 (true
+34.26) for a tight range and a range with empty bins before the peak.
+
 ## v0.1.66 (2026-10-18)
 
-**EBIS: slow ramp of the cathode heating current**
+**EBIS: slow ramp of the cathode heating current** (9b0b1f0)
 
 - New row in the EBIS "Heating" group: "Ramp [A/min]" (default 0.1 A/min,
   stored in QSettings, 0 = set immediately like before), a status label

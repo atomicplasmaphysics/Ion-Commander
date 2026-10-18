@@ -140,6 +140,58 @@ def getFileData(filename: str, tac: int = -1, delay: float = 0) -> tuple[np.ndar
         raise NotImplementedError(f'Not implemented type of "{filetype}"! Should not happen!')
 
 
+def estimateGauss(x_data: np.ndarray, y_data: np.ndarray) -> tuple[float, float, float]:
+    """
+    Robust start values (sigma, mu, c) for a Gaussian peak: position and height of the maximum,
+    sigma from the width at half maximum around the maximum (falls back to a quarter of the range).
+
+    :param x_data: sorted x-values
+    :param y_data: y-values
+    """
+
+    max_index = int(np.argmax(y_data))
+    mu0 = float(x_data[max_index])
+    c0 = float(y_data[max_index])
+    sigma0 = float(x_data[-1] - x_data[0]) / 4
+
+    # walk from the maximum to both sides until the half maximum is reached
+    half = c0 / 2
+    left = max_index
+    while left > 0 and y_data[left] > half:
+        left -= 1
+    right = max_index
+    while right < len(y_data) - 1 and y_data[right] > half:
+        right += 1
+    fwhm = float(x_data[right] - x_data[left])
+    if fwhm > 0:
+        sigma0 = fwhm / (2 * np.sqrt(2 * np.log(2)))
+
+    return sigma0, mu0, c0
+
+
+def gaussBounds(x_data: np.ndarray, c0: float, x_range: tuple[float, float]) -> tuple[list[float], list[float]]:
+    """
+    Bounds (sigma, mu, c) for a Gaussian fit: sigma between a tenth of the bin width and the range width,
+    mu inside the range and c between 0 and 10 times the maximum
+
+    :param x_data: sorted x-values
+    :param c0: maximum of y-values
+    :param x_range: (start, end) of the fit range
+    """
+
+    bin_width = float(np.min(np.diff(x_data))) if len(x_data) > 1 else 1E-12
+    sigma_min = max(bin_width / 10, 1E-12)
+    sigma_max = max(float(x_range[1] - x_range[0]), sigma_min * 2)
+    c_max = max(c0 * 10, 1E-12)
+    return [sigma_min, x_range[0], 0], [sigma_max, x_range[1], c_max]
+
+
+def clipToBounds(p0: list[float], bounds: tuple[list[float], list[float]]) -> list[float]:
+    """Moves start values inside the bounds (curve_fit raises a ValueError otherwise)"""
+
+    return [float(np.clip(value, low, high)) for value, low, high in zip(p0, bounds[0], bounds[1])]
+
+
 class FitMethod:
     """
     General method to fit data
@@ -278,17 +330,13 @@ class FitGaussRange(FitMethod):
             self.parent.writeStatusBar('Not enough datapoints in given range')
             return
 
-        max_index = np.argmax(y_data_limit)
-        mean0 = x_data_limit[max_index]
-        c0 = y_data_limit[max_index]
-        sigma0 = (x_data_limit[-1] - x_data_limit[0]) / 4
+        if len(x_data_limit) < 4:
+            self.parent.writeStatusBar('Not enough datapoints in given range (at least 4 needed)')
+            return
 
-        limit0 = np.greater(y_data_limit, c0)
-        if np.any(limit0):
-            sigma0 = np.std(np.repeat(x_data_limit[limit0], y_data_limit[limit0]))
-
-        p0 = [sigma0, mean0, c0]
-        bounds = ([0, bar_values[0], 0], [bar_values[1] - bar_values[0], bar_values[1], c0 * 10])
+        sigma0, mean0, c0 = estimateGauss(x_data_limit, y_data_limit)
+        bounds = gaussBounds(x_data_limit, c0, (bar_values[0], bar_values[1]))
+        p0 = clipToBounds([sigma0, mean0, c0], bounds)
 
         try:
             popt = curve_fit(self.fitFunction, x_data_limit, y_data_limit, p0=p0, bounds=bounds)[0]
@@ -374,12 +422,22 @@ class FitGaussCenter(FitMethod):
         :param view_range: ranges for visible field [[xmin, xmax], [ymin, ymax]]
         """
 
-        # TODO: better limiting
+        # first guess of the window: 10 % of the visible range around the bar ...
         limit_distance = (view_range[0][1] - view_range[0][0]) * 0.1
         limit_x = (bar_values[0] - limit_distance, bar_values[0] + limit_distance)
         limit = np.logical_and(data[0] > limit_x[0], data[0] < limit_x[1])
         x_data_limit = data[0][limit]
         y_data_limit = data[1][limit]
+
+        # ... then +-3 FWHM around the peak, so wide peaks are not cut and narrow peaks are not disturbed by neighbours
+        if len(x_data_limit) >= 4:
+            sigma_estimate, _, _ = estimateGauss(x_data_limit, y_data_limit)
+            fwhm_estimate = 2 * np.sqrt(2 * np.log(2)) * sigma_estimate
+            limit_distance = float(np.clip(3 * fwhm_estimate, limit_distance / 4, (view_range[0][1] - view_range[0][0]) / 2))
+            limit_x = (bar_values[0] - limit_distance, bar_values[0] + limit_distance)
+            limit = np.logical_and(data[0] > limit_x[0], data[0] < limit_x[1])
+            x_data_limit = data[0][limit]
+            y_data_limit = data[1][limit]
 
         if not len(x_data_limit):
             self.parent.writeStatusBar('Not enough datapoints in given range')
@@ -387,20 +445,15 @@ class FitGaussCenter(FitMethod):
 
         if not x_data_limit[0] < bar_values[0] < x_data_limit[-1]:
             self.parent.writeStatusBar('Bar not in visible range')
-            self.parameters = [0, 0, 0]
             return
 
-        max_index = np.argmax(y_data_limit)
-        mean0 = x_data_limit[max_index]
-        c0 = y_data_limit[max_index]
-        sigma0 = (view_range[0][1] - view_range[0][0]) / 16
+        if len(x_data_limit) < 4:
+            self.parent.writeStatusBar('Not enough datapoints around the bar (at least 4 needed)')
+            return
 
-        limit0 = np.greater(y_data_limit, c0)
-        if np.any(limit0):
-            sigma0 = np.std(np.repeat(x_data_limit[limit0], y_data_limit[limit0]))
-
-        p0 = [sigma0, mean0, c0]
-        bounds = ([0, limit_x[0], 0], [limit_x[1] - limit_x[0], limit_x[1], c0 * 10])
+        sigma0, mean0, c0 = estimateGauss(x_data_limit, y_data_limit)
+        bounds = gaussBounds(x_data_limit, c0, limit_x)
+        p0 = clipToBounds([sigma0, mean0, c0], bounds)
 
         try:
             popt = curve_fit(self.fitFunction, x_data_limit, y_data_limit, p0=p0, bounds=bounds)[0]
@@ -424,16 +477,23 @@ class FitGaussCenter(FitMethod):
         return f'({self.parameter[1]}, {self.parameter[2]}, {self.parameter[3]})'
 
 
-# TODO: improve LogNorm fitting
 class FitLogNormRange(FitMethod):
     """
-    Method to log-norm-fit data from start to stop
+    Method to fit a shifted log-normal distribution from start to stop (for asymmetric peaks with a tail to larger x):
+
+        y = A / (sigma * (x - x0) * sqrt(2 pi)) * exp(-(ln(x - x0) - mu)^2 / (2 sigma^2))   for x > x0, else 0
+
+    A is the area of the peak, x0 the shift. The fit is started with several skewness values (sigma) from a Gaussian
+    pre-fit and the best result (smallest squared residuals) is used.
 
     :param parent: parent widget
     """
 
     title = 'LogNorm (range)'
-    tooltip = 'Makes LogNorm fit'
+    tooltip = 'Makes a shifted log-normal fit in given range (for peaks with a tail)'
+
+    # start values for sigma (skewness) that are tried
+    sigma_starts = (0.05, 0.15, 0.3, 0.6, 1.0)
 
     def __init__(self, parent, **kwargs):
         super().__init__(parent, **kwargs)
@@ -443,7 +503,7 @@ class FitLogNormRange(FitMethod):
                 (0, 0): 'σ',
                 (0, 1): 'μ',
                 (0, 2): 'x0',
-                (0, 3): 'c',
+                (0, 3): 'A',
                 (0, 4): 'mode',
                 (0, 5): 'FWHM'
             }, parent)
@@ -455,6 +515,8 @@ class FitLogNormRange(FitMethod):
                 'Start',
                 'End'
             ])
+
+        self.copy_info = '(mode, A, fwhm)'
 
     def setBarBounds(self, xrange: tuple[float, float]):
         """
@@ -472,18 +534,32 @@ class FitLogNormRange(FitMethod):
         Fitting function
 
         :param xdata: x-values for function
-        :param sigma: sigma of log-norm
-        :param mu: mu of log-norm
-        :param x0: x0 of log-norm
-        :param c: c of log-norm
+        :param sigma: sigma of log-norm (skewness)
+        :param mu: mu of log-norm (log of the scale)
+        :param x0: shift of log-norm (function is 0 for x <= x0)
+        :param c: area of the peak
         :return: y-values
         """
 
-        x = (xdata - x0)
-        ydata = c / (sigma * x * np.sqrt(2 * np.pi)) * np.exp(-np.square(np.log(x) - mu) / (2 * np.square(sigma)))
-        return np.nan_to_num(ydata)
+        xdata = np.asarray(xdata, dtype=float)
+        ydata = np.zeros(xdata.shape)
+        x = xdata - x0
+        valid = x > 0
+        if sigma <= 0 or not np.any(valid):
+            return ydata
+        ydata[valid] = c / (sigma * x[valid] * np.sqrt(2 * np.pi)) * np.exp(-np.square(np.log(x[valid]) - mu) / (2 * np.square(sigma)))
+        return ydata
 
-    # TODO: unfinished
+    @staticmethod
+    def mode(sigma: float, mu: float, x0: float) -> float:
+        """Position of the maximum"""
+        return float(np.exp(mu - np.square(sigma)) + x0)
+
+    @staticmethod
+    def fwhm(sigma: float, mu: float) -> float:
+        """Full width at half maximum"""
+        return float(np.exp(mu - np.square(sigma)) * 2 * np.sinh(np.sqrt(2 * np.log(2)) * sigma))
+
     def fitting(self, bar_values: list[float], data: tuple[np.ndarray, np.ndarray], view_range: list[list[float, float]]):
         """
         Fitting function to determine parameters
@@ -494,55 +570,69 @@ class FitLogNormRange(FitMethod):
         """
 
         limit = np.logical_and(data[0] > bar_values[0], data[0] < bar_values[1])
-        x_data_limit = data[0][limit]
-        y_data_limit = data[1][limit]
+        x_data_limit = np.asarray(data[0][limit], dtype=float)
+        y_data_limit = np.asarray(data[1][limit], dtype=float)
 
-        if not len(x_data_limit):
-            self.parent.writeStatusBar('Not enough datapoints in given range')
+        if len(x_data_limit) < 6:
+            self.parent.writeStatusBar('Not enough datapoints in given range (at least 6 needed)')
             return
 
-        max_index = np.argmax(y_data_limit)
-        mean0_gauss = x_data_limit[max_index]
-        c0_gauss = y_data_limit[max_index]
-        sigma0_gauss = (x_data_limit[-1] - x_data_limit[0]) / 4
+        # start values from the peak: mode, width and area
+        sigma_gauss, mode0, c0 = estimateGauss(x_data_limit, y_data_limit)
+        if c0 <= 0:
+            self.parent.writeStatusBar('No peak in given range')
+            return
+        area0 = c0 * sigma_gauss * np.sqrt(2 * np.pi)
+        x_first = float(x_data_limit[0])
+        width = float(x_data_limit[-1] - x_data_limit[0])
 
-        limit0_gauss = np.greater(y_data_limit, c0_gauss)
-        if np.any(limit0_gauss):
-            sigma0_gauss = np.std(np.repeat(x_data_limit[limit0_gauss], y_data_limit[limit0_gauss]))
+        best = None
+        for sigma0 in self.sigma_starts:
+            # scale exp(mu) so that the FWHM matches the Gaussian estimate, x0 so that the mode matches
+            fwhm_gauss = 2 * np.sqrt(2 * np.log(2)) * sigma_gauss
+            scale = fwhm_gauss / (np.exp(-np.square(sigma0)) * 2 * np.sinh(np.sqrt(2 * np.log(2)) * sigma0))
+            mu0 = float(np.log(scale))
+            x00 = mode0 - scale * np.exp(-np.square(sigma0))
 
-        p0_gauss = [sigma0_gauss, mean0_gauss, c0_gauss]
-        bounds_gauss = ([0, bar_values[0], 0], [bar_values[1] - bar_values[0], bar_values[1], c0_gauss * 10])
+            # x0 (onset of the peak) must be before the maximum; the function is 0 for all points before x0
+            bounds = (
+                [1E-3, mu0 - 10, x_first - 100 * max(width, 1E-12), 0],
+                [5, mu0 + 10, mode0 - 1E-9 * max(abs(mode0), 1), area0 * 20]
+            )
+            p0 = clipToBounds([sigma0, mu0, x00, area0], bounds)
 
-        try:
-            popt_gauss = curve_fit(FitGaussRange.fitFunction, x_data_limit, y_data_limit, p0=p0_gauss, bounds=bounds_gauss)[0]
-        except RuntimeError as error:
-            self.parent.writeStatusBar(f'Error in fitting LogNorm(Gauss): {error}')
-            GlobalConf.logger.info(f'Error in fitting LogNorm(Gauss): {error}')
+            try:
+                popt = curve_fit(self.fitFunction, x_data_limit, y_data_limit, p0=p0, bounds=bounds, maxfev=5000)[0]
+            except (ValueError, TypeError, RuntimeError) as error:
+                GlobalConf.logger.debug(f'LogNorm fit with sigma0 = {sigma0} failed: {error}')
+                continue
+
+            residual = float(np.sum(np.square(self.fitFunction(x_data_limit, *popt) - y_data_limit)))
+            if best is None or residual < best[0]:
+                best = (residual, popt)
+
+        if best is None:
+            self.parent.writeStatusBar('Error in fitting LogNorm: no start value converged')
+            GlobalConf.logger.info('Error in fitting LogNorm: no start value converged')
             return
 
-        v = np.log(1 + np.square(popt_gauss[0] / popt_gauss[1]))
-        p0_log_norm = [np.sqrt(v), np.log(popt_gauss[1]) - 0.5 * v, 0, popt_gauss[2] * popt_gauss[1]]
-        bounds_log_norm = (
-            [p0_log_norm[0] / 2, p0_log_norm[1] * 0.8, -np.inf, 0],
-            [p0_log_norm[0] * 2, p0_log_norm[1] * 1.2, np.inf, p0_log_norm[3] * 2]
-        )
+        sigma, mu, x0, area = best[1]
+        # self.parameter = [sigma, mu, x0, A, mode, FWHM]
+        self.parameter = [
+            float(sigma),
+            float(mu),
+            float(x0),
+            float(area),
+            self.mode(sigma, mu, x0),
+            self.fwhm(sigma, mu)
+        ]
+        self.updateParameters()
 
-        try:
-            popt = curve_fit(self.fitFunction, x_data_limit, y_data_limit, p0=p0_log_norm, bounds=bounds_log_norm)[0]
-            # self.parameter = [sigma, mu, x0, c, mode, FWHM]
-            self.parameter = [
-                popt[0],
-                popt[1],
-                popt[2],
-                popt[3],
-                np.exp(popt[1] - np.square(popt[0])) + popt[2],
-                np.exp(popt[1] - np.square(popt[0])) * (np.exp(np.sqrt(2 * np.log(2)) * popt[0]) - np.exp(-np.sqrt(2 * np.log(2)) * popt[0]))
-            ]
-            self.updateParameters()
+    def copyParameters(self) -> str:
+        """Returns string that will be copied when copy button is pressed"""
 
-        except (ValueError, TypeError, RuntimeError) as error:
-            self.parent.writeStatusBar(f'Error in fitting LogNorm: {error}')
-            GlobalConf.logger.info(f'Error in fitting LogNorm: {error}')
+        # (mode, A, fwhm)
+        return f'({self.parameter[4]}, {self.parameter[3]}, {self.parameter[5]})'
 
 
 class FitCountsRange(FitMethod):
@@ -681,17 +771,13 @@ class FitGaussCountsRange(FitMethod):
         # self.parameter = [sigma, mu, c, FWHM, Counts]
         self.parameter[4] = np.sum(y_data_limit)
 
-        max_index = np.argmax(y_data_limit)
-        mean0 = x_data_limit[max_index]
-        c0 = y_data_limit[max_index]
-        sigma0 = (x_data_limit[-1] - x_data_limit[0]) / 4
+        if len(x_data_limit) < 4:
+            self.parent.writeStatusBar('Not enough datapoints in given range (at least 4 needed)')
+            return
 
-        limit0 = np.greater(y_data_limit, c0)
-        if np.any(limit0):
-            sigma0 = np.std(np.repeat(x_data_limit[limit0], y_data_limit[limit0]))
-
-        p0 = [sigma0, mean0, c0]
-        bounds = ([0, bar_values[0], 0], [bar_values[1] - bar_values[0], bar_values[1], c0 * 10])
+        sigma0, mean0, c0 = estimateGauss(x_data_limit, y_data_limit)
+        bounds = gaussBounds(x_data_limit, c0, (bar_values[0], bar_values[1]))
+        p0 = clipToBounds([sigma0, mean0, c0], bounds)
 
         try:
             popt = curve_fit(self.fitFunction, x_data_limit, y_data_limit, p0=p0, bounds=bounds)[0]
