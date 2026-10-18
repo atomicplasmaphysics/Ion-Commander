@@ -115,13 +115,15 @@ The size of the database is shown in the menu `Database`.
 - [ ] Mass axis calibration in the Analyse tab using the Simulation calculators
 
 ### History / Database
-- [ ] Downsample data for long time ranges in the History tab (faster plots), but show the full density when zooming in
+- [x] Downsample data for long time ranges in the History tab (faster plots), but show the full density when zooming in (~2 points per pixel, averaged in the database, reloaded on zoom/pan)
+- [ ] History: optionally show min/max envelopes instead of averages for downsampled data (spikes of e.g. the pressure can be averaged away)
 - [x] Show the database size (menu `Database`)
 - [x] Rename-proof logging: stable column ids plus a `Labels` table, so renaming e.g. a pressure gauge does not break the history
 - [ ] Use the label valid at the time of the data for exports (currently the latest label is used)
 - [x] `Events` table for one-time events (interlock trips, lost connections, ...)
 - [x] Log lost connections and reconnects as events
-- [ ] Log more events (manual connect/disconnect, script start/end) and mark the events in the History plots
+- [x] Mark the events in the History plots (toggle "Events")
+- [ ] Log more events (manual connect/disconnect, script start/end)
 - [ ] Database maintenance: archive or thin out old data (e.g. keep 1 s data for 30 days, 1 min averages afterwards)
 - [ ] Make the splitter of the History tab work as intended (stretch factors)
 

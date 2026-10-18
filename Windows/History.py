@@ -1,5 +1,8 @@
 import numpy as np
+from math import ceil
 from datetime import datetime, timedelta
+
+import pyqtgraph as pg
 
 
 from PyQt6.QtWidgets import (
@@ -10,6 +13,7 @@ from PyQt6.QtCore import Qt, QTimer
 
 
 from Config.GlobalConf import DefaultParams
+from Config.StylesConf import Colors
 
 from DB.db import DB
 
@@ -47,6 +51,20 @@ class HistoryWindow(TabWidget):
         self.update_timer = QTimer()
         self.update_timer.timeout.connect(self.updatePreview)
         self.update_timer.setInterval(DefaultParams.update_timer_time)
+
+        # downsampling: data is averaged in time buckets inside the database (about <points_per_pixel> points per pixel of the plot).
+        # When zooming/panning, the visible range is loaded again with a finer resolution (debounced by the refine timer)
+        self.points_per_pixel = 2
+        self.selected_range: tuple[int, int] | None = None
+        self.loaded_range: tuple[int, int] | None = None
+        self.loaded_bucket = 1
+        self.plotting = False
+        self.event_lines: list[pg.InfiniteLine] = []
+
+        self.refine_timer = QTimer()
+        self.refine_timer.setSingleShot(True)
+        self.refine_timer.setInterval(300)
+        self.refine_timer.timeout.connect(self.refinePreview)
 
         self.selection_listwidgets: list[QListWidget] = []
 
@@ -97,7 +115,7 @@ class HistoryWindow(TabWidget):
 
         # Update preview button
         self.button_update_preview = QPushButton('Update Preview')
-        self.button_update_preview.setToolTip('Might take some time, since all data will be previewed')
+        self.button_update_preview.setToolTip('Loads the selected data. Long time ranges are averaged (downsampled) - zoom in to see all data points')
         self.button_update_preview.clicked.connect(self.updatePreview)
         self.export_title_hbox.addWidget(self.button_update_preview, alignment=Qt.AlignmentFlag.AlignLeft)
 
@@ -122,13 +140,26 @@ class HistoryWindow(TabWidget):
 
         self.export_title_hbox.addStretch()
 
+        # Events button
+        self.button_events_preview = IndicatorLedButton('Events', initial_state=True)
+        self.button_events_preview.setToolTip('Mark events (interlock trips, lost connections, ...) as vertical lines')
+        self.button_events_preview.clicked.connect(self.updateEvents)
+        self.export_title_hbox.addWidget(self.button_events_preview, alignment=Qt.AlignmentFlag.AlignRight)
+
+        # Resolution label
+        self.label_resolution = QLabel('')
+        self.label_resolution.setToolTip('Resolution of the shown data. Zoom in to load the data with a finer resolution.')
+        self.export_title_hbox.addWidget(self.label_resolution, alignment=Qt.AlignmentFlag.AlignRight)
+
         # Y-log button
         self.button_log_y_preview = IndicatorLedButton('Log-y')
+        self.button_log_y_preview.setToolTip('Logarithmic y-axis')
         self.button_log_y_preview.clicked.connect(self.logYAxis)
         self.export_title_hbox.addWidget(self.button_log_y_preview, alignment=Qt.AlignmentFlag.AlignRight)
 
         # Plotting canvas
         self.time_canvas = TimeCanvas([], grid=True)
+        self.time_canvas.getViewBox().sigXRangeChanged.connect(self.viewRangeChanged)
         self.preview_export_vbox.addWidget(self.time_canvas)
 
         self.export_hbox = QHBoxLayout()
@@ -151,7 +182,7 @@ class HistoryWindow(TabWidget):
 
         # Exporting button
         self.export_button = QPushButton('Export')
-        self.export_button.setToolTip('Export selected data to selected file')
+        self.export_button.setToolTip('Export selected data to selected file (full resolution, not downsampled)')
         self.export_button.clicked.connect(self.exportData)
         self.export_hbox.addWidget(self.export_button, alignment=Qt.AlignmentFlag.AlignLeft)
 
@@ -205,8 +236,8 @@ class HistoryWindow(TabWidget):
         for row in range(self.selection_listwidgets[listwidget_index].count()):
             self.selection_listwidgets[listwidget_index].item(row).setCheckState(state)
 
-    def getData(self) -> tuple[np.ndarray, list[str]]:
-        """Gets checked data"""
+    def getTimeRange(self) -> tuple[int, int] | None:
+        """Returns the selected (start, end) timestamps or None (with a message box) if they are invalid"""
 
         start_time = int(self.start_datetime_widget.getTime().timestamp())
         end_time = int(self.end_datetime_widget.getTime().timestamp())
@@ -218,7 +249,45 @@ class HistoryWindow(TabWidget):
                 'End time before start time!',
                 f'The selected end time ({datetime.fromtimestamp(end_time)}) is before the selected start time ({datetime.fromtimestamp(start_time)})'
             )
+            return None
+        return start_time, end_time
+
+    def getSeries(self, start_time: int, end_time: int, bucket_seconds: int = 1) -> list[tuple[str, np.ndarray, np.ndarray]]:
+        """
+        Gets checked data as separate series (no merging, so no gaps are filled with nan)
+
+        :param start_time: start time as timestamp
+        :param end_time: end time as timestamp
+        :param bucket_seconds: average data in time buckets of this size
+        :returns: list of (label, time, values)
+        """
+
+        series = []
+        for i, table in enumerate(self.database.tables):
+            checked = [0]
+            for row in range(len(table.structure) - 1):
+                if self.selection_listwidgets[i].item(row).checkState() == Qt.CheckState.Checked:
+                    checked.append(row + 1)
+            if len(checked) < 2:
+                continue
+
+            data = self.database.getData(i, tuple(checked), start_time, end_time, bucket_seconds)
+            if data is False:
+                continue
+            column_names, column_values = data
+            column_values = column_values.astype(float)
+
+            for column, column_name in enumerate(column_names[1:], start=1):
+                series.append((f'{table.name}: {self.columnLabel(table.name, column_name)}', column_values[:, 0], column_values[:, column]))
+        return series
+
+    def getData(self) -> tuple[np.ndarray, list[str]]:
+        """Gets checked data in full resolution, merged into one array (for exporting)"""
+
+        time_range = self.getTimeRange()
+        if time_range is None:
             return np.array([]), []
+        start_time, end_time = time_range
 
         datas = []
         labels = []
@@ -247,6 +316,44 @@ class HistoryWindow(TabWidget):
 
         return mergeArraysFirstColumn(datas), labels
 
+    def bucketFor(self, time_span: float) -> int:
+        """
+        Returns the size of the time buckets (in s) to show about <points_per_pixel> points per pixel of the plot
+
+        :param time_span: shown time span in s
+        """
+
+        pixels = max(self.time_canvas.getViewBox().width(), 200)
+        return max(1, int(ceil(time_span / (pixels * self.points_per_pixel))))
+
+    def plotSeries(self, start_time: int, end_time: int, bucket_seconds: int) -> bool:
+        """
+        Loads and plots the checked data in the given range. The x-range of the plot is not changed.
+
+        :returns: True if data was plotted
+        """
+
+        QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
+        self.plotting = True
+        try:
+            self.time_canvas.clean()
+            series = self.getSeries(start_time, end_time, bucket_seconds)
+            for label, x, y in series:
+                self.time_canvas.plot(x, y, label=label, plot_params={'connect': 'finite'})
+                # clipping and peak-downsampling of pyqtgraph keep the rendering fast and spikes visible
+                # (must be set after the curve was added to the plot)
+                self.time_canvas.graph_curves[-1].setClipToView(True)
+                self.time_canvas.graph_curves[-1].setDownsampling(auto=True, method='peak')
+
+            self.loaded_range = (start_time, end_time)
+            self.loaded_bucket = bucket_seconds
+            self.label_resolution.setText(f'Resolution: {bucket_seconds} s' if bucket_seconds > 1 else 'Resolution: all data')
+        finally:
+            self.plotting = False
+            QApplication.restoreOverrideCursor()
+
+        return bool(series)
+
     def updatePreview(self):
         """Updates the preview with given data"""
 
@@ -254,20 +361,75 @@ class HistoryWindow(TabWidget):
             self.start_datetime_widget.setTime(datetime.now() - timedelta(minutes=10))
             self.end_datetime_widget.setTime(datetime.now())
 
-        QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
+        time_range = self.getTimeRange()
+        if time_range is None:
+            return
+        start_time, end_time = time_range
 
-        self.time_canvas.clean()
-        data, labels = self.getData()
-
-        if len(labels) < 2:
+        self.selected_range = time_range
+        if not self.plotSeries(start_time, end_time, self.bucketFor(end_time - start_time)):
             self.writeStatusBar('No data selected or no datapoints available')
-        else:
-            for i in range(1, len(labels)):
-                self.time_canvas.plot(data[:, 0], data[:, i], label=labels[i])
 
-            self.time_canvas.setXRange(np.min(data[:, 0]), np.max(data[:, 0]))
+        self.plotting = True
+        self.time_canvas.setXRange(start_time, end_time, padding=0)
+        self.plotting = False
+        self.updateEvents()
 
-        QApplication.restoreOverrideCursor()
+    def viewRangeChanged(self, *args):
+        """Called when the visible x-range changes (zoom/pan)"""
+
+        if self.plotting or self.selected_range is None or self.auto_update_button.value():
+            return
+        self.refine_timer.start()
+
+    def refinePreview(self):
+        """Loads the visible range again if a finer (zoomed in) or coarser (zoomed out) resolution is needed"""
+
+        if self.selected_range is None or self.loaded_range is None:
+            return
+
+        view_start, view_end = self.time_canvas.getViewBox().viewRange()[0]
+        view_start = max(view_start, self.selected_range[0])
+        view_end = min(view_end, self.selected_range[1])
+        if view_end <= view_start:
+            return
+
+        wanted_bucket = self.bucketFor(view_end - view_start)
+        covered = self.loaded_range[0] <= view_start and view_end <= self.loaded_range[1]
+        finer_needed = wanted_bucket * 2 <= self.loaded_bucket
+        coarser_needed = wanted_bucket >= self.loaded_bucket * 4
+        if covered and not finer_needed and not coarser_needed:
+            return
+
+        # load a bit more than visible, so small pans do not need to load again
+        margin = (view_end - view_start) * 0.5
+        load_start = int(max(self.selected_range[0], view_start - margin))
+        load_end = int(min(self.selected_range[1], view_end + margin))
+        self.plotSeries(load_start, load_end, wanted_bucket)
+
+    def updateEvents(self):
+        """Marks the events of the selected time range as vertical lines"""
+
+        for line in self.event_lines:
+            self.time_canvas.plotItem.removeItem(line)
+        self.event_lines = []
+
+        if not self.button_events_preview.value() or self.selected_range is None:
+            return
+
+        for timestamp, source, event_type, message, value in self.database.getEvents(*self.selected_range):
+            color = Colors.color_red if 'interlock' in event_type else Colors.color_orange
+            line = pg.InfiniteLine(
+                pos=timestamp,
+                angle=90,
+                movable=False,
+                pen=pg.mkPen(color=color, width=1, style=Qt.PenStyle.DashLine),
+                label=f'{source}: {event_type}',
+                labelOpts={'position': 0.95, 'color': color, 'rotateAxis': (1, 0), 'anchors': [(0, 0), (0, 0)]}
+            )
+            line.setToolTip(f'{datetime.fromtimestamp(timestamp):%Y-%m-%d %H:%M:%S} {source} {event_type}\n{message}')
+            self.time_canvas.plotItem.addItem(line, ignoreBounds=True)
+            self.event_lines.append(line)
 
     def exportData(self):
         """Exports the data"""

@@ -63,24 +63,26 @@ def getIntIfInt(number: float) -> float | int:
     return number
 
 
-def mergeArraysFirstColumn(arrays: list[np.ndarray], missing_value: float = np.nan):
+def mergeArraysFirstColumn(arrays: list[np.ndarray], missing_value: float = np.nan, step: int = 1):
     """
     Merge numpy arrays in one, where first column will be the same (only integer steps)
 
     :param arrays: list of numpy arrays to merge
     :param missing_value: default replacement for missing values
+    :param step: step of the first column (e.g. size of time buckets), first columns must be multiples of it
     """
 
+    step = max(int(step), 1)
     min_x = int(min(arr[:, 0].min() for arr in arrays))
     max_x = int(max(arr[:, 0].max() for arr in arrays))
-    x_range = np.arange(min_x, max_x + 1)
+    x_range = np.arange(min_x, max_x + 1, step)
 
     result = np.full((len(x_range), sum(arr.shape[1] - 1 for arr in arrays) + 1), missing_value)
     result[:, 0] = x_range
 
     offset = 1
     for array in arrays:
-        result[(array[:, 0] - min_x).astype(int), offset:offset + array.shape[1] - 1] = array[:, 1:]
+        result[((array[:, 0] - min_x) // step).astype(int), offset:offset + array.shape[1] - 1] = array[:, 1:]
         offset += array.shape[1] - 1
 
     return result
