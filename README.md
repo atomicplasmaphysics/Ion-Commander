@@ -79,7 +79,7 @@ The size of the database is shown in the menu `Database`.
 - [ ] Show the age of the last reading for Laser and Power Meter as well (PSU, EBIS and Pressure done)
 - [ ] Optionally also check the other gauges (not only the selected one)
 - [ ] Interlock self-test button (simulate a trip without hardware) and a "reset/re-arm" confirmation
-- [ ] Ramp the heating current down/up slowly instead of jumping (cathode lifetime)
+- [x] Ramp the heating current down/up slowly instead of jumping (cathode lifetime) - "Ramp [A/min]", the interlock still lowers immediately
 
 ### Hardware / Devices
 - [ ] Integrate the Adjustable Delay Stage (`Threaded` wrapper, `DeviceWrapper`, GUI panel, CommandServer entry, DB logging, position in mm/ps instead of steps)

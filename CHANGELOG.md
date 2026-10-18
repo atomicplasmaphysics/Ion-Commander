@@ -2,9 +2,33 @@
 
 *Automatically created from the commit messages with `python -m Utility.Changelog` - do not edit by hand.*
 
+## v0.1.66 (2026-10-18)
+
+**EBIS: slow ramp of the cathode heating current**
+
+- New row in the EBIS "Heating" group: "Ramp [A/min]" (default 0.1 A/min,
+  stored in QSettings, 0 = set immediately like before), a status label
+  "Ramping: 1.000 A -> 1.05 A" and a "Stop" button that holds the current
+  value.
+- Entering a new heating current starts a software ramp: every 0.5 s the
+  current set in the MICC moves towards the target by speed * elapsed
+  time. Entering another value while ramping retargets the ramp. The ramp
+  starts from the current read from the device on connect (if unknown,
+  the value is set directly).
+- Safety first: the pressure interlock stops a running ramp and lowers the
+  heating current immediately; the trip limit also caps the ramp target.
+- The ramp is stopped on disconnect/reset.
+- A software ramp is used instead of the MICC current ramp, because the
+  hardware ramp is defined in % of the nominal value per second and it is
+  not clear if it applies to the current-controlled heating channel.
+
+Tested offscreen with a fake connection and simulated clock: ramp up
+(0.01 A/s steps), finish at target, ramp down, interlock lowers to 0 A
+immediately and stops the ramp, ramp speed 0 sets immediately.
+
 ## v0.1.65 (2026-10-18)
 
-**Sane numbers, power meter out of range, robust laser telnet connection**
+**Sane numbers, power meter out of range, robust laser telnet connection** (d30c871)
 
 Sane numbers (Utility/Functions.py):
 - New isSaneNumber() (int/float/numpy number, finite, not bool) and

@@ -223,7 +223,7 @@ class GlobalConf:
     title = 'Ion Commander'
 
     # version (single source of truth - update only here)
-    version = '0.1.65'
+    version = '0.1.66'
 
     # logger
     logger = logging.getLogger(title)
@@ -254,6 +254,7 @@ class GlobalConf:
 
     # EBIS interlock parameters
     ebis_interlock_group_name = 'ebis_interlock'
+    ebis_heating_ramp_name = 'ebis_heating_ramp'
     ebis_interlock_gauge_name = 'ebis_interlock_gauge'
 
     # power meter parameters

@@ -228,6 +228,40 @@ class EBISVBoxLayout(QVBoxLayout):
             self.status_current_6,
         )
 
+        # Heating current ramp (changing the heating current slowly is better for the lifetime of the cathode)
+        self.label_heating_ramp = QLabel('Ramp [A/min]')
+        self.spinbox_heating_ramp = DoubleSpinBox(
+            default=GlobalConf.settings.value(GlobalConf.ebis_heating_ramp_name, defaultValue=0.1, type=float),
+            step_size=0.01,
+            input_range=(0, 10),
+            decimals=2,
+            buttons=False
+        )
+        self.spinbox_heating_ramp.setToolTip(
+            'Speed of the heating current ramp in A/min (0: the current is set immediately).\n'
+            'The pressure interlock always lowers the current immediately.'
+        )
+        self.spinbox_heating_ramp.editingFinished.connect(self.saveHeatingRamp)
+        self.status_heating_ramp = QLabel('')
+        self.status_heating_ramp.setToolTip('State of the heating current ramp')
+        self.button_heating_ramp_stop = QPushButton('Stop')
+        self.button_heating_ramp_stop.setToolTip('Stop the heating current ramp at the current value')
+        self.button_heating_ramp_stop.pressed.connect(lambda: self.stopHeatingRamp(hold=True))
+        self.heating_grid.addWidgets(
+            self.label_heating_ramp,
+            self.spinbox_heating_ramp,
+            (self.status_heating_ramp, 2),
+            self.button_heating_ramp_stop
+        )
+
+        # heating current that is set in the device (changes step by step while ramping) and the final target
+        self.heating_setpoint: float | None = None
+        self.heating_target: float | None = None
+        self.heating_ramp_last_time = monotonic()
+        self.heating_ramp_timer = QTimer()
+        self.heating_ramp_timer.setInterval(500)
+        self.heating_ramp_timer.timeout.connect(self.updateHeatingRamp)
+
         # Advanced Settings Group Box
         self.advanced_settings_group_box = QGroupBox('Advanced Settings')
         self.addWidget(self.advanced_settings_group_box)
@@ -481,6 +515,7 @@ class EBISVBoxLayout(QVBoxLayout):
 
             self.spinbox_current_6.setValue(current)
             self.status_current_6.setTargetValue(current)
+            self.heating_setpoint = current
 
         self.threaded_connection.callback(readCurrent, self.threaded_connection.readCurrent(10))
 
@@ -540,9 +575,93 @@ class EBISVBoxLayout(QVBoxLayout):
                 self.active_message_box = False
             current = trip_current
 
+        # heating current is ramped (if enabled and the current set in the device is known)
+        if channel == 5 and self.spinbox_heating_ramp.value() > 0 and self.heating_setpoint is not None:
+            self.startHeatingRamp(current)
+            return
+
+        if channel == 5:
+            self.stopHeatingRamp()
+            self.heating_setpoint = current
+
         self.status_currents[channel].setTargetValue(current)
         phys_channel = self.channel_dict[channel]
         self.threaded_connection.currentSet(phys_channel, current)
+
+    def saveHeatingRamp(self):
+        """Stores the speed of the heating current ramp"""
+
+        GlobalConf.settings.setValue(GlobalConf.ebis_heating_ramp_name, self.spinbox_heating_ramp.value())
+        GlobalConf.settings.sync()
+
+    def startHeatingRamp(self, target: float):
+        """
+        Starts (or retargets) the heating current ramp
+
+        :param target: final heating current in A
+        """
+
+        self.heating_target = target
+        self.heating_ramp_last_time = monotonic()
+        if abs(target - self.heating_setpoint) < 1E-6:
+            self.stopHeatingRamp()
+            return
+
+        GlobalConf.logger.info(f'EBIS: Ramping heating current from {self.heating_setpoint:.3f} A to {target:.3f} A with {self.spinbox_heating_ramp.value()} A/min')
+        if not self.heating_ramp_timer.isActive():
+            self.heating_ramp_timer.start()
+        self.updateHeatingRampStatus()
+
+    def stopHeatingRamp(self, hold: bool = False):
+        """
+        Stops the heating current ramp
+
+        :param hold: keep the current value as new target (shown in the input field)
+        """
+
+        self.heating_ramp_timer.stop()
+        if hold and self.heating_setpoint is not None and self.heating_target is not None and abs(self.heating_target - self.heating_setpoint) > 1E-6:
+            GlobalConf.logger.info(f'EBIS: Heating current ramp stopped at {self.heating_setpoint:.3f} A')
+            self.spinbox_current_6.setValue(self.heating_setpoint)
+        self.heating_target = None
+        self.updateHeatingRampStatus()
+
+    def updateHeatingRamp(self):
+        """Called by the ramp timer: moves the heating current one step towards the target"""
+
+        if self.heating_target is None or self.heating_setpoint is None or not self.indicator_connection.value():
+            self.stopHeatingRamp()
+            return
+
+        now = monotonic()
+        step = self.spinbox_heating_ramp.value() / 60 * (now - self.heating_ramp_last_time)
+        self.heating_ramp_last_time = now
+
+        difference = self.heating_target - self.heating_setpoint
+        if step <= 0 or abs(difference) <= step:
+            new_current = self.heating_target
+        else:
+            new_current = self.heating_setpoint + step * (1 if difference > 0 else -1)
+
+        self.heating_setpoint = new_current
+        self.status_current_6.setTargetValue(new_current)
+        self.threaded_connection.currentSet(self.channel_dict[5], new_current)
+
+        if new_current == self.heating_target:
+            GlobalConf.logger.info(f'EBIS: Heating current ramp finished at {new_current:.3f} A')
+            self.stopHeatingRamp()
+        else:
+            self.updateHeatingRampStatus()
+
+    def updateHeatingRampStatus(self):
+        """Shows the state of the heating current ramp"""
+
+        ramping = self.heating_target is not None and self.heating_ramp_timer.isActive()
+        self.button_heating_ramp_stop.setEnabled(ramping)
+        if ramping:
+            self.status_heating_ramp.setText(f'Ramping: {self.heating_setpoint:.3f} A \u2192 {self.heating_target:.2f} A')
+        else:
+            self.status_heating_ramp.setText('')
 
     def saveInterlockSettings(self):
         """Takes the interlock limits from the input fields and stores them persistently"""
@@ -592,6 +711,9 @@ class EBISVBoxLayout(QVBoxLayout):
             measured_current = self.status_current_6.value
             if set_current > result.target_current or measured_current > result.target_current + self.current_deviation:
                 GlobalConf.logger.warning(f'EBIS: Pressure interlock lowers heating current to {result.target_current} A ({result.message})')
+                # safety first: no ramp, the current is lowered immediately
+                self.stopHeatingRamp()
+                self.heating_setpoint = result.target_current
                 self.spinbox_current_6.setValue(result.target_current)
                 self.status_current_6.setTargetValue(result.target_current)
                 self.threaded_connection.currentSet(self.channel_dict[5], result.target_current)
@@ -841,6 +963,9 @@ class EBISVBoxLayout(QVBoxLayout):
             row.reset()
 
         self.spinbox_current_6.reset()
+        if hasattr(self, 'heating_ramp_timer'):
+            self.stopHeatingRamp()
+            self.heating_setpoint = None
         self.status_current_6.setValue(0)
         self.status_current_6.setTargetValue(0)
 
