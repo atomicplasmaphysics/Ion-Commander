@@ -33,6 +33,10 @@ class DefaultParams:
     update_timer_time = 1000
     ramp_timer_time = 10000
 
+    # reconnect parameters (time between attempts in ms after a lost connection)
+    reconnect_interval_time = 5000
+    reconnect_interval_time_laser = 15000
+
     # PSU parameters
     psu_voltage_deviation = 5
     psu_voltage_maximum = 6000
@@ -100,7 +104,7 @@ class GlobalConf:
     title = 'Ion Commander'
 
     # version (single source of truth - update only here)
-    version = '0.1.55'
+    version = '0.1.56'
 
     # logger
     logger = logging.getLogger(title)
@@ -182,7 +186,8 @@ class GlobalConf:
         psu: str = None,
         ebis: str = None,
         pressure: str = None,
-        laser: tuple[int, int, int, int, int] | list[int] = None
+        laser: tuple[int, int, int, int, int] | list[int] = None,
+        power_meter: str = None
     ):
         """
         Updates and saves settings object with connection parameters
@@ -191,6 +196,7 @@ class GlobalConf:
         :param ebis: port of EBIS
         :param pressure: port of pressure ADC
         :param laser: tuple of (laser_ip1, laser_ip2, laser_ip3, laser_ip4, laser_port)
+        :param power_meter: resource name of power meter
         """
 
         if psu is not None:
@@ -205,6 +211,8 @@ class GlobalConf:
             GlobalConf.settings.setValue(GlobalConf.connection_laser_ip3_name, laser[2])
             GlobalConf.settings.setValue(GlobalConf.connection_laser_ip4_name, laser[3])
             GlobalConf.settings.setValue(GlobalConf.connection_laser_port_name, laser[4])
+        if power_meter is not None:
+            GlobalConf.settings.setValue(GlobalConf.connection_power_meter_port_name, power_meter)
 
         GlobalConf.settings.sync()
 
@@ -218,6 +226,8 @@ class GlobalConf:
             return GlobalConf.settings.value(GlobalConf.connection_ebis_port_name, defaultValue='', type=str)
         if connection_type == 'pressure':
             return GlobalConf.settings.value(GlobalConf.connection_pressure_port_name, defaultValue='', type=str)
+        if connection_type == 'power_meter':
+            return GlobalConf.settings.value(GlobalConf.connection_power_meter_port_name, defaultValue='', type=str)
         if connection_type == 'laser':
             return (GlobalConf.settings.value(GlobalConf.connection_laser_ip1_name, defaultValue=-1, type=int),
                     GlobalConf.settings.value(GlobalConf.connection_laser_ip2_name, defaultValue=-1, type=int),

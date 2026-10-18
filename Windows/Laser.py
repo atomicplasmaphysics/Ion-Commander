@@ -11,6 +11,7 @@ from DB.db import DB
 from Socket.CommandServer import DeviceMonacoWrapper
 
 from Utility.Layouts import InsertingGridLayout, IndicatorLed, ErrorTable, DoubleSpinBox, SpinBox, ComboBox, DisplayLabel, SpinBoxRange
+from Utility.AutoReconnect import AutoReconnect
 from Utility.Dialogs import IPDialog, showMessageBox
 from Utility.Functions import getPrefix, getSignificantDigits, getIntIfInt
 
@@ -32,6 +33,10 @@ class LaserVBoxLayout(QVBoxLayout):
         self.update_timer.start()
 
         self.active_message_box = False
+
+        # automatic reconnect after a lost connection (longer interval, since a failing attempt blocks up to the timeout)
+        self.last_port: tuple[tuple[int, int, int, int], int] | None = None
+        self.auto_reconnect = AutoReconnect('Laser', self.reconnect, interval=DefaultParams.reconnect_interval_time_laser)
         self.combobox_message_box_warning = True
 
         self.device_wrapper = DeviceMonacoWrapper()
@@ -81,7 +86,7 @@ class LaserVBoxLayout(QVBoxLayout):
         self.indicator_connection = IndicatorLed(off_color=Colors.color_red)
         self.status_connection = QLabel('Not connected')
         self.button_connection = QPushButton('Connect')
-        self.button_connection.pressed.connect(self.connect)
+        self.button_connection.pressed.connect(self.manualConnect)
         self.button_connection_settings = QPushButton()
         self.button_connection_settings.setIcon(QIcon('icons/preferences.png'))
         self.button_connection_settings.pressed.connect(self.connectionPreferences)
@@ -955,13 +960,14 @@ class LaserVBoxLayout(QVBoxLayout):
 
         return False
 
-    def connect(self, ip: tuple[int, int, int, int] = None, port: int = None, messagebox: bool = True):
+    def connect(self, ip: tuple[int, int, int, int] = None, port: int = None, messagebox: bool = True, clear_faults: bool = True):
         """
         Connects to laser with given IP address and port number. If those are not provided, the current values are used.
 
         :param ip: IP address to connect to
         :param port: port number to connect to
         :param messagebox: show messagebox if failed
+        :param clear_faults: acknowledge faults after connecting to initialize the fault table (not done on automatic reconnects)
         """
 
         if ip is None or port is None:
@@ -982,15 +988,17 @@ class LaserVBoxLayout(QVBoxLayout):
                 self.connection.open()
                 self.device_wrapper.threaded_connection = ThreadedConnection(
                     self.connection,
-                    self.unconnect
+                    self.connectionLost
                 )
                 self.indicator_connection.setValue(True)
                 self.status_connection.setText('Connected')
+                self.last_port = (tuple(ip), port)
                 self.button_connection_settings.setEnabled(False)
                 self.button_connection.setText('Disconnect')
 
                 # clear faults to initialize fault table
-                self.device_wrapper.threaded_connection.fackSet()
+                if clear_faults:
+                    self.device_wrapper.threaded_connection.fackSet()
 
             # TODO: probably add some more socket connection errors here
             except (ConnectionError, TimeoutError, ConnectionAbortedError, UnicodeDecodeError, OSError) as error:
@@ -1018,6 +1026,28 @@ class LaserVBoxLayout(QVBoxLayout):
             self.button_connection.setText('Connect')
 
         self.updateAllValues()
+
+    def manualConnect(self):
+        """Connect/disconnect button pressed by the user (stops automatic reconnecting)"""
+
+        self.auto_reconnect.stop()
+        self.connect()
+
+    def connectionLost(self):
+        """Called if the connection to the device was lost: disconnects and tries to reconnect periodically"""
+
+        GlobalConf.logger.warning('Laser: Connection lost')
+        self.unconnect()
+        if self.last_port is not None:
+            self.auto_reconnect.start()
+
+    def reconnect(self) -> bool:
+        """Tries to reconnect silently to the last port, returns True if connected"""
+
+        if not self.device_wrapper.threaded_connection.isDummy():
+            return True
+        self.connect(self.last_port[0], self.last_port[1], False, clear_faults=False)
+        return self.indicator_connection.value()
 
     def unconnect(self):
         """Disconnect from any port"""
@@ -1098,13 +1128,17 @@ class LaserVBoxLayout(QVBoxLayout):
         """Must be called when application is closed"""
 
         self.device_wrapper.threaded_connection.close()
+        # remember the address if connected or if the connection was lost (not if the user disconnected)
         last_connection = [-1, -1, -1, -1, -1]
+        if self.connection is not None or self.auto_reconnect.active:
+            ip, port = self.last_port if self.last_port is not None else (self.ip, self.port)
+            last_connection[0] = ip[0]
+            last_connection[1] = ip[1]
+            last_connection[2] = ip[2]
+            last_connection[3] = ip[3]
+            last_connection[4] = port
+        self.auto_reconnect.stop()
         if self.connection is not None:
-            last_connection[0] = self.ip[0]
-            last_connection[1] = self.ip[1]
-            last_connection[2] = self.ip[2]
-            last_connection[3] = self.ip[3]
-            last_connection[4] = self.port
             self.connection.close()
 
         GlobalConf.updateConnections(laser=last_connection)

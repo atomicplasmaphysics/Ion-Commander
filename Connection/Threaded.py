@@ -2,6 +2,9 @@ from typing import TYPE_CHECKING, Callable
 from time import time, sleep, monotonic
 
 
+from serial import SerialException
+
+
 from PyQt6.QtCore import QObject, pyqtSignal, QRunnable, pyqtSlot, QThreadPool
 
 
@@ -182,6 +185,10 @@ class ThreadedConnection(QObject):
         # watchdog: time (monotonic) of the last successful answer of the device, None if there was none yet
         self.last_result_time: float | None = None
 
+        # set on close, so (queued) errors of a closed connection do not trigger a lost connection again
+        self.closed = False
+        self.connection_aborted = False
+
     def isDummy(self) -> bool:
         """Returns if it is a dummy <ThreadedConnection>"""
 
@@ -203,11 +210,13 @@ class ThreadedConnection(QObject):
         :param error: exception that occurred
         """
 
-        # TODO: include which device had the error
-        GlobalConf.logger.error(error)
+        device_name = type(self.connection).__name__.replace('Connection', '') if self.connection is not None else 'Dummy'
+        GlobalConf.logger.error(f'{device_name}: {type(error).__name__}: {error}')
 
-        if isinstance(error, ConnectionAbortedError) or isinstance(error, ConnectionResetError):
-            if self.connection_aborted_function is not None:
+        # lost connection (e.g. unplugged USB device raises SerialException, closed socket raises ConnectionResetError)
+        if isinstance(error, (ConnectionAbortedError, ConnectionResetError, BrokenPipeError, SerialException)):
+            if self.connection_aborted_function is not None and not self.closed and not self.connection_aborted:
+                self.connection_aborted = True
                 self.connection_aborted_function()
             return
 
@@ -273,6 +282,8 @@ class ThreadedConnection(QObject):
 
     def close(self):
         """Closes the worker"""
+
+        self.closed = True
 
         if not self.worker.started or not self.worker.running:
             return

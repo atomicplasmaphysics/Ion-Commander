@@ -10,6 +10,7 @@ from DB.db import DB
 from Socket.CommandServer import CommandServer
 
 from Utility.Layouts import TabWidget
+from Utility.AutoReconnect import EventLog
 
 from Windows.Control import ControlWindow
 from Windows.Monitor import MonitorWindow
@@ -45,6 +46,9 @@ class MainWindow(QMainWindow):
         self.setWindowTitle(self.window_title)
 
         self.database = DB()
+
+        # widgets without access to the database can log events (e.g. lost connections) via the EventLog
+        EventLog.sink = self.database.insertEvent
 
         #
         # TABS FOR DIFFERENT SIMULATION PROGRAMS

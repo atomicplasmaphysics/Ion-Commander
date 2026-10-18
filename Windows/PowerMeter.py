@@ -15,6 +15,7 @@ from Socket.CommandServer import DeviceTLPMxWrapper
 
 from Utility.Layouts import InsertingGridLayout, IndicatorLed, DoubleSpinBox, DisplayLabel, SpinBox, ComboBox, LatexLabel
 from Utility.Functions import getPrefix
+from Utility.AutoReconnect import AutoReconnect
 from Utility.Dialogs import showMessageBox
 
 from Connection.TLPMx import TLPMxConnection, TLPMxValues, getResources
@@ -32,6 +33,10 @@ class PowerMeterVBoxLayout(QVBoxLayout):
         self.update_timer.start()
 
         self.active_message_box = False
+
+        # automatic reconnect after a lost connection
+        self.last_port = ''
+        self.auto_reconnect = AutoReconnect('Power Meter', self.reconnect)
 
         self.device_wrapper = DeviceTLPMxWrapper()
         self.connection: None | TLPMxConnection = None
@@ -62,7 +67,7 @@ class PowerMeterVBoxLayout(QVBoxLayout):
         self.combobox_connection = ComboBox()
         self.connection_hbox_selection.addWidget(self.combobox_connection)
         self.button_connection = QPushButton('Connect')
-        self.button_connection.pressed.connect(self.connect)
+        self.button_connection.pressed.connect(self.manualConnect)
         self.connection_hbox_selection.addWidget(self.button_connection)
 
         self.button_connection_refresh = QPushButton()
@@ -206,6 +211,10 @@ class PowerMeterVBoxLayout(QVBoxLayout):
 
         self.reset()
         self.combobox_display_parameter.setCurrentIndex(GlobalConf.getPowerMeterDisplayParameter())
+
+        last_connection = GlobalConf.getConnection('power_meter')
+        if last_connection:
+            self.connect(last_connection, False)
             
     def getDisplayParameter(self, values: tuple[float, float]) -> float:
         """
@@ -460,10 +469,11 @@ class PowerMeterVBoxLayout(QVBoxLayout):
                 self.connection.open()
                 self.device_wrapper.threaded_connection = ThreadedTLPMxConnection(
                     self.connection,
-                    self.unconnect
+                    self.connectionLost
                 )
                 self.indicator_connection.setValue(True)
                 self.status_connection.setText('Connected')
+                self.last_port = port
                 self.combobox_connection.setEnabled(False)
                 self.button_connection_refresh.setEnabled(False)
                 self.button_connection.setText('Disconnect')
@@ -495,6 +505,28 @@ class PowerMeterVBoxLayout(QVBoxLayout):
             self.button_connection.setText('Connect')
 
         self.updateAllValues()
+
+    def manualConnect(self):
+        """Connect/disconnect button pressed by the user (stops automatic reconnecting)"""
+
+        self.auto_reconnect.stop()
+        self.connect()
+
+    def connectionLost(self):
+        """Called if the connection to the device was lost: disconnects and tries to reconnect periodically"""
+
+        GlobalConf.logger.warning('Power Meter: Connection lost')
+        self.unconnect()
+        if self.last_port:
+            self.auto_reconnect.start()
+
+    def reconnect(self) -> bool:
+        """Tries to reconnect silently to the last port, returns True if connected"""
+
+        if not self.device_wrapper.threaded_connection.isDummy():
+            return True
+        self.connect(self.last_port, False)
+        return self.indicator_connection.value()
 
     def unconnect(self):
         """Disconnect from any port"""
@@ -585,9 +617,16 @@ class PowerMeterVBoxLayout(QVBoxLayout):
 
         self.device_wrapper.threaded_connection.close()
 
+        # remember the port if connected or if the connection was lost (not if the user disconnected)
+        last_connection = ''
+        if self.connection is not None or self.auto_reconnect.active:
+            last_connection = self.last_port
+        self.auto_reconnect.stop()
+
         if self.connection is not None:
             self.connection.close()
 
+        GlobalConf.updateConnections(power_meter=last_connection)
         GlobalConf.updatePowerMeterDisplayParameter(self.combobox_display_parameter.currentIndex())
 
     def log(self, db: DB):

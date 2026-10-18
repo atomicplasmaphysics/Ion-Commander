@@ -17,6 +17,7 @@ from DB.db import DB
 from Socket.CommandServer import DeviceISEGWrapper
 
 from Utility.Layouts import InsertingGridLayout, IndicatorLed, DoubleSpinBox, DisplayLabel, PolarityButton, SpinBox, ComboBox, ReadingAgeLabel
+from Utility.AutoReconnect import AutoReconnect
 from Utility.Dialogs import showMessageBox
 
 from Connection.USBPorts import getComports
@@ -42,6 +43,10 @@ class PSUVBoxLayout(QVBoxLayout):
         self.ramp_start_voltage = 0
 
         self.active_message_box = False
+
+        # automatic reconnect after a lost connection
+        self.last_port = ''
+        self.auto_reconnect = AutoReconnect('PSU', self.reconnect)
 
         self.device_wrapper = DeviceISEGWrapper()
         self.connection: None | ISEGConnection = None
@@ -69,7 +74,7 @@ class PSUVBoxLayout(QVBoxLayout):
         self.status_connection = QLabel('Not connected')
         self.combobox_connection = ComboBox()
         self.button_connection = QPushButton('Connect')
-        self.button_connection.pressed.connect(self.connect)
+        self.button_connection.pressed.connect(self.manualConnect)
         self.button_connection_refresh = QPushButton()
         self.button_connection_refresh.setToolTip('Refresh connections list')
         self.button_connection_refresh.setIcon(QIcon('icons/refresh.png'))
@@ -628,10 +633,11 @@ class PSUVBoxLayout(QVBoxLayout):
                 self.connection.open()
                 self.device_wrapper.threaded_connection = ThreadedISEGConnection(
                     self.connection,
-                    self.unconnect
+                    self.connectionLost
                 )
                 self.indicator_connection.setValue(True)
                 self.status_connection.setText('Connected')
+                self.last_port = comport
                 self.combobox_connection.setEnabled(False)
                 self.button_connection_refresh.setEnabled(False)
                 self.button_connection.setText('Disconnect')
@@ -661,6 +667,28 @@ class PSUVBoxLayout(QVBoxLayout):
             self.button_connection.setText('Connect')
 
         self.updateAllValues()
+
+    def manualConnect(self):
+        """Connect/disconnect button pressed by the user (stops automatic reconnecting)"""
+
+        self.auto_reconnect.stop()
+        self.connect()
+
+    def connectionLost(self):
+        """Called if the connection to the device was lost: disconnects and tries to reconnect periodically"""
+
+        GlobalConf.logger.warning('PSU: Connection lost')
+        self.unconnect()
+        if self.last_port:
+            self.auto_reconnect.start()
+
+    def reconnect(self) -> bool:
+        """Tries to reconnect silently to the last port, returns True if connected"""
+
+        if not self.device_wrapper.threaded_connection.isDummy():
+            return True
+        self.connect(self.last_port, False)
+        return self.indicator_connection.value()
 
     def unconnect(self):
         """Disconnect from any port"""
@@ -808,9 +836,12 @@ class PSUVBoxLayout(QVBoxLayout):
 
         self.device_wrapper.threaded_connection.close()
 
+        # remember the port if connected or if the connection was lost (not if the user disconnected)
         last_connection = ''
+        if self.connection is not None or self.auto_reconnect.active:
+            last_connection = self.last_port or self.combobox_connection.getValue(text=True)
+        self.auto_reconnect.stop()
         if self.connection is not None:
-            last_connection = self.combobox_connection.getValue(text=True)
             self.connection.close()
 
         GlobalConf.updateConnections(psu=last_connection)

@@ -79,11 +79,12 @@ The size of the database is shown in the menu `Database`.
 - [x] EBIS: use a `DeviceWrapper` like the PSU so it can be controlled via CommandServer/Scripts
 - [x] Add EBIS to the CommandServer (device name `EBIS`, the pressure interlock still limits the heating current)
 - [ ] EBIS via CommandServer: map logical channels (Cathode, DT1, ...) to the physical MICC channels, like the GUI does
-- [ ] Automatic reconnect on lost connection and remember/auto-connect last used ports on startup
+- [x] Automatic reconnect on lost connection and remember/auto-connect last used ports on startup (all devices, also the power meter)
+- [ ] Detect hanging devices (no answer for a long time, but no exception) and reconnect them as well
 - [ ] Monaco: cleaner return types for faults/IP/help (see TODOs in `Monaco.py`)
 - [ ] Monaco: parse `?DATA` (datalogger) output
 - [ ] ISEG: implement MICC user calibration commands
-- [ ] Include the device name in error messages of `ThreadedConnection.handleError`
+- [x] Include the device name in error messages of `ThreadedConnection.handleError`
 - [ ] Get limits, units and decimals of PSU/EBIS spinboxes right, and move the input ranges to `DefaultParams`
 - [ ] EBIS heating current: enable button directly at the current row (currently blocked by the warning message box on `editingFinished`)
 - [ ] PSU: decide if all other channels must be switched on again after a polarity switch
@@ -118,7 +119,8 @@ The size of the database is shown in the menu `Database`.
 - [x] Rename-proof logging: stable column ids plus a `Labels` table, so renaming e.g. a pressure gauge does not break the history
 - [ ] Use the label valid at the time of the data for exports (currently the latest label is used)
 - [x] `Events` table for one-time events (interlock trips, lost connections, ...)
-- [ ] Log more events (connect/disconnect, script start/end) and mark the events in the History plots
+- [x] Log lost connections and reconnects as events
+- [ ] Log more events (manual connect/disconnect, script start/end) and mark the events in the History plots
 - [ ] Database maintenance: archive or thin out old data (e.g. keep 1 s data for 30 days, 1 min averages afterwards)
 - [ ] Make the splitter of the History tab work as intended (stretch factors)
 
@@ -146,4 +148,5 @@ The size of the database is shown in the menu `Database`.
 - [x] EBIS interlock: `hard_pmax_val`/`soft_pmax_val` start at `10` (= 10 mbar) and are only converted to `10 * 10^-8 mbar` after the spinbox was edited - the interlock is effectively off until then
 - [x] `ConnectionWorker.execute` (`Threaded.py`): `work.append(work)` in the queue overflow branch should be `self.work.append(work)`
 - [x] `ThreadedConnection.callback` (`Threaded.py`): after deleting a list of callback ids it raises `ValueError`, because the list is not an `int`
-- [ ] Devices forget their last port if the connection was lost before closing the app (`closeEvent` only stores the port if still connected)
+- [x] Devices forget their last port if the connection was lost before closing the app (`closeEvent` only stores the port if still connected)
+- [x] Unplugged USB devices (`SerialException`) were not detected as lost connection - the panel stayed "connected" and logged an error every second

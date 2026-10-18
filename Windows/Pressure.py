@@ -17,6 +17,7 @@ from DB.db import DB
 from Socket.CommandServer import DeviceMixedPressureWrapper
 
 from Utility.Layouts import PressureWidget, IndicatorLed, ComboBox, ReadingAgeLabel
+from Utility.AutoReconnect import AutoReconnect
 from Utility.Dialogs import showMessageBox
 
 from Connection.USBPorts import getComports
@@ -49,6 +50,10 @@ class PressureVBoxLayout(QVBoxLayout):
         self.update_timer.start()
 
         self.device_wrapper = DeviceMixedPressureWrapper()
+
+        # automatic reconnect after a lost connection
+        self.last_port = ''
+        self.auto_reconnect = AutoReconnect('Pressure', self.reconnect)
         self.connection: None | MixedPressureConnection = None
 
         # time (monotonic) of the last successful reading, None if there was no reading since connecting
@@ -81,7 +86,7 @@ class PressureVBoxLayout(QVBoxLayout):
         self.combobox_connection = ComboBox()
         self.connection_hbox_selection.addWidget(self.combobox_connection)
         self.button_connection = QPushButton('Connect')
-        self.button_connection.pressed.connect(self.connect)
+        self.button_connection.pressed.connect(self.manualConnect)
         self.connection_hbox_selection.addWidget(self.button_connection)
 
         self.button_connection_refresh = QPushButton()
@@ -152,10 +157,11 @@ class PressureVBoxLayout(QVBoxLayout):
                 self.connection.open()
                 self.device_wrapper.threaded_connection = ThreadedMixedPressureConnection(
                     self.connection,
-                    self.unconnect
+                    self.connectionLost
                 )
                 self.indicator_connection.setValue(True)
                 self.status_connection.setText('Connected')
+                self.last_port = comport
                 self.combobox_connection.setEnabled(False)
                 self.button_connection_refresh.setEnabled(False)
                 self.button_connection.setText('Disconnect')
@@ -183,6 +189,28 @@ class PressureVBoxLayout(QVBoxLayout):
             self.combobox_connection.setEnabled(True)
             self.button_connection_refresh.setEnabled(True)
             self.button_connection.setText('Connect')
+
+    def manualConnect(self):
+        """Connect/disconnect button pressed by the user (stops automatic reconnecting)"""
+
+        self.auto_reconnect.stop()
+        self.connect()
+
+    def connectionLost(self):
+        """Called if the connection to the device was lost: disconnects and tries to reconnect periodically"""
+
+        GlobalConf.logger.warning('Pressure: Connection lost')
+        self.unconnect()
+        if self.last_port:
+            self.auto_reconnect.start()
+
+    def reconnect(self) -> bool:
+        """Tries to reconnect silently to the last port, returns True if connected"""
+
+        if not self.device_wrapper.threaded_connection.isDummy():
+            return True
+        self.connect(self.last_port, False)
+        return self.indicator_connection.value()
 
     def unconnect(self):
         """Disconnect from any port"""
@@ -272,9 +300,12 @@ class PressureVBoxLayout(QVBoxLayout):
         """Must be called when application is closed"""
 
         self.device_wrapper.threaded_connection.close()
+        # remember the port if connected or if the connection was lost (not if the user disconnected)
         last_connection = ''
+        if self.connection is not None or self.auto_reconnect.active:
+            last_connection = self.last_port or self.combobox_connection.getValue(text=True)
+        self.auto_reconnect.stop()
         if self.connection is not None:
-            last_connection = self.combobox_connection.getValue(text=True)
             self.connection.close()
 
         GlobalConf.updateConnections(pressure=last_connection)
