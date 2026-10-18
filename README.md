@@ -81,7 +81,8 @@ The size of the database is shown in the menu `Database`.
 - [ ] EBIS via CommandServer: map logical channels (Cathode, DT1, ...) to the physical MICC channels, like the GUI does
 - [x] Automatic reconnect on lost connection and remember/auto-connect last used ports on startup (all devices, also the power meter)
 - [ ] Detect hanging devices (no answer for a long time, but no exception) and reconnect them as well
-- [ ] Monaco: cleaner return types for faults/IP/help (see TODOs in `Monaco.py`)
+- [x] Monaco: cleaner return types for faults/IP/help (lists of codes/texts, `parseIP`, `MonacoCommand`, `MonacoSettings`, `MonacoReprate`)
+- [ ] Monaco: verify the parsing of `?NEW`, `?SESSIONS`, `?TIMEZONES` and `?DAF` with real fault output (formats are not documented)
 - [ ] Monaco: parse `?DATA` (datalogger) output
 - [ ] ISEG: implement MICC user calibration commands
 - [x] Include the device name in error messages of `ThreadedConnection.handleError`

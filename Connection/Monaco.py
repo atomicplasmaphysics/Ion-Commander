@@ -194,10 +194,154 @@ COMMAND        ACCESS    TYPE MIN  MAX     DESCRIPTION
 ?WNAME         CUST      STR               Get the description of a warning code
 """
 
+import re
+from typing import NamedTuple
 from datetime import datetime
 
 
 from Connection.Telnet import TelnetConnection
+
+
+class MonacoCommand(NamedTuple):
+    """One entry of the ?HELP output"""
+    command: str
+    access: str
+    type: str
+    minimum: str
+    maximum: str
+    description: str
+
+
+class MonacoSettings(NamedTuple):
+    """Result of ?SET (still usable as tuple)"""
+    mrr: float  # amplifier repetition rate in kHz
+    pw: float  # pulse width in fs
+    rrd: int  # repetition rate divisor
+    sb: int  # number of seeder bursts
+
+
+class MonacoReprate(NamedTuple):
+    """One available repetition rate/seeder burst combination"""
+    reprate: float  # in kHz
+    bursts: int
+    name: str
+
+
+def parseCodes(response: str) -> list[int]:
+    """
+    Parses a list of fault/warning codes like "12&34" ("SYSTEM OK" or other text returns an empty list)
+
+    :param response: response of the laser
+    """
+
+    codes = []
+    for code in response.replace('\r', '').replace('\n', '&').split('&'):
+        try:
+            codes.append(int(code.strip()))
+        except ValueError:
+            pass
+    return codes
+
+
+def parseTexts(response: str, ok_texts: tuple[str, ...] = ('SYSTEM OK', 'NO ACTIVE')) -> list[str]:
+    """
+    Parses a list of texts separated by "&" or new lines. Returns an empty list if the response means "no entries".
+
+    :param response: response of the laser
+    :param ok_texts: if the response contains one of these texts (case-insensitive), there are no entries
+    """
+
+    upper = response.upper()
+    if any(ok_text in upper for ok_text in ok_texts):
+        return []
+    texts = []
+    for text in response.replace('\r', '').replace('\n', '&').split('&'):
+        text = text.strip(' -')
+        if text:
+            texts.append(text)
+    return texts
+
+
+def parseIP(ip: str) -> tuple[int, int, int, int] | None:
+    """
+    Converts an IP address string "169.254.21.151" into a tuple of 4 integers (None if it is not a valid IP address)
+
+    :param ip: IP address as string
+    """
+
+    parts = ip.strip().split('.')
+    if len(parts) != 4:
+        return None
+    try:
+        numbers = tuple(int(part) for part in parts)
+    except ValueError:
+        return None
+    if not all(0 <= number <= 255 for number in numbers):
+        return None
+    return numbers
+
+
+def parseHelp(response: str) -> list[MonacoCommand]:
+    """
+    Parses the output of ?HELP into a list of <MonacoCommand> (query commands start with "?")
+
+    :param response: response of the laser
+    """
+
+    pattern = re.compile(
+        r'^(?P<command>\??[^\s?]\S*)\s+(?P<access>[A-Z]+)'
+        r'(?:\s+(?P<type>INT|FLT|STR|I64|U64|BOOL)\b)?'
+        r'(?:\s+(?P<minimum>-?\d+(?:\.\d+)?)\s+(?P<maximum>-?\d+(?:\.\d+)?))?'
+        r'\s*(?P<description>.*)$'
+    )
+
+    commands = []
+    for line in response.replace('\r', '').split('\n'):
+        line = line.strip()
+        if not line or line.startswith('COMMAND'):
+            continue
+        match = pattern.match(line)
+        if match is None:
+            continue
+        commands.append(MonacoCommand(
+            match['command'],
+            match['access'],
+            match['type'] or '',
+            match['minimum'] or '',
+            match['maximum'] or '',
+            match['description'].strip()
+        ))
+    return commands
+
+
+def parseReprates(response: str) -> list[MonacoReprate]:
+    """
+    Parses repetition rates like "200:5:'', 200:5:'PulseEQ', 1000:10:''"
+
+    :param response: response of the laser
+    """
+
+    reprates = []
+    for match in re.finditer(r"(\d+(?:\.\d+)?)\s*:\s*(\d+)\s*(?::\s*'([^']*)')?", response):
+        reprates.append(MonacoReprate(float(match[1]), int(match[2]), match[3] or ''))
+    return reprates
+
+
+def parseKeyValues(response: str) -> dict[str, str]:
+    """
+    Parses "KEY=VALUE" pairs separated by "&", "," or new lines (entries without "=" get an empty value)
+
+    :param response: response of the laser
+    """
+
+    values = {}
+    for entry in re.split(r'[&,\r\n]+', response):
+        entry = entry.strip()
+        if not entry:
+            continue
+        key, _, value = entry.partition('=')
+        values[key.strip()] = value.strip()
+    return values
 
 
 def tryConvertToFloat(inp, fallback: float = -1) -> float:
@@ -352,10 +496,9 @@ class MonacoConnection(TelnetConnection):
         """Returns chiller flow"""
         return self._queryAndReturnFloat('?CHF')
 
-    # TODO: better faults
-    def chfaultGet(self) -> str:
-        """Returns chiller faults"""
-        return self._queryAndReturn('?CHFAULT')
+    def chfaultGet(self) -> list[str]:
+        """Returns list of active chiller faults (empty if there are none)"""
+        return parseTexts(self._queryAndReturn('?CHFAULT'))
 
     def chfhGet(self) -> float:
         """Returns chiller high flow rate warning limit"""
@@ -439,12 +582,11 @@ class MonacoConnection(TelnetConnection):
             return -1
         return mmr / rrd
 
-    # TODO: better errors
-    def dafGet(self) -> str:
-        """Returns descriptions of active faults"""
-        return self._queryAndReturn('?DAF')
+    def dafGet(self) -> list[str]:
+        """Returns descriptions of active faults (empty if "SYSTEM OK")"""
+        return parseTexts(self._queryAndReturn('?DAF'))
 
-    # TODO: better data get
+    # TODO: parse data of datalogger (format unknown)
     def dataGet(self, cmd: str) -> str:
         """Returns data from the datalogger"""
         return self._queryAndReturn(f'?DATA {cmd}')
@@ -585,20 +727,13 @@ class MonacoConnection(TelnetConnection):
         """Closes an Ethernet connection"""
         self._queryAndReturn('EXIT')
 
-    # TODO: better faults
     def fGet(self) -> list[int]:
         """
         Displays a list of faults, if present.
         Use ?FNAME command to show a description of a particular fault.
         If a fault is present, it will turn off the laser.
         """
-        res = self._queryAndReturn('?F')
-        ret = []
-        try:
-            ret = [int(s) for s in res.split('&')]
-        except ValueError:
-            pass
-        return ret
+        return parseCodes(self._queryAndReturn('?F'))
 
     def fGetInfo(self) -> dict[int, tuple[str, str]]:
         """Displays a list of fault ids and their type and description"""
@@ -619,19 +754,17 @@ class MonacoConnection(TelnetConnection):
         """Acknowledge faults and return the laser to a ready state if the fault condition is lifted"""
         self._queryAndReturn('FACK=1')
 
-    # TODO: better faults
-    def faultsGet(self) -> str:
-        """Returns a list of numbered codes of all active faults. separated by an &, or returns “System OK” if no active faults"""
-        return self._queryAndReturn('?FAULTS')
+    def faultsGet(self) -> list[int]:
+        """Returns a list of numbered codes of all active faults (empty if "System OK")"""
+        return parseCodes(self._queryAndReturn('?FAULTS'))
 
-    # TODO: better faults
-    def fhGet(self) -> str:
+    def fhGet(self) -> list[int]:
         """
-        Returns the fault history with index numbers delimited by “&” sign with no spaces.
+        Returns the fault history as list of codes (empty if "SYSTEM OK").
         Faults are recorded in chronological order since last AC power up or last FHC command.
         Fault history is limited to the last 20 faults.
         """
-        return self._queryAndReturn('?FH')
+        return parseCodes(self._queryAndReturn('?FH'))
 
     def fhcSet(self):
         """Clears the fault history"""
@@ -685,13 +818,12 @@ class MonacoConnection(TelnetConnection):
         """Returns the heartbeat timeout in seconds (0=disabled)"""
         return self._queryAndReturnInt('?HB')
 
-    # TODO: better help
-    def helpGet(self, search: str = '') -> str:
-        """Query commands, with optional filter"""
+    def helpGet(self, search: str = '') -> list[MonacoCommand]:
+        """Query commands, with optional filter. Query commands start with "?"."""
         cmd = '?HELP'
         if search:
             cmd += f' {search}'
-        return self._queryAndReturn(cmd)
+        return parseHelp(self._queryAndReturn(cmd))
 
     def hhGet(self) -> float:
         """Returns the number of operating hours on the system head"""
@@ -820,10 +952,9 @@ class MonacoConnection(TelnetConnection):
         ret_state = l_states.get(l_state, ('Not defined', True))
         return ret_state[0], ret_state[1], l_state
 
-    # TODO: return ip in tuple of 4 ints instead of string -> external function
-    def lipGet(self) -> str:
-        """Returns last used static IP address"""
-        return self._queryAndReturn('?LIP')
+    def lipGet(self) -> tuple[int, int, int, int] | None:
+        """Returns last used static IP address as tuple of 4 integers (None if not available)"""
+        return parseIP(self._queryAndReturn('?LIP'))
 
     def lmGet(self) -> str:
         """Returns the laser model"""
@@ -855,13 +986,9 @@ class MonacoConnection(TelnetConnection):
         """
         return self._queryAndReturnInt('?LOCKOUT')
 
-    # TODO: better implementation
-    def lookupRepratesNamesGet(self) -> str:
-        """
-        Returns a list of the laser repetition rates/seeder burst lengths that are available in the format:
-        {reprate in kHz}:{seeder burst length}
-        """
-        return self._queryAndReturn('?LOOKUP REPRATES NAMES')
+    def lookupRepratesNamesGet(self) -> list[MonacoReprate]:
+        """Returns a list of the available laser repetition rates (in kHz), seeder burst lengths and names"""
+        return parseReprates(self._queryAndReturn('?LOOKUP REPRATES NAMES'))
 
     def lpssnGet(self) -> str:
         """Returns low power stage serial number"""
@@ -887,10 +1014,9 @@ class MonacoConnection(TelnetConnection):
         """Get machine safe shutter installed"""
         return self._queryAndReturnInt('?MSI')
 
-    # TODO: better output
-    def newGet(self) -> str:
-        """Returns every parameter that has changed"""
-        return self._queryAndReturn('?NEW')
+    def newGet(self) -> dict[str, str]:
+        """Returns every parameter that has changed as {parameter: value}"""
+        return parseKeyValues(self._queryAndReturn('?NEW'))
 
     def passwordSet(self, password: str):
         """Sets up or changes the user password"""
@@ -1109,10 +1235,9 @@ class MonacoConnection(TelnetConnection):
         """
         return self._queryAndReturnInt('?SE')
 
-    # TODO: better output
-    def sessionsGet(self) -> str:
+    def sessionsGet(self) -> list[str]:
         """Lists the active connections"""
-        return self._queryAndReturn('?SESSIONS')
+        return parseTexts(self._queryAndReturn('?SESSIONS'), ok_texts=())
 
     def setSet(
         self,
@@ -1154,8 +1279,7 @@ class MonacoConnection(TelnetConnection):
 
         self._queryAndReturn(cmd)
 
-    # TODO: better output variables
-    def setGet(self) -> tuple[float, float, int, int]:
+    def setGet(self) -> MonacoSettings:
         """
         Returns the current values for the laser parameters:
             MRR: amplifier repetition rate in kHz
@@ -1165,7 +1289,7 @@ class MonacoConnection(TelnetConnection):
         """
         query = self._queryAndReturn('?SET').split(',')
         query.extend(['0'] * (4 - len(query)))
-        return (
+        return MonacoSettings(
             tryConvertToFloat(query[0]),
             tryConvertToFloat(query[1]),
             int(tryConvertToFloat(query[2])),
@@ -1280,10 +1404,9 @@ class MonacoConnection(TelnetConnection):
         """Returns local time zone on the laser clock"""
         return self._queryAndReturn('?TIMEZONE')
 
-    # TODO: better returning
-    def timezonesGet(self) -> str:
+    def timezonesGet(self) -> list[str]:
         """Returns available time zones for this laser"""
-        return self._queryAndReturn('?TIMEZONES')
+        return parseTexts(self._queryAndReturn('?TIMEZONES'), ok_texts=())
 
     def tstlGet(self) -> int:
         """Checks if all temperature servos are tight locked"""
@@ -1303,13 +1426,7 @@ class MonacoConnection(TelnetConnection):
 
     def wGet(self) -> list[int]:
         """Displays a list of warning ids"""
-        res = self._queryAndReturn('?W')
-        ret = []
-        try:
-            ret = [int(s) for s in res.split('&')]
-        except ValueError:
-            pass
-        return ret
+        return parseCodes(self._queryAndReturn('?W'))
 
     def wGetInfo(self) -> dict[int, tuple[str, str]]:
         """Displays a list of warning ids and their type and description"""
@@ -1326,10 +1443,9 @@ class MonacoConnection(TelnetConnection):
             ret[w] = (res[0].strip(), str(':'.join(res[1:]).strip()))
         return ret
 
-    # TODO: better output
-    def whGet(self) -> str:
-        """Displays the warning history"""
-        return self._queryAndReturn('?WH')
+    def whGet(self) -> list[int]:
+        """Displays the warning history as list of codes (empty if "SYSTEM OK")"""
+        return parseCodes(self._queryAndReturn('?WH'))
 
     def whcSet(self):
         """Clears the warning history"""
