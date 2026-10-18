@@ -291,6 +291,7 @@ class PowerMeterVBoxLayout(QVBoxLayout):
 
         # get display value
         def setDisplayValue(values: [float, float]):
+            # TODO: value might not be in valid range or something
             value = self.getDisplayParameter(values)
             self.status_display_power_min.setValue(min(self.status_display_power_min.value, value))
             self.status_display_power_max.setValue(max(self.status_display_power_max.value, value))

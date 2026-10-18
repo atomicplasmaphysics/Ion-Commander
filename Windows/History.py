@@ -158,9 +158,9 @@ class HistoryWindow(TabWidget):
 
         self.splitter.addWidget(self.preview_export_widget)
 
-        # Division between columns
-        self.splitter.setStretchFactor(0, 10)
-        self.splitter.setStretchFactor(0, 90)
+        # Division between columns  # TODO: does not really work as intended
+        self.splitter.setStretchFactor(0, 5)
+        self.splitter.setStretchFactor(0, 95)
 
     def selectAll(self, listwidget_index: int, state: Qt.CheckState):
         """
