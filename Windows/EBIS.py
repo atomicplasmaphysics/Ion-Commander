@@ -1,3 +1,6 @@
+from time import monotonic
+
+
 from serial import SerialException
 
 
@@ -11,8 +14,9 @@ from Config.StylesConf import Colors
 
 from DB.db import DB
 
-from Utility.Layouts import InsertingGridLayout, IndicatorLed, DoubleSpinBox, DisplayLabel, ComboBox
+from Utility.Layouts import InsertingGridLayout, IndicatorLed, DoubleSpinBox, DisplayLabel, ComboBox, ScientificDoubleSpinBox, ReadingAgeLabel
 from Utility.Dialogs import showMessageBox
+from Utility.Interlock import PressureInterlock, InterlockLimits, InterlockResult
 
 from Connection.USBPorts import getComports
 from Connection.ISEG import ISEGConnection
@@ -64,13 +68,15 @@ class EBISVBoxLayout(QVBoxLayout):
         self.button_connection_refresh.setToolTip('Refresh connections list')
         self.button_connection_refresh.setIcon(QIcon('icons/refresh.png'))
         self.button_connection_refresh.pressed.connect(self.setComportsComboBox)
+        self.status_reading_age = ReadingAgeLabel()
         self.connection_grid.addWidgets(
             self.label_connection,
             self.indicator_connection,
             (self.status_connection, 2),
             self.combobox_connection,
             self.button_connection,
-            self.button_connection_refresh
+            self.button_connection_refresh,
+            self.status_reading_age
         )
 
         # Potentials Group Box
@@ -346,75 +352,121 @@ class EBISVBoxLayout(QVBoxLayout):
             self.spinbox_advanced_settings_ramp
         )
 
-        # Pressure safety
-        self.pressure_group_box = QGroupBox('Pressure Control')
+        # Pressure interlock
+        self.pressure_group_box = QGroupBox('Pressure Interlock')
+        self.pressure_group_box.setToolTip(
+            'Lowers the cathode heating current if the pressure is too high or if there is no valid pressure reading.\n'
+            'A trip is latched until "Re-arm" is pressed.'
+        )
         self.addWidget(self.pressure_group_box)
+
+        self.pressure_vbox = QVBoxLayout()
+        self.pressure_group_box.setLayout(self.pressure_vbox)
 
         self.pressure_hbox = QHBoxLayout()
         self.pressure_hbox.setAlignment(Qt.AlignmentFlag.AlignLeft)
-        self.pressure_group_box.setLayout(self.pressure_hbox)
+        self.pressure_vbox.addLayout(self.pressure_hbox)
 
         self.pressure_grid = InsertingGridLayout()
         self.pressure_hbox.addLayout(self.pressure_grid)
 
+        stored_limits, stored_gauge = GlobalConf.getEBISInterlock()
+        self.interlock = PressureInterlock(
+            InterlockLimits.fromDict(stored_limits),
+            check_interval=DefaultParams.update_timer_time / 1000
+        )
+        limits = self.interlock.limits
+
+        # Interlock state
+        self.label_interlock_state = QLabel('State')
+        self.indicator_interlock_state = IndicatorLed(on_color=Colors.color_red, off_color=Colors.color_green)
+        self.indicator_interlock_state.setToolTip('Green: armed, red: tripped')
+        self.status_interlock_state = QLabel(self.interlock.state.text())
+        self.button_interlock_reset = QPushButton('Re-arm')
+        self.button_interlock_reset.setToolTip('Re-arms the interlock after a trip. It trips again immediately if the cause is still present.')
+        self.button_interlock_reset.pressed.connect(self.resetInterlock)
+        self.pressure_grid.addWidgets(
+            self.label_interlock_state,
+            self.indicator_interlock_state,
+            (self.status_interlock_state, 2),
+            self.button_interlock_reset
+        )
+
         # Pressure gauge selection
         self.label_pressure_gauge = QLabel('Pressure Gauge')
+        pressure_gauge_names = list(PressureVBoxLayout.pressure_gauges.keys())
         self.combobox_pressure_gauge = ComboBox(
-            entries=PressureVBoxLayout.pressure_gauges.keys()
+            entries=pressure_gauge_names,
+            default=pressure_gauge_names.index(stored_gauge) if stored_gauge in pressure_gauge_names else 0
         )
+        self.combobox_pressure_gauge.setToolTip('Pressure gauge used by the interlock')
+        self.combobox_pressure_gauge.currentIndexChanged.connect(self.saveInterlockSettings)
+        self.status_interlock_pressure = QLabel('')
+        self.status_interlock_pressure.setToolTip('Last pressure of the selected gauge and age of the reading')
         self.pressure_grid.addWidgets(
             self.label_pressure_gauge,
-            self.combobox_pressure_gauge
+            None,
+            self.combobox_pressure_gauge,
+            self.status_interlock_pressure
         )
 
-        # Hard pressure limit (turns off immediately)
-        self.label_hard_pmax = QLabel('Hard limit max pressure [10^-8 mbar]') # Not great but I dont want to make a new SpinBox class for scientific notation
-        self.hard_pmax_val = 10
-        self.spinbox_hard_pmax = DoubleSpinBox(default=self.hard_pmax_val, step_size=1, input_range=(0.1, 1000), decimals=1, buttons=False)
-        self.spinbox_hard_pmax.editingFinished.connect(lambda: setattr(self, 'hard_pmax_val', self.spinbox_hard_pmax.value() * 1E-8)) # set pressure in 10^-8mbar
+        # Hard pressure limit (lowers current immediately)
+        self.label_hard_pmax = QLabel('Hard limit [mbar]')
+        self.spinbox_hard_pmax = ScientificDoubleSpinBox(default=limits.hard_pressure, input_range=(1E-11, 1E3))
+        self.spinbox_hard_pmax.setToolTip('If the pressure is above this value, the heating current is lowered immediately (e.g. 1E-7)')
+        self.spinbox_hard_pmax.editingFinished.connect(self.saveInterlockSettings)
+        self.label_hard_current = QLabel('Current [A]')
+        self.spinbox_hard_current = DoubleSpinBox(default=limits.hard_current, step_size=0.1, input_range=(0, 3), decimals=2, buttons=False)
+        self.spinbox_hard_current.setToolTip('Heating current after a hard trip or if there is no valid pressure reading')
+        self.spinbox_hard_current.editingFinished.connect(self.saveInterlockSettings)
         self.pressure_grid.addWidgets(
             self.label_hard_pmax,
-            self.spinbox_hard_pmax
-        )
-
-        # Safe heating current
-        self.label_hard_current = QLabel('Hard target current [A]')
-        self.hard_current_val = 0.0
-        self.spinbox_hard_current = DoubleSpinBox(default=self.hard_current_val, step_size=0.1, input_range=(0, 3), decimals=2, buttons=False)
-        self.spinbox_hard_current.editingFinished.connect(lambda: setattr(self, 'hard_current_val', self.spinbox_hard_current.value()))
-        self.pressure_grid.addWidgets(
+            None,
+            self.spinbox_hard_pmax,
             self.label_hard_current,
             self.spinbox_hard_current
         )
 
-        # Soft pressure limit (turns off if avg perssure is over limit for too long)
-        self.label_soft_pmax = QLabel('Soft limit max pressure [10^-8 mbar]')
-        self.soft_pmax_val = 10
-        self.spinbox_soft_pmax = DoubleSpinBox(default=self.soft_pmax_val, step_size=1, input_range=(0.11, 1000), decimals=1, buttons=False)
-        self.spinbox_soft_pmax.editingFinished.connect(lambda: setattr(self, 'soft_pmax_val', self.spinbox_soft_pmax.value() * 1E-8)) # set pressure in 10^-8mbar
+        # Soft pressure limit (lowers current if median pressure is over limit for too long)
+        self.label_soft_pmax = QLabel('Soft limit [mbar]')
+        self.spinbox_soft_pmax = ScientificDoubleSpinBox(default=limits.soft_pressure, input_range=(1E-11, 1E3))
+        self.spinbox_soft_pmax.setToolTip('If the median pressure over the soft limit duration is above this value, the heating current is lowered')
+        self.spinbox_soft_pmax.editingFinished.connect(self.saveInterlockSettings)
+        self.label_soft_current = QLabel('Current [A]')
+        self.spinbox_soft_current = DoubleSpinBox(default=limits.soft_current, step_size=0.1, input_range=(0, 3), decimals=2, buttons=False)
+        self.spinbox_soft_current.setToolTip('Heating current after a soft trip')
+        self.spinbox_soft_current.editingFinished.connect(self.saveInterlockSettings)
         self.pressure_grid.addWidgets(
             self.label_soft_pmax,
-            self.spinbox_soft_pmax
+            None,
+            self.spinbox_soft_pmax,
+            self.label_soft_current,
+            self.spinbox_soft_current
         )
 
         # Soft pressure limit time
         self.label_soft_pmax_time = QLabel('Soft limit duration [s]')
-        self.soft_time_val = 3
-        self.spinbox_soft_time = DoubleSpinBox(default=self.soft_time_val, step_size=1, input_range=(0, 1000), decimals=1, buttons=False)
-        self.spinbox_soft_time.editingFinished.connect(lambda: setattr(self, 'soft_time_val', self.spinbox_soft_time.value()))
+        self.spinbox_soft_time = DoubleSpinBox(default=limits.soft_time, step_size=1, input_range=(0, 1000), decimals=1, buttons=False)
+        self.spinbox_soft_time.setToolTip('Duration over which the median pressure is compared with the soft limit')
+        self.spinbox_soft_time.editingFinished.connect(self.saveInterlockSettings)
         self.pressure_grid.addWidgets(
             self.label_soft_pmax_time,
+            None,
             self.spinbox_soft_time
         )
 
-        # Safe heating current
-        self.label_soft_current = QLabel('Soft target current [A]')
-        self.soft_current_val = 0.0
-        self.spinbox_soft_current = DoubleSpinBox(default=self.soft_current_val, step_size=0.1, input_range=(0, 3), decimals=2, buttons=False)
-        self.spinbox_soft_current.editingFinished.connect(lambda: setattr(self, 'soft_current_val', self.spinbox_soft_current.value()))
+        # Watchdog time
+        self.label_watchdog_time = QLabel('No reading timeout [s]')
+        self.spinbox_watchdog_time = DoubleSpinBox(default=limits.watchdog_time, step_size=1, input_range=(2, 600), decimals=1, buttons=False)
+        self.spinbox_watchdog_time.setToolTip(
+            'If there is no valid pressure reading for this time (gauge/ADC disconnected, pressure 0 or not updating),\n'
+            'the heating current is lowered to the hard limit current'
+        )
+        self.spinbox_watchdog_time.editingFinished.connect(self.saveInterlockSettings)
         self.pressure_grid.addWidgets(
-            self.label_soft_current,
-            self.spinbox_soft_current
+            self.label_watchdog_time,
+            None,
+            self.spinbox_watchdog_time
         )
 
         # grouped items
@@ -485,6 +537,7 @@ class EBISVBoxLayout(QVBoxLayout):
         ]
 
         self.reset()
+        self.updateInterlockDisplay()
 
         last_connection = GlobalConf.getConnection('ebis')
         if last_connection:
@@ -492,6 +545,8 @@ class EBISVBoxLayout(QVBoxLayout):
 
     def updateLoop(self):
         """Called by timer; Updates actual voltages"""
+
+        self.status_reading_age.setAge(self.threaded_connection.secondsSinceLastResult(), self.indicator_connection.value())
 
         if not self.checkConnection(False):
             return
@@ -617,9 +672,107 @@ class EBISVBoxLayout(QVBoxLayout):
         if not self.checkConnection():
             return
 
+        # heating current is limited while the pressure interlock is tripped
+        trip_current = self.interlock.tripCurrent()
+        if channel == 5 and trip_current is not None and current > trip_current:
+            GlobalConf.logger.warning(f'EBIS: Heating current {current} A refused, pressure interlock is tripped (max. {trip_current} A)')
+            self.spinbox_current_6.setValue(trip_current)
+            if not self.active_message_box:
+                self.active_message_box = True
+                showMessageBox(
+                    None,
+                    QMessageBox.Icon.Warning,
+                    'Pressure interlock tripped!',
+                    f'The heating current is limited to {trip_current} A, because the pressure interlock is tripped:<br>{self.interlock.trip_message}',
+                    'Re-arm the interlock first (EBIS panel: Pressure Interlock: Re-arm).'
+                )
+                self.active_message_box = False
+            current = trip_current
+
         self.status_currents[channel].setTargetValue(current)
         phys_channel = self.channel_dict[channel]
         self.threaded_connection.currentSet(phys_channel, current)
+
+    def saveInterlockSettings(self):
+        """Takes the interlock limits from the input fields and stores them persistently"""
+
+        self.interlock.limits = InterlockLimits(
+            hard_pressure=self.spinbox_hard_pmax.value(),
+            hard_current=self.spinbox_hard_current.value(),
+            soft_pressure=self.spinbox_soft_pmax.value(),
+            soft_time=self.spinbox_soft_time.value(),
+            soft_current=self.spinbox_soft_current.value(),
+            watchdog_time=self.spinbox_watchdog_time.value()
+        )
+        GlobalConf.updateEBISInterlock(
+            self.interlock.limits.toDict(),
+            self.combobox_pressure_gauge.getValue(text=True)
+        )
+
+    def resetInterlock(self):
+        """Re-arms the interlock after a trip"""
+
+        if self.interlock.isTripped():
+            GlobalConf.logger.info(f'EBIS: Pressure interlock re-armed by user (was: {self.interlock.state.text()}: {self.interlock.trip_message})')
+        self.interlock.reset()
+        if not self.indicator_connection.value():
+            self.interlock.disable()
+        self.updateInterlockDisplay()
+
+    def checkInterlock(self, pressure: float | None, reading_age: float | None) -> InterlockResult | None:
+        """
+        Checks the pressure interlock and lowers the heating current if needed. Should be called periodically.
+
+        :param pressure: last pressure of the selected gauge in mbar (0 or None if not available)
+        :param reading_age: seconds since the last successful pressure reading (None if there was none)
+        :returns: result of the check (None if the EBIS is not connected)
+        """
+
+        if not self.indicator_connection.value():
+            self.interlock.disable()
+            self.updateInterlockDisplay(pressure, reading_age)
+            return None
+
+        result = self.interlock.check(pressure, reading_age, monotonic())
+
+        if result.target_current is not None:
+            # also compare with the measured current, so changes from scripts/CommandServer are caught as well
+            set_current = self.spinbox_current_6.value()
+            measured_current = self.status_current_6.value
+            if set_current > result.target_current or measured_current > result.target_current + self.current_deviation:
+                GlobalConf.logger.warning(f'EBIS: Pressure interlock lowers heating current to {result.target_current} A ({result.message})')
+                self.spinbox_current_6.setValue(result.target_current)
+                self.status_current_6.setTargetValue(result.target_current)
+                self.threaded_connection.currentSet(self.channel_dict[5], result.target_current)
+
+        if result.new_trip:
+            GlobalConf.logger.error(f'EBIS: Pressure interlock {result.state.text()}: {result.message}')
+
+        self.updateInterlockDisplay(pressure, reading_age)
+        return result
+
+    def updateInterlockDisplay(self, pressure: float | None = None, reading_age: float | None = None):
+        """
+        Updates the interlock state in the GUI
+
+        :param pressure: last pressure of the selected gauge in mbar
+        :param reading_age: seconds since the last successful pressure reading
+        """
+
+        state = self.interlock.state
+        self.indicator_interlock_state.setValue(state.isTripped())
+        text = state.text()
+        if state.isTripped():
+            text = f'{text}, max. {self.interlock.tripCurrent()} A'
+        self.status_interlock_state.setText(text)
+        self.status_interlock_state.setToolTip(self.interlock.trip_message)
+        self.status_interlock_state.setStyleSheet(f'color: {Colors.color_red};' if state.isTripped() else '')
+
+        if PressureInterlock.isValidPressure(pressure):
+            age_text = 'no reading' if reading_age is None else f'{reading_age:.1f} s ago'
+            self.status_interlock_pressure.setText(f'{pressure:.2E} mbar ({age_text})')
+        else:
+            self.status_interlock_pressure.setText('No valid pressure')
 
     def setCurrentLimit(self, channel: int, current: float):
         """

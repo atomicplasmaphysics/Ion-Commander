@@ -1,5 +1,5 @@
 from typing import TYPE_CHECKING, Callable
-from time import time, sleep
+from time import time, sleep, monotonic
 
 
 from PyQt6.QtCore import QObject, pyqtSignal, QRunnable, pyqtSlot, QThreadPool
@@ -179,10 +179,20 @@ class ThreadedConnection(QObject):
         self.callback_id = CallbackId()
         self.callbacks = {}
 
+        # watchdog: time (monotonic) of the last successful answer of the device, None if there was none yet
+        self.last_result_time: float | None = None
+
     def isDummy(self) -> bool:
         """Returns if it is a dummy <ThreadedConnection>"""
 
         return self.connection is None
+
+    def secondsSinceLastResult(self) -> float | None:
+        """Returns the seconds since the last successful answer of the device (None if there was none yet)"""
+
+        if self.last_result_time is None:
+            return None
+        return monotonic() - self.last_result_time
 
     @pyqtSlot(int, Exception)
     def handleError(self, callback_id: int, error: Exception):
@@ -252,6 +262,8 @@ class ThreadedConnection(QObject):
 
         if self.connection is None:
             raise NotImplementedError('There should not be a callback happening')
+
+        self.last_result_time = monotonic()
 
         function = self.callbacks.get(callback_id)
         if function is None:

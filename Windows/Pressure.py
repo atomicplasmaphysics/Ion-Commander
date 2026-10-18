@@ -16,7 +16,7 @@ from DB.db import DB
 
 from Socket.CommandServer import DeviceMixedPressureWrapper
 
-from Utility.Layouts import PressureWidget, IndicatorLed, ComboBox
+from Utility.Layouts import PressureWidget, IndicatorLed, ComboBox, ReadingAgeLabel
 from Utility.Dialogs import showMessageBox
 
 from Connection.USBPorts import getComports
@@ -71,6 +71,8 @@ class PressureVBoxLayout(QVBoxLayout):
         self.connection_hbox.addWidget(self.indicator_connection)
         self.status_connection = QLabel('Not connected')
         self.connection_hbox.addWidget(self.status_connection)
+        self.status_reading_age = ReadingAgeLabel()
+        self.connection_hbox.addWidget(self.status_reading_age)
 
         self.connection_hbox_selection = QHBoxLayout()
         self.connection_hbox_selection.setAlignment(Qt.AlignmentFlag.AlignLeft)
@@ -110,6 +112,8 @@ class PressureVBoxLayout(QVBoxLayout):
 
     def updatePressure(self):
         """Updates the pressure variables"""
+
+        self.status_reading_age.setAge(self.secondsSinceLastUpdate(), not self.device_wrapper.threaded_connection.isDummy())
 
         if self.device_wrapper.threaded_connection.isDummy():
             return

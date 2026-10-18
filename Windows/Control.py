@@ -13,9 +13,6 @@ from Windows.EBIS import EBISVBoxLayout
 from Windows.Laser import LaserVBoxLayout
 from Windows.Pressure import PressureVBoxLayout
 
-from math import ceil
-from statistics import median
-
 
 class ControlWindow(TabWidget):
     """
@@ -70,7 +67,6 @@ class ControlWindow(TabWidget):
             self.pressure_check_timer.timeout.connect(self.pressureCheck)
             self.pressure_check_timer.setInterval(DefaultParams.update_timer_time)
             self.pressure_check_timer.start()
-            self.pressure_buffer=[]
 
         # LASER CONTROL
         self.laser_vbox = VBoxTitleLayout('LASER', parent=self, add_stretch=True, popout_enable=True)
@@ -109,34 +105,24 @@ class ControlWindow(TabWidget):
         self.splitter.setStretchFactor(splitter_count, int(100 - splitter_width * splitter_count))
 
     def pressureCheck(self):
-        """Checks pressure periodically"""
+        """Feeds the EBIS pressure interlock periodically and logs every trip to the database"""
 
-        # disable EBIS heating current if pressure is too high
-        if not self.ebis_enabled or not self.ebis_group_vbox.indicator_connection.value():
+        if not self.ebis_enabled:
             return
 
-        selected_pressure_gauge = self.ebis_group_vbox.combobox_pressure_gauge.getValue()
-        if selected_pressure_gauge < 0 or selected_pressure_gauge > len(self.pressure_group_vbox.pressure_widgets):
-            GlobalConf.logger.error(f'Selected pressure gauge ({selected_pressure_gauge}) not available (0 - {len(self.pressure_group_vbox.pressure_widgets)} possible)')
+        gauge_name = self.ebis_group_vbox.combobox_pressure_gauge.getValue(text=True)
+        pressure = self.pressure_group_vbox.getPressure(gauge_name)
+        reading_age = self.pressure_group_vbox.secondsSinceLastUpdate()
+
+        result = self.ebis_group_vbox.checkInterlock(pressure, reading_age)
+        if result is None or not result.new_trip:
             return
 
-        last_pressure = self.pressure_group_vbox.pressure_widgets[selected_pressure_gauge].pressure
-
-        # Hard limit : turn off immediately if pressure is above hard limit
-        if last_pressure > self.ebis_group_vbox.hard_pmax_val and self.ebis_group_vbox.spinbox_current_6.value() > self.ebis_group_vbox.hard_current_val:
-            self.ebis_group_vbox.setCurrent(5, self.ebis_group_vbox.hard_current_val)
-            self.ebis_group_vbox.spinbox_current_6.setValue(self.ebis_group_vbox.hard_current_val)
-            return
-
-        # Soft limit : turn off if average pressure is above soft limit
-        pressure_buffer_length = ceil(1000 * self.ebis_group_vbox.soft_time_val / DefaultParams.update_timer_time)
-        self.pressure_buffer.append(last_pressure)
-        self.pressure_buffer = self.pressure_buffer[-pressure_buffer_length:]
-        # average_pressure = sum(self.pressure_buffer) / len(self.pressure_buffer)
-        if median(self.pressure_buffer) > self.ebis_group_vbox.soft_pmax_val and self.ebis_group_vbox.spinbox_current_6.value() > self.ebis_group_vbox.soft_current_val:
-            self.ebis_group_vbox.setCurrent(5, self.ebis_group_vbox.soft_current_val)
-            self.ebis_group_vbox.spinbox_current_6.setValue(self.ebis_group_vbox.soft_current_val)
-            return
+        message = f'{result.state.text()} ({gauge_name}): {result.message}, heating current limited to {result.target_current} A'
+        self.writeStatusBar(f'EBIS pressure interlock: {message}', 0)
+        database = getattr(self.main_window, 'database', None)
+        if database is not None:
+            database.insertEvent('EBIS', f'interlock_{result.state.name.lower()}', message, result.value)
 
     def closeEvent(self, event):
         """Closes all connections"""

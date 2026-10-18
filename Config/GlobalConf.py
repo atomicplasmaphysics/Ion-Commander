@@ -100,7 +100,7 @@ class GlobalConf:
     title = 'Ion Commander'
 
     # version (single source of truth - update only here)
-    version = '0.1.53'
+    version = '0.1.54'
 
     # logger
     logger = logging.getLogger(title)
@@ -125,6 +125,10 @@ class GlobalConf:
     connection_laser_ip4_name = 'connection_laser_ip4'
     connection_laser_port_name = 'connection_laser_port'
     connection_power_meter_port_name = 'connection_power_meter_port'
+
+    # EBIS interlock parameters
+    ebis_interlock_group_name = 'ebis_interlock'
+    ebis_interlock_gauge_name = 'ebis_interlock_gauge'
 
     # power meter parameters
     power_meter_display_parameter_name = 'power_meter_display_parameter'
@@ -221,6 +225,37 @@ class GlobalConf:
                     GlobalConf.settings.value(GlobalConf.connection_laser_ip4_name, defaultValue=-1, type=int),
                     GlobalConf.settings.value(GlobalConf.connection_laser_port_name, defaultValue=-1, type=int))
         raise NotImplementedError(f'Connection type {connection_type} not implemented')
+
+    @staticmethod
+    def updateEBISInterlock(limits: dict[str, float] = None, gauge: str = None):
+        """
+        Updates and saves settings object with the EBIS pressure interlock parameters
+
+        :param limits: dictionary of interlock limits (see <InterlockLimits>), all pressures in mbar
+        :param gauge: name of the selected pressure gauge
+        """
+
+        if limits is not None:
+            for key, value in limits.items():
+                GlobalConf.settings.setValue(f'{GlobalConf.ebis_interlock_group_name}/{key}', float(value))
+        if gauge is not None:
+            GlobalConf.settings.setValue(GlobalConf.ebis_interlock_gauge_name, gauge)
+
+        GlobalConf.settings.sync()
+
+    @staticmethod
+    def getEBISInterlock() -> tuple[dict[str, float], str]:
+        """Returns (dictionary of stored interlock limits, name of pressure gauge); missing limits are not in the dictionary"""
+
+        limits = {}
+        GlobalConf.settings.beginGroup(GlobalConf.ebis_interlock_group_name)
+        keys = GlobalConf.settings.childKeys()
+        GlobalConf.settings.endGroup()
+        for key in keys:
+            limits[key] = GlobalConf.settings.value(f'{GlobalConf.ebis_interlock_group_name}/{key}', defaultValue=-1, type=float)
+
+        gauge = GlobalConf.settings.value(GlobalConf.ebis_interlock_gauge_name, defaultValue='', type=str)
+        return limits, gauge
 
     @staticmethod
     def updatePowerMeterDisplayParameter(display_parameter: int):

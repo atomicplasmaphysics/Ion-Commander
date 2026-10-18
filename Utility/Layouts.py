@@ -629,6 +629,108 @@ class DoubleSpinBox(QDoubleSpinBox):
         return value_formatted_str
 
 
+class ScientificDoubleSpinBox(QDoubleSpinBox):
+    """
+    Extension of QDoubleSpinBox for values in scientific notation (e.g. pressures like 1.5E-8).
+    Input like "1.5e-8", "1.5E-8" or "0.000000015" is accepted. Stepping (if enabled) multiplies/divides the mantissa by one step.
+
+    :param default: default value to start with and reset
+    :param input_range: (optional) valid input range
+    :param significant_digits: (optional) number of digits after the decimal point of the mantissa
+    :param buttons: (optional) if buttons for increasing/decreasing should be displayed
+    :param scroll: (optional) if scrolling changes the value
+    """
+
+    def __init__(
+        self,
+        *args,
+        default: float = 0,
+        input_range: tuple[float, float] = None,
+        significant_digits: int = 2,
+        buttons: bool = False,
+        scroll: bool = False,
+        **kwargs
+    ):
+        super().__init__(*args, **kwargs)
+
+        self.setMinimumSize(70, 20)
+
+        self.default = default
+        self.significant_digits = significant_digits
+
+        # QDoubleSpinBox rounds internally to its decimals, so allow (nearly) all
+        self.setDecimals(323)
+
+        if input_range is not None:
+            self.setRange(input_range[0], input_range[1])
+
+        if not buttons:
+            self.setButtonSymbols(QSpinBox.ButtonSymbols.NoButtons)
+
+        if not scroll:
+            self.wheelEvent = lambda event: None
+
+        self.setValue(default)
+
+    def reset(self):
+        """Resets itself to its default value"""
+        self.setValue(self.default)
+
+    def textFromValue(self, value: float) -> str:
+        """Displays value in scientific notation"""
+        return f'{value:.{self.significant_digits}E}'
+
+    def valueFromText(self, text: str) -> float:
+        """Converts text into value"""
+        try:
+            return float(text.strip().replace(',', '.'))
+        except ValueError:
+            return self.value()
+
+    def validate(self, text: str, position: int):
+        """Validates the input"""
+
+        from PyQt6.QtGui import QValidator
+
+        stripped = text.strip().replace(',', '.')
+        try:
+            value = float(stripped)
+        except ValueError:
+            # allow partial input like "1.", "1e", "1e-"
+            if stripped == '' or all(char in '0123456789.eE+-' for char in stripped):
+                return QValidator.State.Intermediate, text, position
+            return QValidator.State.Invalid, text, position
+
+        if self.minimum() <= value <= self.maximum():
+            return QValidator.State.Acceptable, text, position
+        return QValidator.State.Intermediate, text, position
+
+    def fixup(self, text: str) -> str:
+        """Called if input is not acceptable when editing is finished: clamp to range"""
+        try:
+            value = float(text.strip().replace(',', '.'))
+        except ValueError:
+            return self.textFromValue(self.value())
+        return self.textFromValue(min(max(value, self.minimum()), self.maximum()))
+
+    def stepBy(self, steps: int):
+        """Steps the mantissa: 1.0E-8 -> 2.0E-8 (up) or 9.0E-9 (down)"""
+
+        value = self.value()
+        if value <= 0:
+            super().stepBy(steps)
+            return
+
+        for _ in range(abs(steps)):
+            exponent = int(np.floor(np.log10(value)))
+            mantissa = round(value / 10 ** exponent, self.significant_digits)
+            if steps > 0:
+                value = (mantissa + 1) * 10 ** exponent
+            else:
+                value = (mantissa - 1) * 10 ** exponent if mantissa > 1 else 9 * 10 ** (exponent - 1)
+        self.setValue(min(max(value, self.minimum()), self.maximum()))
+
+
 class LineEdit(QLineEdit):
     """
     Extension of QLineEdit
@@ -1590,6 +1692,49 @@ class PressureWidget(QWidget):
         self.pressure_label.setText(label_text)
         self.stack_widget.changePercentage(percentage)
         self.stack_widget.setValue(stack_widget_value)
+
+
+class ReadingAgeLabel(QLabel):
+    """
+    Label that shows the age of the last reading of a device (watchdog display).
+    Turns orange if the reading is older than <warn_time> and red if it is older than <error_time>.
+
+    :param warn_time: age in seconds from which the label is shown in orange
+    :param error_time: age in seconds from which the label is shown in red
+    """
+
+    def __init__(self, *args, warn_time: float = 3, error_time: float = 10, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.warn_time = warn_time
+        self.error_time = error_time
+        self.setToolTip('Time since the last successful reading of the device (watchdog)')
+        self.setAge(None, connected=False)
+
+    def setAge(self, age: float | None, connected: bool = True):
+        """
+        Sets the age of the last reading
+
+        :param age: age in seconds (None if there was no reading yet)
+        :param connected: if the device is connected (if not, nothing is shown)
+        """
+
+        if not connected:
+            self.setText('')
+            self.setStyleSheet('')
+            return
+
+        if age is None:
+            self.setText('No reading yet')
+            color = Colors.color_orange
+        else:
+            self.setText(f'Last reading {age:.1f} s ago')
+            color = ''
+            if age >= self.error_time:
+                color = Colors.color_red
+            elif age >= self.warn_time:
+                color = Colors.color_orange
+
+        self.setStyleSheet(f'color: {color};' if color else '')
 
 
 class StackWidget(QLCDNumber):

@@ -16,7 +16,7 @@ from DB.db import DB
 
 from Socket.CommandServer import DeviceISEGWrapper
 
-from Utility.Layouts import InsertingGridLayout, IndicatorLed, DoubleSpinBox, DisplayLabel, PolarityButton, SpinBox, ComboBox
+from Utility.Layouts import InsertingGridLayout, IndicatorLed, DoubleSpinBox, DisplayLabel, PolarityButton, SpinBox, ComboBox, ReadingAgeLabel
 from Utility.Dialogs import showMessageBox
 
 from Connection.USBPorts import getComports
@@ -74,13 +74,15 @@ class PSUVBoxLayout(QVBoxLayout):
         self.button_connection_refresh.setToolTip('Refresh connections list')
         self.button_connection_refresh.setIcon(QIcon('icons/refresh.png'))
         self.button_connection_refresh.pressed.connect(self.setComportsComboBox)
+        self.status_reading_age = ReadingAgeLabel()
         self.connection_grid.addWidgets(
             self.label_connection,
             self.indicator_connection,
             (self.status_connection, 2),
             self.combobox_connection,
             self.button_connection,
-            self.button_connection_refresh
+            self.button_connection_refresh,
+            self.status_reading_age
         )
 
         # Control Group Box
@@ -378,6 +380,8 @@ class PSUVBoxLayout(QVBoxLayout):
 
     def updateLoop(self):
         """Called by timer; Updates actual voltages"""
+
+        self.status_reading_age.setAge(self.device_wrapper.threaded_connection.secondsSinceLastResult(), self.indicator_connection.value())
 
         if not self.checkConnection(False):
             return

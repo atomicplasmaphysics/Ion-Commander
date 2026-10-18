@@ -60,10 +60,12 @@ The size of the database is shown in the menu `Database`.
 - [x] No focus on any button (especially not the "connect"/"disconnect" button on popped out panels)
 
 ### Safety (EBIS interlock)
-- [ ] Make the pressure interlock fail-safe: if the pressure gauge is disconnected or not updating (pressure is reset to `0`), lower the heating current instead of silently passing
-- [ ] Add a watchdog for stale readings (timestamp of last successful read per device), shown in the GUI; shut down if there is no valid reading for too long
-- [ ] Show interlock state (armed / tripped soft / tripped hard) and log every trip to the database
-- [ ] Persist interlock limits in `QSettings` and keep them in one unit (no `10^-8 mbar` spinbox workaround - e.g. a scientific-notation spinbox)
+- [x] Make the pressure interlock fail-safe: if the pressure gauge is disconnected or not updating (pressure is reset to `0`), lower the heating current instead of silently passing (`Utility/Interlock.py`, tested with `python -m Utility.Interlock`)
+- [x] Add a watchdog for stale readings (timestamp of last successful read per device), shown in the GUI; lower the heating current if there is no valid reading for too long ("No reading timeout")
+- [x] Show interlock state (armed / tripped soft / tripped hard / tripped no reading) and log every trip to the database (`Events` table)
+- [x] Persist interlock limits in `QSettings` and keep them in one unit (mbar, `ScientificDoubleSpinBox`)
+- [x] Latch trips until "Re-arm" is pressed, refuse higher heating currents while tripped and also catch current changes from scripts (measured current is checked)
+- [ ] Show the age of the last reading for Laser and Power Meter as well (PSU, EBIS and Pressure done)
 - [ ] Optionally also check the other gauges (not only the selected one)
 - [ ] Interlock self-test button (simulate a trip without hardware) and a "reset/re-arm" confirmation
 - [ ] Ramp the heating current down/up slowly instead of jumping (cathode lifetime)
@@ -139,7 +141,7 @@ The size of the database is shown in the menu `Database`.
 
 ## BUGs
 - [ ] Pack images in executable - otherwise not shown (icon paths are relative to the working directory - resolve them relative to the project folder)
-- [ ] EBIS interlock: `hard_pmax_val`/`soft_pmax_val` start at `10` (= 10 mbar) and are only converted to `10 * 10^-8 mbar` after the spinbox was edited - the interlock is effectively off until then
+- [x] EBIS interlock: `hard_pmax_val`/`soft_pmax_val` start at `10` (= 10 mbar) and are only converted to `10 * 10^-8 mbar` after the spinbox was edited - the interlock is effectively off until then
 - [x] `ConnectionWorker.execute` (`Threaded.py`): `work.append(work)` in the queue overflow branch should be `self.work.append(work)`
 - [x] `ThreadedConnection.callback` (`Threaded.py`): after deleting a list of callback ids it raises `ValueError`, because the list is not an `int`
 - [ ] Devices forget their last port if the connection was lost before closing the app (`closeEvent` only stores the port if still connected)
