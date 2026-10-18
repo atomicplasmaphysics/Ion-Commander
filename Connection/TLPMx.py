@@ -1731,24 +1731,24 @@ class TLPMxConnection:
         return port.value
 
     def setDeviceBaudrate(self, baudrate: int):
-        """Sets device baudrate"""
+        """Sets device baudrate [in Bd/s]"""
         result = self.dll.TLPMX_setDeviceBaudrate(self.devSession, c_uint32(baudrate))
         self.checkError(result)
 
     def getDeviceBaudrate(self) -> int:
-        """Gets device baudrate"""
+        """Gets device baudrate [in Bd/s]"""
         baudrate = c_uint32(0)
         result = self.dll.TLPMX_getDeviceBaudrate(self.devSession, byref(baudrate))
         self.checkError(result)
         return baudrate.value
 
     def setDriverBaudrate(self, baudrate: int):
-        """Sets driver baudrate"""
+        """Sets driver baudrate [in Bd/s]"""
         result = self.dll.TLPMX_setDriverBaudrate(self.devSession, c_uint32(baudrate))
         self.checkError(result)
 
     def getDriverBaudrate(self):
-        """Gets driver baudrate"""
+        """Gets driver baudrate [in Bd/s]"""
         baudrate = c_uint32(0)
         result = self.dll.TLPMX_getDriverBaudrate(self.devSession, byref(baudrate))
         self.checkError(result)

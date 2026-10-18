@@ -50,7 +50,7 @@ class LucidControlConnection:
 
     :param comport: COM Port
     :param timeout: Timeout [in s]
-    :param baudrate: Baudrate
+    :param baudrate: Baudrate [in Bd/s]
     :param channels: Number of channels
     :param debug: If debug is enabled
     """

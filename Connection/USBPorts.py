@@ -44,7 +44,7 @@ class COMConnection:
     :param comport: COM Port
     :param timeout: Timeout [in s]
     :param encoding: Encoding
-    :param baudrate: Baudrate
+    :param baudrate: Baudrate [in Bd/s]
     :param echo: If device has echo. Will be checked
     :param cleaning: If output cache should be cleared when entering and exiting
     :param tx_term: transmission terminator characters (e.g.: '\r', '\n', '\r\n')

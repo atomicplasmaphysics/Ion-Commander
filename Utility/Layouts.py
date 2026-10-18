@@ -12,7 +12,7 @@ import logging
 
 import numpy as np
 
-from PyQt6.QtCore import Qt, pyqtSignal, QByteArray, QSize, QRect, QRectF, QPointF
+from PyQt6.QtCore import Qt, pyqtSignal, QByteArray, QSize, QRect, QRectF, QPointF, QObject, QEvent
 from PyQt6.QtGui import (
     QIcon, QPainter, QPixmap, QColor, QBrush, QLinearGradient, QPainterPath, QAction, QFont, QFontMetrics, QTextCursor,
     QPen, QTextFormat, QPalette
@@ -150,6 +150,26 @@ class PopoutWidget(QDialog):
         """Called when close button is pressed"""
         self.vbox_title_layout.restoreMainWidget()
         event.accept()
+
+    def reject(self):
+        """Called when escape is pressed. QDialog would only hide itself without calling closeEvent"""
+        self.close()
+
+
+class NoButtonFocusFilter(QObject):
+    """
+    Application wide event filter that removes the keyboard focus from all QPushButtons and prevents them from being
+    the auto-default button (otherwise pressing enter, e.g. in a spinbox, triggers the first button of a popped out panel).
+    QPushButtons inside real dialogs (e.g. QMessageBox) keep their default behaviour.
+    """
+
+    def eventFilter(self, obj: QObject, event: QEvent) -> bool:
+        if event.type() == QEvent.Type.Polish and isinstance(obj, QPushButton):
+            window = obj.window()
+            if not isinstance(window, QDialog) or isinstance(window, PopoutWidget):
+                obj.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+                obj.setAutoDefault(False)
+        return super().eventFilter(obj, event)
 
 
 class VBoxTitleLayout(QVBoxLayout):

@@ -133,7 +133,7 @@ class ConnectionWorker(QRunnable):
                 try:
                     work = self.work.pop(0)
                     if work[1] > auto_delete_time:
-                        work.append(work)
+                        self.work.append(work)
                     else:
                         deleted_callback_ids.append(work[0])
                 except IndexError:

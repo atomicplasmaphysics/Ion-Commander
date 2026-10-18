@@ -15,11 +15,9 @@ from Config.StylesConf import Styles
 
 from Windows.Main import MainWindow
 
-from Utility.Layouts import SplashPixmap
+from Utility.Layouts import SplashPixmap, NoButtonFocusFilter
 
 from Log.Logger import setupLogging
-
-# TODO: no focus on any button (especially not the "disconnect"/"connect" button on popped out panels
 
 
 def main():
@@ -43,6 +41,10 @@ def main():
     app.setWindowIcon(QIcon('icons/logo.png'))
 
     app.setStyleSheet(Styles.global_style_sheet)
+
+    # no focus on any button (especially not the "disconnect"/"connect" button on popped out panels)
+    no_button_focus_filter = NoButtonFocusFilter(app)
+    app.installEventFilter(no_button_focus_filter)
 
     # get splash size
     screen = app.primaryScreen().availableVirtualGeometry()
