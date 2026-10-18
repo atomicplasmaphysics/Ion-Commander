@@ -1,0 +1,448 @@
+"""
+Connection to FLIR/Teledyne cameras (the ones used with SpinView).
+
+Backends (the first available one is used):
+1) PySpin      - Python wrapper of the Spinnaker SDK (download "spinnaker_python" matching the installed Spinnaker
+                 version and the Python version from the Teledyne website and install the wheel with pip)
+2) harvesters  - generic GenICam library (pip install harvesters) that uses the GenTL producer (.cti) of the installed
+                 Spinnaker SDK, e.g. "C:/Program Files/Teledyne/Spinnaker/cti64/vs2015/Spinnaker_GenTL_v140.cti"
+3) virtual     - simulated camera with a laser spot (camera id "virtual"), for testing without hardware
+
+All functions are blocking, use the threaded connection in the GUI.
+"""
+
+from glob import glob
+from time import sleep, monotonic
+
+
+import numpy as np
+
+
+from Config.GlobalConf import GlobalConf
+
+
+try:
+    import PySpin
+except ImportError:
+    PySpin = None
+
+try:
+    from harvesters.core import Harvester
+except ImportError:
+    Harvester = None
+
+
+VIRTUAL_CAMERA_ID = 'virtual'
+
+# possible locations of the Spinnaker GenTL producer (used by harvesters)
+SPINNAKER_CTI_PATTERNS = [
+    'C:/Program Files/Teledyne/Spinnaker/cti64/*/Spinnaker_GenTL*.cti',
+    'C:/Program Files/FLIR Systems/Spinnaker/cti64/*/Spinnaker_GenTL*.cti',
+    'C:/Program Files/Point Grey Research/Spinnaker/cti64/*/Spinnaker_GenTL*.cti',
+]
+
+
+def findSpinnakerCTI() -> str:
+    """Returns the path of the Spinnaker GenTL producer ('' if not found)"""
+
+    for pattern in SPINNAKER_CTI_PATTERNS:
+        files = sorted(glob(pattern))
+        if files:
+            return files[-1]
+    return ''
+
+
+def availableBackend() -> str:
+    """Returns the name of the camera backend that can be used ('pyspin', 'harvesters' or '' if none)"""
+
+    if PySpin is not None:
+        return 'pyspin'
+    if Harvester is not None and findSpinnakerCTI():
+        return 'harvesters'
+    return ''
+
+
+def backendHelp() -> str:
+    """Explains how to make real cameras available"""
+
+    if availableBackend():
+        return f'Camera backend: {availableBackend()}'
+    cti = findSpinnakerCTI()
+    text = 'No camera backend installed (only the virtual camera is available). Install either\n'
+    text += '- the Spinnaker Python wrapper "spinnaker_python" (wheel from the Teledyne website, must match the Spinnaker and Python version) or\n'
+    text += '- "pip install harvesters"'
+    text += f' (uses the installed Spinnaker GenTL producer: {cti})' if cti else ' together with the Spinnaker SDK'
+    return text
+
+
+def listCameras() -> list[tuple[str, str]]:
+    """
+    Returns the connected cameras as list of (camera id, description); the virtual camera is always included.
+    The camera id is the serial number (PySpin) or the index (harvesters).
+    """
+
+    cameras = []
+    backend = availableBackend()
+    try:
+        if backend == 'pyspin':
+            system = PySpin.System.GetInstance()
+            camera_list = system.GetCameras()
+            try:
+                for i in range(camera_list.GetSize()):
+                    camera = camera_list.GetByIndex(i)
+                    node_map = camera.GetTLDeviceNodeMap()
+                    serial = PySpin.CStringPtr(node_map.GetNode('DeviceSerialNumber')).GetValue()
+                    model = PySpin.CStringPtr(node_map.GetNode('DeviceModelName')).GetValue()
+                    cameras.append((str(serial), f'{model} (S/N {serial})'))
+                    del camera
+            finally:
+                camera_list.Clear()
+                system.ReleaseInstance()
+
+        elif backend == 'harvesters':
+            harvester = Harvester()
+            harvester.add_file(findSpinnakerCTI())
+            harvester.update()
+            for i, info in enumerate(harvester.device_info_list):
+                model = getattr(info, 'model', 'Camera')
+                serial = getattr(info, 'serial_number', str(i))
+                cameras.append((str(i), f'{model} (S/N {serial})'))
+            harvester.reset()
+
+    except Exception as error:
+        GlobalConf.logger.error(f'Camera: listing cameras with backend "{backend}" failed: {error}')
+
+    cameras.append((VIRTUAL_CAMERA_ID, 'Virtual camera (simulated laser spot)'))
+    return cameras
+
+
+class CameraConnection:
+    """
+    Connection to one camera
+
+    :param camera_id: serial number (PySpin), index (harvesters) or "virtual"
+    :param timeout: timeout for grabbing an image in ms
+    """
+
+    def __init__(self, camera_id: str, timeout: int = 2000):
+        self.camera_id = str(camera_id)
+        self.timeout = timeout
+        self.backend = VIRTUAL_CAMERA_ID if self.camera_id == VIRTUAL_CAMERA_ID else availableBackend()
+
+        self.acquiring = False
+
+        # PySpin
+        self._system = None
+        self._camera_list = None
+        self._camera = None
+
+        # harvesters
+        self._harvester = None
+        self._acquirer = None
+
+        # virtual camera
+        self._virtual = {'exposure': 10000., 'gain': 0., 'width': 640, 'height': 480, 'start': monotonic()}
+
+    def __enter__(self):
+        return self.open()
+
+    def __exit__(self, exception_type, exception_value, exception_traceback):
+        self.close()
+
+    # ------------------------------------------------------------------ connection
+    def open(self):
+        """Opens the connection (raises ConnectionError if not possible)"""
+
+        if self.backend == VIRTUAL_CAMERA_ID:
+            return self
+
+        if not self.backend:
+            raise ConnectionError(backendHelp())
+
+        try:
+            if self.backend == 'pyspin':
+                self._system = PySpin.System.GetInstance()
+                self._camera_list = self._system.GetCameras()
+                camera = self._camera_list.GetBySerial(self.camera_id)
+                if camera is None or not camera.IsValid():
+                    raise ConnectionError(f'Camera with serial number "{self.camera_id}" not found')
+                self._camera = camera
+                self._camera.Init()
+                self._camera.AcquisitionMode.SetValue(PySpin.AcquisitionMode_Continuous)
+                # manual exposure and gain, so the values of the GUI are used
+                self._camera.ExposureAuto.SetValue(PySpin.ExposureAuto_Off)
+                self._camera.GainAuto.SetValue(PySpin.GainAuto_Off)
+                # 8/16 bit mono images if possible
+                try:
+                    self._camera.PixelFormat.SetValue(PySpin.PixelFormat_Mono16)
+                except PySpin.SpinnakerException:
+                    pass
+
+            elif self.backend == 'harvesters':
+                self._harvester = Harvester()
+                self._harvester.add_file(findSpinnakerCTI())
+                self._harvester.update()
+                index = int(self.camera_id)
+                create = getattr(self._harvester, 'create', None) or getattr(self._harvester, 'create_image_acquirer')
+                self._acquirer = create(index)
+                node_map = self._acquirer.remote_device.node_map
+                for name, value in [('ExposureAuto', 'Off'), ('GainAuto', 'Off'), ('AcquisitionMode', 'Continuous')]:
+                    try:
+                        getattr(node_map, name).value = value
+                    except Exception:
+                        pass
+
+        except ConnectionError:
+            self.close()
+            raise
+        except Exception as error:
+            self.close()
+            raise ConnectionError(f'Could not open camera "{self.camera_id}" ({self.backend}): {error}')
+
+        return self
+
+    def close(self):
+        """Closes the connection"""
+
+        try:
+            self.stopAcquisition()
+        except Exception:
+            pass
+
+        if self.backend == 'pyspin':
+            try:
+                if self._camera is not None:
+                    self._camera.DeInit()
+            except Exception:
+                pass
+            self._camera = None
+            if self._camera_list is not None:
+                self._camera_list.Clear()
+                self._camera_list = None
+            if self._system is not None:
+                self._system.ReleaseInstance()
+                self._system = None
+
+        elif self.backend == 'harvesters':
+            try:
+                if self._acquirer is not None:
+                    self._acquirer.destroy()
+            except Exception:
+                pass
+            self._acquirer = None
+            if self._harvester is not None:
+                self._harvester.reset()
+                self._harvester = None
+
+    def identification(self) -> str:
+        """Returns model and serial number"""
+
+        if self.backend == VIRTUAL_CAMERA_ID:
+            return 'Virtual camera'
+        if self.backend == 'pyspin' and self._camera is not None:
+            return f'{self._camera.TLDevice.DeviceModelName.GetValue()} (S/N {self._camera.TLDevice.DeviceSerialNumber.GetValue()})'
+        if self.backend == 'harvesters' and self._acquirer is not None:
+            info = self._acquirer.remote_device.node_map
+            return f'{info.DeviceModelName.value} (S/N {info.DeviceSerialNumber.value})'
+        return self.camera_id
+
+    # ------------------------------------------------------------------ parameters
+    def _node(self, name: str):
+        """Returns node of the harvesters node map"""
+        return getattr(self._acquirer.remote_device.node_map, name)
+
+    def setExposure(self, exposure: float):
+        """Sets the exposure time in µs (clipped to the allowed range)"""
+
+        minimum, maximum = self.getExposureRange()
+        exposure = float(np.clip(exposure, minimum, maximum))
+        if self.backend == VIRTUAL_CAMERA_ID:
+            self._virtual['exposure'] = exposure
+        elif self.backend == 'pyspin':
+            self._camera.ExposureTime.SetValue(exposure)
+        elif self.backend == 'harvesters':
+            self._node('ExposureTime').value = exposure
+
+    def getExposure(self) -> float:
+        """Returns the exposure time in µs"""
+
+        if self.backend == VIRTUAL_CAMERA_ID:
+            return self._virtual['exposure']
+        if self.backend == 'pyspin':
+            return float(self._camera.ExposureTime.GetValue())
+        return float(self._node('ExposureTime').value)
+
+    def getExposureRange(self) -> tuple[float, float]:
+        """Returns (minimum, maximum) of the exposure time in µs"""
+
+        if self.backend == VIRTUAL_CAMERA_ID:
+            return 10., 1E6
+        if self.backend == 'pyspin':
+            return float(self._camera.ExposureTime.GetMin()), float(self._camera.ExposureTime.GetMax())
+        node = self._node('ExposureTime')
+        return float(node.min), float(node.max)
+
+    def setGain(self, gain: float):
+        """Sets the gain in dB (clipped to the allowed range)"""
+
+        minimum, maximum = self.getGainRange()
+        gain = float(np.clip(gain, minimum, maximum))
+        if self.backend == VIRTUAL_CAMERA_ID:
+            self._virtual['gain'] = gain
+        elif self.backend == 'pyspin':
+            self._camera.Gain.SetValue(gain)
+        elif self.backend == 'harvesters':
+            self._node('Gain').value = gain
+
+    def getGain(self) -> float:
+        """Returns the gain in dB"""
+
+        if self.backend == VIRTUAL_CAMERA_ID:
+            return self._virtual['gain']
+        if self.backend == 'pyspin':
+            return float(self._camera.Gain.GetValue())
+        return float(self._node('Gain').value)
+
+    def getGainRange(self) -> tuple[float, float]:
+        """Returns (minimum, maximum) of the gain in dB"""
+
+        if self.backend == VIRTUAL_CAMERA_ID:
+            return 0., 40.
+        if self.backend == 'pyspin':
+            return float(self._camera.Gain.GetMin()), float(self._camera.Gain.GetMax())
+        node = self._node('Gain')
+        return float(node.min), float(node.max)
+
+    def getMaximumValue(self) -> int:
+        """Returns the maximum pixel value (saturation) of the current pixel format"""
+
+        if self.backend == 'pyspin':
+            try:
+                return 65535 if 'Mono16' in self._camera.PixelFormat.GetCurrentEntry().GetSymbolic() else 255
+            except Exception:
+                return 65535
+        if self.backend == 'harvesters':
+            try:
+                return 65535 if '16' in str(self._node('PixelFormat').value) else 255
+            except Exception:
+                return 65535
+        return 4095
+
+    # ------------------------------------------------------------------ acquisition
+    def startAcquisition(self):
+        """Starts the continuous acquisition"""
+
+        if self.acquiring:
+            return
+        if self.backend == 'pyspin':
+            self._camera.BeginAcquisition()
+        elif self.backend == 'harvesters':
+            self._acquirer.start()
+        self.acquiring = True
+
+    def stopAcquisition(self):
+        """Stops the acquisition"""
+
+        if not self.acquiring:
+            return
+        self.acquiring = False
+        if self.backend == 'pyspin' and self._camera is not None:
+            self._camera.EndAcquisition()
+        elif self.backend == 'harvesters' and self._acquirer is not None:
+            self._acquirer.stop()
+
+    def grabImage(self) -> np.ndarray:
+        """Returns the next image as 2D numpy array (starts the acquisition if needed)"""
+
+        self.startAcquisition()
+
+        if self.backend == VIRTUAL_CAMERA_ID:
+            return self._virtualImage()
+
+        if self.backend == 'pyspin':
+            image = self._camera.GetNextImage(self.timeout)
+            try:
+                if image.IsIncomplete():
+                    raise ConnectionError(f'Incomplete image (status {image.GetImageStatus()})')
+                return np.array(image.GetNDArray(), copy=True)
+            finally:
+                image.Release()
+
+        with self._acquirer.fetch(timeout=self.timeout / 1000) as buffer:
+            component = buffer.payload.components[0]
+            return np.array(component.data, copy=True).reshape(component.height, component.width)
+
+    def _virtualImage(self) -> np.ndarray:
+        """Simulated laser spot that moves slowly, with noise; brightness scales with exposure and gain"""
+
+        sleep(0.03)
+        height, width = self._virtual['height'], self._virtual['width']
+        t = monotonic() - self._virtual['start']
+        x0 = width / 2 + 40 * np.sin(t / 5)
+        y0 = height / 2 + 25 * np.cos(t / 7)
+        y, x = np.mgrid[0:height, 0:width]
+        scale = self._virtual['exposure'] / 10000 * 10 ** (self._virtual['gain'] / 20)
+        spot = 3000 * scale * np.exp(-((x - x0) ** 2 / (2 * 30 ** 2) + (y - y0) ** 2 / (2 * 20 ** 2)))
+        image = spot + np.random.normal(60, 8, (height, width))
+        return np.clip(image, 0, 4095).astype(np.uint16)
+
+
+def beamStatistics(image: np.ndarray, maximum_value: int, background_percentile: float = 10) -> dict[str, float]:
+    """
+    Simple beam profile statistics of an image
+
+    :param image: 2D image
+    :param maximum_value: saturation value of the camera
+    :param background_percentile: percentile of the pixels used as background
+    :returns: dictionary with maximum, saturation (fraction of saturated pixels), centroid x/y and rms width x/y (pixels)
+    """
+
+    image = np.asarray(image, dtype=float)
+
+    # background and noise from the border of the image (5 % on every side), where usually no beam is
+    border = max(1, int(min(image.shape) * 0.05))
+    frame = np.concatenate([image[:border].ravel(), image[-border:].ravel(), image[:, :border].ravel(), image[:, -border:].ravel()])
+    background = float(np.median(frame))
+    noise = float(np.std(frame))
+    if background_percentile is not None and frame.size < 10:
+        background = float(np.percentile(image, background_percentile))
+
+    signal = image - background
+    # only the spot: ignore pixels within the noise
+    signal[signal < 3 * noise] = 0
+    total = float(signal.sum())
+
+    statistics = {
+        'maximum': float(image.max()),
+        'saturation': float(np.mean(image >= maximum_value)),
+        'x': float('nan'),
+        'y': float('nan'),
+        'sigma_x': float('nan'),
+        'sigma_y': float('nan'),
+    }
+    if total <= 0:
+        return statistics
+
+    y, x = np.indices(signal.shape)
+    cx = float((signal * x).sum() / total)
+    cy = float((signal * y).sum() / total)
+    statistics.update({
+        'x': cx,
+        'y': cy,
+        'sigma_x': float(np.sqrt((signal * (x - cx) ** 2).sum() / total)),
+        'sigma_y': float(np.sqrt((signal * (y - cy) ** 2).sum() / total)),
+    })
+    return statistics
+
+
+def main():
+    print(backendHelp())
+    print('Cameras:', listCameras())
+    with CameraConnection(VIRTUAL_CAMERA_ID) as camera:
+        camera.setExposure(20000)
+        image = camera.grabImage()
+        print(camera.identification(), image.shape, image.dtype, beamStatistics(image, camera.getMaximumValue()))
+
+
+if __name__ == '__main__':
+    main()

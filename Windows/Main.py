@@ -67,7 +67,7 @@ class MainWindow(QMainWindow):
 
         # Add monitor tab
         self.monitor_window = MonitorWindow(self)
-        self.addTab(self.monitor_window, 'Monitor', 'Monitoring devices (power meter)')
+        self.addTab(self.monitor_window, 'Monitor', 'Monitoring devices (power meter, camera)')
 
         # Add history tab
         self.history_window = HistoryWindow(self, self.database)
@@ -93,7 +93,8 @@ class MainWindow(QMainWindow):
             'PSU': self.control_window.psu_group_vbox.device_wrapper,
             'LASER': self.control_window.laser_group_vbox.device_wrapper,
             'PRESSURE': self.control_window.pressure_group_vbox.device_wrapper,
-            'POWER': self.monitor_window.power_meter_group_vbox.device_wrapper
+            'POWER': self.monitor_window.power_meter_group_vbox.device_wrapper,
+            'CAMERA': self.monitor_window.camera_group_vbox.device_wrapper
         }
         if self.control_window.ebis_enabled:
             devices['EBIS'] = self.control_window.ebis_group_vbox.device_wrapper

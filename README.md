@@ -16,6 +16,12 @@ pyserial    3.5
 duckdb      1.3.2
 ```
 
+Optional (for the camera in the Monitor tab, the Spinnaker SDK/SpinView must be installed), one of:
+- `spinnaker_python` (PySpin): wheel from the Teledyne website, must match the installed Spinnaker version and the Python version
+- `harvesters` (`pip install harvesters`): uses the GenTL producer of the installed Spinnaker SDK (`Spinnaker_GenTL_*.cti`)
+
+Without them only the virtual camera (simulated laser spot) is available.
+
 To execute the GUI, download all files from this repository and execute the `main.py` file from the console.
 ```bash
 >> python3 main.py
@@ -86,7 +92,8 @@ The size of the database is shown in the menu `Database`.
 - [ ] Implement Keithley PicoAmp meter in the Monitor tab (driver already exists)
 - [ ] Keithley PicoAmp meter: set instrument back to local mode on close (`KeithleyPAmeter.py`)
 - [ ] Keithley PicoAmp meter: check return values of `setCurrentRange`/`getLastData` (`KeithleyPAmeter.py`)
-- [ ] Implement camera in the Monitor tab
+- [x] Implement camera in the Monitor tab (FLIR/Teledyne via PySpin or harvesters, virtual camera, beam statistics, CommandServer `CAMERA`)
+- [ ] Camera: test with the real camera (only tested with the virtual camera), log beam position/width to the database, ROI selection
 - [x] EBIS: use a `DeviceWrapper` like the PSU so it can be controlled via CommandServer/Scripts
 - [x] Add EBIS to the CommandServer (device name `EBIS`, the pressure interlock still limits the heating current)
 - [ ] EBIS via CommandServer: map logical channels (Cathode, DT1, ...) to the physical MICC channels, like the GUI does

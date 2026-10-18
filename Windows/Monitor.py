@@ -7,6 +7,7 @@ from DB.db import DB
 from Utility.Layouts import TabWidget, VBoxTitleLayout
 
 from Windows.PowerMeter import PowerMeterVBoxLayout
+from Windows.Camera import CameraVBoxLayout
 
 
 class MonitorWindow(TabWidget):
@@ -16,7 +17,6 @@ class MonitorWindow(TabWidget):
     :param parent: parent widget
     """
 
-    # TODO: implement camera
     # TODO: implement Keithley PicoAmp meter
 
     def __init__(self, parent):
@@ -44,12 +44,24 @@ class MonitorWindow(TabWidget):
         self.power_meter_vbox_parent.setLayout(self.power_meter_vbox)
         self.splitter.addWidget(self.power_meter_vbox_parent)
 
+        # CAMERA
+        self.camera_vbox = VBoxTitleLayout('Camera', parent=self, add_stretch=True, popout_enable=True)
+        self.camera_group_vbox = CameraVBoxLayout()
+        self.camera_group_vbox.setAlignment(Qt.AlignmentFlag.AlignTop)
+
+        self.camera_vbox_parent = QWidget(self)
+        self.camera_vbox.setBodyLayout(self.camera_group_vbox)
+        self.camera_vbox_parent.setLayout(self.camera_vbox)
+        self.splitter.addWidget(self.camera_vbox_parent)
+
         # Division between columns
         self.splitter.setStretchFactor(0, 30)
+        self.splitter.setStretchFactor(1, 70)
 
     def closeEvent(self, event):
         """Closes all connections"""
         self.power_meter_group_vbox.closeEvent()
+        self.camera_group_vbox.closeEvent()
 
     def log(self, db: DB):
         """

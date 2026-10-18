@@ -89,6 +89,10 @@ class DefaultParams:
     cs_encoding = 'utf-8'
     cs_max_connections = 10
 
+    # Camera parameters
+    camera_folder = 'Images'
+    camera_live_interval = 100
+
     # Script parameters
     script_folder = 'Scripts'
     script_extension = 'lsd'
@@ -223,7 +227,7 @@ class GlobalConf:
     title = 'Ion Commander'
 
     # version (single source of truth - update only here)
-    version = '0.1.69'
+    version = '0.1.70'
 
     # logger
     logger = logging.getLogger(title)
@@ -248,6 +252,7 @@ class GlobalConf:
     connection_laser_ip4_name = 'connection_laser_ip4'
     connection_laser_port_name = 'connection_laser_port'
     connection_power_meter_port_name = 'connection_power_meter_port'
+    connection_camera_name = 'connection_camera'
 
     # popped out panels
     popout_group_name = 'popouts'
@@ -312,7 +317,8 @@ class GlobalConf:
         ebis: str = None,
         pressure: str = None,
         laser: tuple[int, int, int, int, int] | list[int] = None,
-        power_meter: str = None
+        power_meter: str = None,
+        camera: str = None
     ):
         """
         Updates and saves settings object with connection parameters
@@ -338,6 +344,8 @@ class GlobalConf:
             GlobalConf.settings.setValue(GlobalConf.connection_laser_port_name, laser[4])
         if power_meter is not None:
             GlobalConf.settings.setValue(GlobalConf.connection_power_meter_port_name, power_meter)
+        if camera is not None:
+            GlobalConf.settings.setValue(GlobalConf.connection_camera_name, camera)
 
         GlobalConf.settings.sync()
 
@@ -353,6 +361,8 @@ class GlobalConf:
             return GlobalConf.settings.value(GlobalConf.connection_pressure_port_name, defaultValue='', type=str)
         if connection_type == 'power_meter':
             return GlobalConf.settings.value(GlobalConf.connection_power_meter_port_name, defaultValue='', type=str)
+        if connection_type == 'camera':
+            return GlobalConf.settings.value(GlobalConf.connection_camera_name, defaultValue='', type=str)
         if connection_type == 'laser':
             return (GlobalConf.settings.value(GlobalConf.connection_laser_ip1_name, defaultValue=-1, type=int),
                     GlobalConf.settings.value(GlobalConf.connection_laser_ip2_name, defaultValue=-1, type=int),

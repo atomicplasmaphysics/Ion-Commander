@@ -2,9 +2,45 @@
 
 *Automatically created from the commit messages with `python -m Utility.Changelog` - do not edit by hand.*
 
+## v0.1.70 (2026-10-18)
+
+**Camera (SpinView/FLIR) in the Monitor tab**
+
+Connection (new Connection/Camera.py):
+- CameraConnection for FLIR/Teledyne cameras with the first available
+  backend: PySpin (Spinnaker Python wrapper) or harvesters with the GenTL
+  producer of the installed Spinnaker SDK (found automatically, e.g.
+  C:/Program Files/Teledyne/Spinnaker/cti64/vs2015/Spinnaker_GenTL_v140.cti).
+  Neither is installed at the moment, the panel explains what to install.
+- Virtual camera (id "virtual") with a moving, noisy Gaussian laser spot
+  whose brightness follows exposure and gain - for testing without
+  hardware.
+- Functions: listCameras(), open/close, identification, set/get exposure
+  (us) and gain (dB) incl. ranges (values are clipped), continuous
+  acquisition, grabImage() -> 2D numpy array, saturation value.
+- beamStatistics(): maximum, saturated fraction, centroid and rms width;
+  background and noise from the image border, only pixels above 3x noise
+  are used (FWHM within 0.3 % on a synthetic spot).
+- ThreadedCameraConnection and DeviceCameraWrapper; the camera is
+  available in the CommandServer as "CAMERA".
+
+GUI (new Windows/Camera.py, Monitor tab):
+- Camera selection (+ refresh), connect/disconnect, reading age, backend
+  info; exposure and gain with the values set in the camera; live image
+  (one request at a time, so a slow camera does not fill the queue),
+  single image, save as PNG (8 bit) + NPY (raw) into "Images/", auto
+  levels, crosshair at the centroid.
+- Beam: maximum/saturation (red if saturated), centroid, FWHM, frame rate.
+- Last camera is remembered (not the virtual one), automatic reconnect.
+- Images/ added to .gitignore, README: optional camera packages.
+
+Tested offscreen with the virtual camera: connect, exposure, 2 s live
+(6.5 fps offscreen), statistics, saving, disconnect, Monitor tab. The real
+camera could not be tested (not connected and no backend installed).
+
 ## v0.1.69 (2026-10-18)
 
-**Tooltips for Scripts, Tips, Simulation, Analyse and fit parameters**
+**Tooltips for Scripts, Tips, Simulation, Analyse and fit parameters** (38ffcfe)
 
 - Fit parameter fields (StackedVBoxLayout/FittingWidget): label and value
   explain the symbol (σ, μ, c, FWHM, x0, A, mode, Counts, x₁, x₂, ∆x),
