@@ -129,7 +129,7 @@ The size of the database is shown in the menu `Database`.
 
 ### GUI
 - [ ] Add tooltips to everything
-- [ ] Reduce code duplication of the channel rows in `PSU.py`/`EBIS.py` (one channel widget class)
+- [x] Reduce code duplication of the channel rows in `PSU.py`/`EBIS.py` (`Utility/ChannelRows.py`: `VoltageChannelRow`, `CurrentLimitRow`)
 - [x] Settings dialog for `DefaultParams` (update interval, limits, laser IP, server port) instead of editing the code (menu `Settings > Preferences...`)
 - [ ] Apply changed preferences without restarting the application
 - [x] Show CommandServer status (running, connected clients) in the status bar
@@ -152,5 +152,6 @@ The size of the database is shown in the menu `Database`.
 - [x] EBIS interlock: `hard_pmax_val`/`soft_pmax_val` start at `10` (= 10 mbar) and are only converted to `10 * 10^-8 mbar` after the spinbox was edited - the interlock is effectively off until then
 - [x] `ConnectionWorker.execute` (`Threaded.py`): `work.append(work)` in the queue overflow branch should be `self.work.append(work)`
 - [x] `ThreadedConnection.callback` (`Threaded.py`): after deleting a list of callback ids it raises `ValueError`, because the list is not an `int`
+- [x] EBIS: current limits were sent to the logical channel index instead of the physical MICC channel (e.g. the limit of Drift Tube 1 was set on the Repeller)
 - [x] Devices forget their last port if the connection was lost before closing the app (`closeEvent` only stores the port if still connected)
 - [x] Unplugged USB devices (`SerialException`) were not detected as lost connection - the panel stayed "connected" and logged an error every second

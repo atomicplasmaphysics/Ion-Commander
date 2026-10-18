@@ -19,6 +19,7 @@ from Socket.CommandServer import DeviceISEGWrapper
 from Utility.Layouts import InsertingGridLayout, IndicatorLed, DoubleSpinBox, DisplayLabel, ComboBox, ScientificDoubleSpinBox, ReadingAgeLabel
 from Utility.AutoReconnect import AutoReconnect
 from Utility.Dialogs import showMessageBox
+from Utility.ChannelRows import VoltageChannelRow, CurrentLimitRow
 from Utility.Interlock import PressureInterlock, InterlockLimits, InterlockResult
 
 from Connection.USBPorts import getComports
@@ -48,6 +49,16 @@ class EBISVBoxLayout(QVBoxLayout):
         self.device_wrapper = DeviceISEGWrapper()
         self.connection: None | ISEGConnection = None
         self.threaded_connection = ThreadedDummyConnection()
+
+        # logical channel (GUI row) -> physical channel of the MICC crate
+        self.channel_dict = {
+            0: 0,   # Cathode
+            1: 2,   # Drift Tube 1
+            2: 3,   # Drift Tube 2
+            3: 4,   # Drift Tube 3
+            4: 1,   # Repeller
+            5: 10   # Cathode heating
+        }
 
         self.voltage_deviation = DefaultParams.ebis_voltage_deviation
         self.voltage_maximum = DefaultParams.ebis_voltage_maximum
@@ -126,95 +137,21 @@ class EBISVBoxLayout(QVBoxLayout):
             (QLabel('High Voltage'), 2)
         )
 
-        # Cathode
-        self.label_voltage_1 = QLabel('Cathode')
-        self.spinbox_voltage_1 = DoubleSpinBox(default=0, step_size=0.1, input_range=(0, self.voltage_maximum), decimals=1, buttons=False)
-        self.spinbox_voltage_1.editingFinished.connect(lambda: self.setVoltage(0, self.spinbox_voltage_1.value()))
-        self.status_voltage_1 = DisplayLabel(value=0, unit='V', target_value=0, deviation=self.voltage_deviation)
-        self.status_current_1 = DisplayLabel(value=0, unit='A', target_value=0, deviation=self.current_maximum, enable_prefix=True)
-        self.indicator_voltage_1 = IndicatorLed()
-        self.button_enable_1 = QPushButton('Enable')
-        self.button_enable_1.pressed.connect(lambda: self.setOutput(0, not self.indicator_voltage_1.value()))
-        self.potential_grid.addWidgets(
-            self.label_voltage_1,
-            self.spinbox_voltage_1,
-            self.status_voltage_1,
-            self.status_current_1,
-            self.indicator_voltage_1,
-            self.button_enable_1
-        )
-
-        # Drift Tube 1
-        self.label_voltage_2 = QLabel('Drift Tube 1')
-        self.spinbox_voltage_2 = DoubleSpinBox(default=0, step_size=0.1, input_range=(0, self.voltage_maximum), decimals=1, buttons=False)
-        self.spinbox_voltage_2.editingFinished.connect(lambda: self.setVoltage(1, self.spinbox_voltage_2.value()))
-        self.status_voltage_2 = DisplayLabel(value=0, unit='V', target_value=0, deviation=self.voltage_deviation)
-        self.status_current_2 = DisplayLabel(value=0, unit='A', target_value=0, deviation=self.current_maximum, enable_prefix=True)
-        self.indicator_voltage_2 = IndicatorLed()
-        self.button_enable_2 = QPushButton('Enable')
-        self.button_enable_2.pressed.connect(lambda: self.setOutput(1, not self.indicator_voltage_2.value()))
-        self.potential_grid.addWidgets(
-            self.label_voltage_2,
-            self.spinbox_voltage_2,
-            self.status_voltage_2,
-            self.status_current_2,
-            self.indicator_voltage_2,
-            self.button_enable_2
-        )
-
-        # Drift Tube 2
-        self.label_voltage_3 = QLabel('Drift Tube 2')
-        self.spinbox_voltage_3 = DoubleSpinBox(default=0, step_size=0.1, input_range=(0, self.voltage_maximum), decimals=1, buttons=False)
-        self.spinbox_voltage_3.editingFinished.connect(lambda: self.setVoltage(2, self.spinbox_voltage_3.value()))
-        self.status_voltage_3 = DisplayLabel(value=0, unit='V', target_value=0, deviation=self.voltage_deviation)
-        self.status_current_3 = DisplayLabel(value=0, unit='A', target_value=0, deviation=self.current_maximum, enable_prefix=True)
-        self.indicator_voltage_3 = IndicatorLed()
-        self.button_enable_3 = QPushButton('Enable')
-        self.button_enable_3.pressed.connect(lambda: self.setOutput(2, not self.indicator_voltage_3.value()))
-        self.potential_grid.addWidgets(
-            self.label_voltage_3,
-            self.spinbox_voltage_3,
-            self.status_voltage_3,
-            self.status_current_3,
-            self.indicator_voltage_3,
-            self.button_enable_3
-        )
-
-        # Drift Tube 3
-        self.label_voltage_4 = QLabel('Drift Tube 3')
-        self.spinbox_voltage_4 = DoubleSpinBox(default=0, step_size=0.1, input_range=(0, self.voltage_maximum), decimals=1, buttons=False)
-        self.spinbox_voltage_4.editingFinished.connect(lambda: self.setVoltage(3, self.spinbox_voltage_4.value()))
-        self.status_voltage_4 = DisplayLabel(value=0, unit='V', target_value=0, deviation=self.voltage_deviation)
-        self.status_current_4 = DisplayLabel(value=0, unit='A', target_value=0, deviation=self.current_maximum, enable_prefix=True)
-        self.indicator_voltage_4 = IndicatorLed()
-        self.button_enable_4 = QPushButton('Enable')
-        self.button_enable_4.pressed.connect(lambda: self.setOutput(3, not self.indicator_voltage_4.value()))
-        self.potential_grid.addWidgets(
-            self.label_voltage_4,
-            self.spinbox_voltage_4,
-            self.status_voltage_4,
-            self.status_current_4,
-            self.indicator_voltage_4,
-            self.button_enable_4
-        )
-
-        # Repeller
-        self.label_voltage_5 = QLabel('Repeller')
-        self.spinbox_voltage_5 = DoubleSpinBox(default=0, step_size=0.1, input_range=(0, self.voltage_maximum), decimals=1, buttons=False)
-        self.spinbox_voltage_5.editingFinished.connect(lambda: self.setVoltage(4, self.spinbox_voltage_5.value()))
-        self.status_voltage_5 = DisplayLabel(value=0, unit='V', target_value=0, deviation=self.voltage_deviation)
-        self.status_current_5 = DisplayLabel(value=0, unit='A', target_value=0, deviation=self.current_maximum, enable_prefix=True)
-        self.indicator_voltage_5 = IndicatorLed()
-        self.button_enable_5 = QPushButton('Enable')
-        self.button_enable_5.pressed.connect(lambda: self.setOutput(4, not self.indicator_voltage_5.value()))
-        self.potential_grid.addWidgets(
-            self.label_voltage_5,
-            self.spinbox_voltage_5,
-            self.status_voltage_5,
-            self.status_current_5,
-            self.indicator_voltage_5,
-            self.button_enable_5
-        )
+        # one row per channel (index = logical channel, see <channel_dict> for the physical channels)
+        self.channel_names = ['Cathode', 'Drift Tube 1', 'Drift Tube 2', 'Drift Tube 3', 'Repeller']
+        self.channel_rows = [
+            VoltageChannelRow(
+                self.potential_grid,
+                name,
+                channel,
+                set_voltage=self.setVoltage,
+                set_output=self.setOutput,
+                voltage_maximum=self.voltage_maximum,
+                voltage_deviation=self.voltage_deviation,
+                current_maximum=self.current_maximum
+            )
+            for channel, name in enumerate(self.channel_names)
+        ]
 
         # Limits Group Box
         self.limits_group_box = QGroupBox('Limits')
@@ -235,60 +172,10 @@ class EBISVBoxLayout(QVBoxLayout):
         )
 
         # TODO: global values for input ranges
-        # Cathode
-        self.label_limit_1 = QLabel('Cathode')
-        self.spinbox_limit_current_1 = DoubleSpinBox(default=0.002, step_size=0.001, input_range=(0.002, 2), decimals=3, buttons=False)
-        self.spinbox_limit_current_1.editingFinished.connect(lambda: self.setCurrentLimit(0, self.spinbox_limit_current_1.value()))
-        self.indicator_current_limit_1 = IndicatorLed(on_color=Colors.color_red)
-        self.limits_grid.addWidgets(
-            self.label_limit_1,
-            self.spinbox_limit_current_1,
-            self.indicator_current_limit_1
-        )
-
-        # Drift Tube 1
-        self.label_limit_2 = QLabel('Drift Tube 1')
-        self.spinbox_limit_current_2 = DoubleSpinBox(default=0.002, step_size=0.001, input_range=(0.002, 1), decimals=3, buttons=False)
-        self.spinbox_limit_current_2.editingFinished.connect(lambda: self.setCurrentLimit(1, self.spinbox_limit_current_2.value()))
-        self.indicator_current_limit_2 = IndicatorLed(on_color=Colors.color_red)
-        self.limits_grid.addWidgets(
-            self.label_limit_2,
-            self.spinbox_limit_current_2,
-            self.indicator_current_limit_2
-        )
-
-        # Drift Tube 2
-        self.label_limit_3 = QLabel('Drift Tube 2')
-        self.spinbox_limit_current_3 = DoubleSpinBox(default=0.002, step_size=0.001, input_range=(0.002, 1), decimals=3, buttons=False)
-        self.spinbox_limit_current_3.editingFinished.connect(lambda: self.setCurrentLimit(2, self.spinbox_limit_current_3.value()))
-        self.indicator_current_limit_3 = IndicatorLed(on_color=Colors.color_red)
-        self.limits_grid.addWidgets(
-            self.label_limit_3,
-            self.spinbox_limit_current_3,
-            self.indicator_current_limit_3
-        )
-
-        # Drift Tube 3
-        self.label_limit_4 = QLabel('Drift Tube 3')
-        self.spinbox_limit_current_4 = DoubleSpinBox(default=0.002, step_size=0.001, input_range=(0.002, 1), decimals=3, buttons=False)
-        self.spinbox_limit_current_4.editingFinished.connect(lambda: self.setCurrentLimit(3, self.spinbox_limit_current_4.value()))
-        self.indicator_current_limit_4 = IndicatorLed(on_color=Colors.color_red)
-        self.limits_grid.addWidgets(
-            self.label_limit_4,
-            self.spinbox_limit_current_4,
-            self.indicator_current_limit_4
-        )
-
-        # Repeller
-        self.label_limit_5 = QLabel('Repeller')
-        self.spinbox_limit_current_5 = DoubleSpinBox(default=0.002, step_size=0.001, input_range=(0.002, 1), decimals=3, buttons=False)
-        self.spinbox_limit_current_5.editingFinished.connect(lambda: self.setCurrentLimit(4, self.spinbox_limit_current_5.value()))
-        self.indicator_current_limit_5 = IndicatorLed(on_color=Colors.color_red)
-        self.limits_grid.addWidgets(
-            self.label_limit_5,
-            self.spinbox_limit_current_5,
-            self.indicator_current_limit_5
-        )
+        self.limit_rows = [
+            CurrentLimitRow(self.limits_grid, name, channel, self.setCurrentLimit, input_range=(0.002, 2 if channel == 0 else 1))
+            for channel, name in enumerate(self.channel_names)
+        ]
 
         # Heating Group Box
         self.heating_group_box = QGroupBox('Heating')
@@ -310,22 +197,17 @@ class EBISVBoxLayout(QVBoxLayout):
             (QLabel('High Voltage'), 2)
         )
 
-        # Cathode Heating Voltage
-        self.label_voltage_6 = QLabel('Heating Voltage')
-        self.spinbox_voltage_6 = DoubleSpinBox(default=0, step_size=0.1, input_range=(0, 5), decimals=1, buttons=False)
-        self.spinbox_voltage_6.editingFinished.connect(lambda: self.setVoltage(5, self.spinbox_voltage_6.value()))
-        self.status_voltage_6 = DisplayLabel(value=0, unit='V', target_value=0, deviation=self.voltage_deviation)
-        self.indicator_voltage_6 = IndicatorLed()
-        self.button_enable_6 = QPushButton('Enable')
-        self.button_enable_6.pressed.connect(lambda: self.setOutput(5, not self.indicator_voltage_6.value()))
-        self.heating_grid.addWidgets(
-            self.label_voltage_6,
-            self.spinbox_voltage_6,
-            self.status_voltage_6,
-            None,
-            self.indicator_voltage_6,
-            self.button_enable_6
-        )
+        # Cathode Heating Voltage (no current column, the heating current is set in the next row)
+        self.channel_rows.append(VoltageChannelRow(
+            self.heating_grid,
+            'Heating Voltage',
+            5,
+            set_voltage=self.setVoltage,
+            set_output=self.setOutput,
+            voltage_maximum=5,
+            voltage_deviation=self.voltage_deviation,
+            show_current=False
+        ))
 
         # Cathode Heating Current
         self.label_current_6 = QLabel('Heating Current')
@@ -477,72 +359,16 @@ class EBISVBoxLayout(QVBoxLayout):
             self.spinbox_watchdog_time
         )
 
-        # grouped items
-        self.channel_dict = {
-            0: 0,
-            1: 2,
-            2: 3,
-            3: 4,
-            4: 1,
-            5: 10
-        }
         self.all_channels_selector = [channel for _, channel in self.channel_dict.items()]
-        self.spinbox_voltages = [
-            self.spinbox_voltage_1,
-            self.spinbox_voltage_2,
-            self.spinbox_voltage_3,
-            self.spinbox_voltage_4,
-            self.spinbox_voltage_5,
-            self.spinbox_voltage_6
-        ]
-        self.status_voltages = [
-            self.status_voltage_1,
-            self.status_voltage_2,
-            self.status_voltage_3,
-            self.status_voltage_4,
-            self.status_voltage_5,
-            self.status_voltage_6
-        ]
-        self.status_currents = [
-            self.status_current_1,
-            self.status_current_2,
-            self.status_current_3,
-            self.status_current_4,
-            self.status_current_5,
-            self.status_current_6
-        ]
-        self.indicators_voltage = [
-            self.indicator_voltage_1,
-            self.indicator_voltage_2,
-            self.indicator_voltage_3,
-            self.indicator_voltage_4,
-            self.indicator_voltage_5,
-            self.indicator_voltage_6
-        ]
-        self.buttons_enable = [
-            self.button_enable_1,
-            self.button_enable_2,
-            self.button_enable_3,
-            self.button_enable_4,
-            self.button_enable_5,
-            self.button_enable_6
-        ]
-        self.spinbox_limit_currents = [
-            self.spinbox_limit_current_1,
-            self.spinbox_limit_current_2,
-            self.spinbox_limit_current_3,
-            self.spinbox_limit_current_4,
-            self.spinbox_limit_current_5,
-            None
-        ]
-        self.indicator_current_limits = [
-            self.indicator_current_limit_1,
-            self.indicator_current_limit_2,
-            self.indicator_current_limit_3,
-            self.indicator_current_limit_4,
-            self.indicator_current_limit_5,
-            None
-        ]
+
+        # grouped lists (the device callbacks work with these lists, index 5 is the cathode heating)
+        self.spinbox_voltages = [row.spinbox_voltage for row in self.channel_rows]
+        self.status_voltages = [row.status_voltage for row in self.channel_rows]
+        self.status_currents = [row.status_current for row in self.channel_rows[:5]] + [self.status_current_6]
+        self.indicators_voltage = [row.indicator for row in self.channel_rows]
+        self.buttons_enable = [row.button_enable for row in self.channel_rows]
+        self.spinbox_limit_currents = [row.spinbox_limit for row in self.limit_rows] + [None]
+        self.indicator_current_limits = [row.indicator_limit for row in self.limit_rows] + [None]
 
         self.reset()
         self.updateInterlockDisplay()
@@ -802,7 +628,7 @@ class EBISVBoxLayout(QVBoxLayout):
         if not self.checkConnection():
             return
 
-        self.threaded_connection.currentSet(channel, current / 1000)
+        self.threaded_connection.currentSet(self.channel_dict[channel], current / 1000)
 
     def setOutput(self, channel: int, state: bool):
         """
@@ -1003,32 +829,12 @@ class EBISVBoxLayout(QVBoxLayout):
         self.status_high_voltage.setText('Disabled')
         self.button_high_voltage.setText('Enable')
 
-        for indicator in self.indicators_voltage:
-            indicator.setValue(False)
-
-        for button in self.buttons_enable:
-            button.setText('Enable')
-
-        for spinbox in self.spinbox_voltages:
-            spinbox.reset()
-
-        for status in self.status_voltages:
-            status.setValue(0)
-            status.setTargetValue(0)
-
-        for status in self.status_currents:
-            status.setValue(0)
-            status.setTargetValue(0)
-
-        for indicator in self.indicator_current_limits:
-            if indicator is not None:
-                indicator.setValue(False)
-
-        for spinbox in self.spinbox_limit_currents:
-            if spinbox is not None:
-                spinbox.reset()
+        for row in self.channel_rows + self.limit_rows:
+            row.reset()
 
         self.spinbox_current_6.reset()
+        self.status_current_6.setValue(0)
+        self.status_current_6.setTargetValue(0)
 
         self.spinbox_advanced_settings_ramp.reset()
 
@@ -1070,17 +876,18 @@ class EBISVBoxLayout(QVBoxLayout):
         """
 
         if self.connection is not None:
+            cathode, drift_tube_1, drift_tube_2, drift_tube_3, repeller, heating = self.channel_rows
             db.insertEBIS(
-                abs(self.status_voltage_1.value),  # CatV, negative
-                abs(self.status_current_1.value),  # CatI, negative
-                self.status_voltage_2.value,  # DT1V
-                self.status_current_2.value,  # DT1I
-                self.status_voltage_3.value,  # DT2V
-                self.status_current_3.value,  # DT2I
-                self.status_voltage_4.value,  # DT3V
-                self.status_current_4.value,  # DT3I
-                abs(self.status_voltage_5.value),  # RepV, negative
-                abs(self.status_current_5.value),  # RepI, negative
-                self.status_voltage_6.value,  # HeatV
+                abs(cathode.status_voltage.value),  # CatV, negative
+                abs(cathode.status_current.value),  # CatI, negative
+                drift_tube_1.status_voltage.value,  # DT1V
+                drift_tube_1.status_current.value,  # DT1I
+                drift_tube_2.status_voltage.value,  # DT2V
+                drift_tube_2.status_current.value,  # DT2I
+                drift_tube_3.status_voltage.value,  # DT3V
+                drift_tube_3.status_current.value,  # DT3I
+                abs(repeller.status_voltage.value),  # RepV, negative
+                abs(repeller.status_current.value),  # RepI, negative
+                heating.status_voltage.value,  # HeatV
                 self.status_current_6.value   # HeatI
             )
