@@ -2,9 +2,44 @@
 
 *Automatically created from the commit messages with `python -m Utility.Changelog` - do not edit by hand.*
 
+## v0.1.68 (2026-10-18)
+
+**History: pressure prediction fit, min/max envelope, working splitter**
+
+Prediction fit (new Utility/PressureFit.py, new row in the History tab):
+- Fits the visible part of a selected curve (pressures are preselected)
+  and draws the prediction as dashed red line until 3x the fitted time
+  span into the future. Result: final value p_inf, time constant/exponent,
+  relative rms and when 1.1 x p_inf is reached.
+- Models (all with offset p_inf = predicted final pressure):
+  Exponential p(t) = p_inf + A exp(-t/tau)  - pumping of the gas volume
+  Power law   p(t) = p_inf + A (t + t1)^-n  - outgassing of the walls,
+              usually the better model for long times (n ~ 1 for metals)
+- Relative weights (sigma = p), because pressures span several decades;
+  several start values, the best result is used; a warning is shown if a
+  parameter ends at its limit (model probably not suitable).
+- Self tests: python -m Utility.PressureFit
+
+Min/Max envelope:
+- New toggle "Min/Max": for downsampled data the minimum and maximum of
+  every time bucket are shown as shaded band around the averaged curve,
+  so short pressure spikes are not averaged away.
+- DB.getData(..., envelope=True) returns avg, min and max per bucket in
+  one query.
+
+Splitter:
+- Bug fix: setStretchFactor(0, ...) was called twice instead of for both
+  widgets. Now selection : plot = 1 : 4, and the splitter sizes are stored
+  on close and restored on startup (QSettings "history_splitter_state").
+
+Tested offscreen with a scratch DB (6 h synthetic pump down with a 5 s
+spike): envelope keeps the spike (1.03E-6 vs. 8.8E-7 average), the
+exponential fit gives p_inf = 2.00E-9 mbar and tau = 60 min (true
+values), the power law fit warns, splitter state is stored.
+
 ## v0.1.67 (2026-10-18)
 
-**Fitting: finished LogNorm fit, better start values and limits**
+**Fitting: finished LogNorm fit, better start values and limits** (676bc37)
 
 Gauss fits (range, center, gauss + counts):
 - Bug fix: the start value of sigma was never estimated from the data

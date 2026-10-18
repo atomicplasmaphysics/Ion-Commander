@@ -128,7 +128,7 @@ The size of the database is shown in the menu `Database`.
 
 ### History / Database
 - [x] Downsample data for long time ranges in the History tab (faster plots), but show the full density when zooming in (~2 points per pixel, averaged in the database, reloaded on zoom/pan)
-- [ ] History: optionally show min/max envelopes instead of averages for downsampled data (spikes of e.g. the pressure can be averaged away)
+- [x] History: optionally show min/max envelopes instead of averages for downsampled data (toggle "Min/Max")
 - [x] Show the database size (menu `Database`)
 - [x] Rename-proof logging: stable column ids plus a `Labels` table, so renaming e.g. a pressure gauge does not break the history
 - [ ] Use the label valid at the time of the data for exports (currently the latest label is used)
@@ -137,8 +137,9 @@ The size of the database is shown in the menu `Database`.
 - [x] Mark the events in the History plots (toggle "Events")
 - [ ] Log more events (manual connect/disconnect, script start/end)
 - [ ] Database maintenance: archive or thin out old data (e.g. keep 1 s data for 30 days, 1 min averages afterwards)
-- [ ] Make the splitter of the History tab work as intended (stretch factors)
-- [ ] History: exponential fit of the pressure to predict the final pressure
+- [x] Make the splitter of the History tab work as intended (stretch factors, sizes are remembered)
+- [x] History: exponential fit of the pressure to predict the final pressure (also power law for outgassing, `Utility/PressureFit.py`)
+- [ ] History: store prediction fits as events/notes and show the predicted curve after a restart
 
 ### GUI
 - [x] Add tooltips to everything (all device panels, History, Analyse, tabs, menus, settings)

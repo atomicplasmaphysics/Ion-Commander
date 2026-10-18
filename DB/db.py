@@ -131,7 +131,7 @@ class Tables:
 
         return f'''INSERT INTO {self.name} ({','.join(self.variables)}) VALUES ({','.join(['?'] * len(self.variables))});'''
 
-    def get(self, column_ids: tuple[int], start_time: int | None, end_time: int | None, bucket_seconds: int | None = None) -> tuple[list, str]:
+    def get(self, column_ids: tuple[int], start_time: int | None, end_time: int | None, bucket_seconds: int | None = None, envelope: bool = False) -> tuple[list, str]:
         """
         SQL query to get columns of data within given timeframe
 
@@ -139,6 +139,7 @@ class Tables:
         :param start_time: start time as timestamp
         :param end_time: end time as timestamp
         :param bucket_seconds: if > 1 and the first column is "Time", the data is averaged in time buckets of this size (downsampling)
+        :param envelope: with buckets: return avg, min and max of every column (columns: Time, c1_avg, c1_min, c1_max, c2_avg, ...)
 
         :returns: list of columns, sql query
         """
@@ -164,7 +165,12 @@ class Tables:
         if bucket_seconds is not None and int(bucket_seconds) > 1 and column_names[0] == 'Time':
             bucket_seconds = int(bucket_seconds)
             # "Time - Time % x" works for sqlite3 and duckdb (integer division differs between them)
-            selection = [f'Time - (Time % {bucket_seconds}) AS Time'] + [f'avg({column_name}) AS {column_name}' for column_name in column_names[1:]]
+            selection = [f'Time - (Time % {bucket_seconds}) AS Time']
+            for column_name in column_names[1:]:
+                selection.append(f'avg({column_name}) AS {column_name}')
+                if envelope:
+                    selection.append(f'min({column_name}) AS {column_name}_min')
+                    selection.append(f'max({column_name}) AS {column_name}_max')
             return column_names, f'''SELECT {', '.join(selection)} FROM {self.name}{condition} GROUP BY 1 ORDER BY 1;'''
 
         return column_names, f'''SELECT {', '.join(column_names)} FROM {self.name}{condition};'''
@@ -555,7 +561,8 @@ class DB:
         columns: int | tuple[int] | list[str] | None = None,
         start_time: int | None = None,
         end_time: int | None = None,
-        bucket_seconds: int | None = None
+        bucket_seconds: int | None = None,
+        envelope: bool = False
     ) -> bool | tuple[list, np.ndarray]:
         """
         Get values from table with table_idx
@@ -565,6 +572,7 @@ class DB:
         :param start_time: start time as timestamp
         :param end_time: end time as timestamp
         :param bucket_seconds: average data in time buckets of this size (None or <= 1: raw data)
+        :param envelope: with buckets, also return min and max of every bucket (3 value columns per column: avg, min, max)
         """
 
         columns_all = list(self.tables[table_idx].structure.keys())
@@ -582,7 +590,7 @@ class DB:
                 column_ids.append(columns_all.index(column))
             column_ids = tuple(column_ids)
 
-        column_names, query = self.tables[table_idx].get(column_ids, start_time, end_time, bucket_seconds)
+        column_names, query = self.tables[table_idx].get(column_ids, start_time, end_time, bucket_seconds, envelope)
         results = self._execute_return(query)
         if not results:
             return False

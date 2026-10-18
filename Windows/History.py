@@ -12,7 +12,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, QTimer
 
 
-from Config.GlobalConf import DefaultParams
+from Config.GlobalConf import GlobalConf, DefaultParams
 from Config.StylesConf import Colors
 
 from DB.db import DB
@@ -20,7 +20,8 @@ from DB.db import DB
 from Utility.Functions import mergeArraysFirstColumn
 from Utility.FileDialogs import selectFileDialog
 from Utility.Dialogs import showMessageBox
-from Utility.Layouts import TabWidget, TimeCanvas, IndicatorLedButton, DateTimeEdit, FilePath
+from Utility.Layouts import TabWidget, TimeCanvas, IndicatorLedButton, DateTimeEdit, FilePath, ComboBox
+from Utility.PressureFit import FIT_MODELS, PressureFitResult, formatDuration
 
 
 class HistoryWindow(TabWidget):
@@ -60,6 +61,9 @@ class HistoryWindow(TabWidget):
         self.loaded_bucket = 1
         self.plotting = False
         self.event_lines: list[pg.InfiniteLine] = []
+        self.envelope_items: list = []
+        self.current_series: list[tuple[str, np.ndarray, np.ndarray]] = []
+        self.fit_items: list = []
 
         self.refine_timer = QTimer()
         self.refine_timer.setSingleShot(True)
@@ -148,6 +152,15 @@ class HistoryWindow(TabWidget):
         self.button_events_preview.clicked.connect(self.updateEvents)
         self.export_title_hbox.addWidget(self.button_events_preview, alignment=Qt.AlignmentFlag.AlignRight)
 
+        # Min/max envelope button
+        self.button_envelope_preview = IndicatorLedButton('Min/Max')
+        self.button_envelope_preview.setToolTip(
+            'Show the minimum and maximum of every time bucket as shaded band (only for downsampled data),\n'
+            'so short spikes (e.g. of the pressure) are not averaged away'
+        )
+        self.button_envelope_preview.clicked.connect(self.replot)
+        self.export_title_hbox.addWidget(self.button_envelope_preview, alignment=Qt.AlignmentFlag.AlignRight)
+
         # Resolution label
         self.label_resolution = QLabel('')
         self.label_resolution.setToolTip('Resolution of the shown data. Zoom in to load the data with a finer resolution.')
@@ -158,6 +171,37 @@ class HistoryWindow(TabWidget):
         self.button_log_y_preview.setToolTip('Logarithmic y-axis')
         self.button_log_y_preview.clicked.connect(self.logYAxis)
         self.export_title_hbox.addWidget(self.button_log_y_preview, alignment=Qt.AlignmentFlag.AlignRight)
+
+        # Prediction fit (e.g. final pressure after pumping down)
+        self.fit_hbox = QHBoxLayout()
+        self.fit_hbox.setAlignment(Qt.AlignmentFlag.AlignLeft)
+        self.preview_export_vbox.addLayout(self.fit_hbox)
+
+        self.label_fit = QLabel('Prediction fit:')
+        self.label_fit.setToolTip(
+            'Fits the visible part of a curve to predict its final value (e.g. the final pressure after pumping down):\n'
+            'Exponential: p(t) = p∞ + A·exp(-t/τ) (pumping of the gas volume)\n'
+            'Power law: p(t) = p∞ + A·(t + t1)^-n (outgassing of the walls, usually better for long times)'
+        )
+        self.fit_hbox.addWidget(self.label_fit)
+        self.combobox_fit_model = ComboBox(entries=list(FIT_MODELS.keys()))
+        self.combobox_fit_model.setToolTip(self.label_fit.toolTip())
+        self.fit_hbox.addWidget(self.combobox_fit_model)
+        self.combobox_fit_series = ComboBox(entries=[])
+        self.combobox_fit_series.setToolTip('Curve that is fitted')
+        self.combobox_fit_series.setMinimumWidth(200)
+        self.fit_hbox.addWidget(self.combobox_fit_series)
+        self.button_fit = QPushButton('Fit visible range')
+        self.button_fit.setToolTip('Fit the selected curve in the visible time range and draw the prediction (dashed)')
+        self.button_fit.clicked.connect(self.fitPrediction)
+        self.fit_hbox.addWidget(self.button_fit)
+        self.button_fit_clear = QPushButton('Clear fit')
+        self.button_fit_clear.setToolTip('Remove the prediction from the plot')
+        self.button_fit_clear.clicked.connect(self.clearFit)
+        self.fit_hbox.addWidget(self.button_fit_clear)
+        self.label_fit_result = QLabel('')
+        self.label_fit_result.setToolTip('Result of the prediction fit')
+        self.fit_hbox.addWidget(self.label_fit_result)
 
         # Plotting canvas
         self.time_canvas = TimeCanvas([], grid=True)
@@ -193,9 +237,22 @@ class HistoryWindow(TabWidget):
 
         self.splitter.addWidget(self.preview_export_widget)
 
-        # Division between columns  # TODO: does not really work as intended
-        self.splitter.setStretchFactor(0, 5)
-        self.splitter.setStretchFactor(0, 95)
+        # Division between selection (top) and plot (bottom); the sizes are restored from the last session
+        self.splitter.setStretchFactor(0, 1)
+        self.splitter.setStretchFactor(1, 4)
+        self.splitter.setSizes([200, 800])
+        splitter_state = GlobalConf.settings.value(self.splitter_state_name, defaultValue=None)
+        if splitter_state is not None:
+            self.splitter.restoreState(splitter_state)
+
+    splitter_state_name = 'history_splitter_state'
+
+    def closeEvent(self, event):
+        """Stores the splitter sizes"""
+
+        GlobalConf.settings.setValue(self.splitter_state_name, self.splitter.saveState())
+        GlobalConf.settings.sync()
+        super().closeEvent(event)
 
     def columnLabel(self, table_name: str, column_name: str, with_unit: bool = True) -> str:
         """
@@ -255,15 +312,18 @@ class HistoryWindow(TabWidget):
             return None
         return start_time, end_time
 
-    def getSeries(self, start_time: int, end_time: int, bucket_seconds: int = 1) -> list[tuple[str, np.ndarray, np.ndarray]]:
+    def getSeries(self, start_time: int, end_time: int, bucket_seconds: int = 1, envelope: bool = False) -> list[tuple]:
         """
         Gets checked data as separate series (no merging, so no gaps are filled with nan)
 
         :param start_time: start time as timestamp
         :param end_time: end time as timestamp
         :param bucket_seconds: average data in time buckets of this size
-        :returns: list of (label, time, values)
+        :param envelope: also return minimum and maximum of every bucket (only if bucket_seconds > 1)
+        :returns: list of (label, time, values) or (label, time, values, minima, maxima) with envelope
         """
+
+        envelope = envelope and bucket_seconds > 1
 
         series = []
         for i, table in enumerate(self.database.tables):
@@ -274,14 +334,19 @@ class HistoryWindow(TabWidget):
             if len(checked) < 2:
                 continue
 
-            data = self.database.getData(i, tuple(checked), start_time, end_time, bucket_seconds)
+            data = self.database.getData(i, tuple(checked), start_time, end_time, bucket_seconds, envelope)
             if data is False:
                 continue
             column_names, column_values = data
             column_values = column_values.astype(float)
 
-            for column, column_name in enumerate(column_names[1:], start=1):
-                series.append((f'{table.name}: {self.columnLabel(table.name, column_name)}', column_values[:, 0], column_values[:, column]))
+            for index, column_name in enumerate(column_names[1:]):
+                label = f'{table.name}: {self.columnLabel(table.name, column_name)}'
+                if envelope:
+                    column = 1 + 3 * index
+                    series.append((label, column_values[:, 0], column_values[:, column], column_values[:, column + 1], column_values[:, column + 2]))
+                else:
+                    series.append((label, column_values[:, 0], column_values[:, index + 1]))
         return series
 
     def getData(self) -> tuple[np.ndarray, list[str]]:
@@ -340,13 +405,24 @@ class HistoryWindow(TabWidget):
         self.plotting = True
         try:
             self.time_canvas.clean()
-            series = self.getSeries(start_time, end_time, bucket_seconds)
-            for label, x, y in series:
+            for item in self.envelope_items:
+                self.time_canvas.plotItem.removeItem(item)
+            self.envelope_items = []
+
+            series = self.getSeries(start_time, end_time, bucket_seconds, self.button_envelope_preview.value())
+            for label, x, y, *envelope in series:
                 self.time_canvas.plot(x, y, label=label, plot_params={'connect': 'finite'})
+                curve = self.time_canvas.graph_curves[-1]
                 # clipping and peak-downsampling of pyqtgraph keep the rendering fast and spikes visible
                 # (must be set after the curve was added to the plot)
-                self.time_canvas.graph_curves[-1].setClipToView(True)
-                self.time_canvas.graph_curves[-1].setDownsampling(auto=True, method='peak')
+                curve.setClipToView(True)
+                curve.setDownsampling(auto=True, method='peak')
+
+                if envelope:
+                    self.addEnvelope(x, envelope[0], envelope[1], curve.opts['pen'].color())
+
+            self.current_series = [(label, x, y) for label, x, y, *_ in series]
+            self.updateFitSeries()
 
             self.loaded_range = (start_time, end_time)
             self.loaded_bucket = bucket_seconds
@@ -356,6 +432,95 @@ class HistoryWindow(TabWidget):
             QApplication.restoreOverrideCursor()
 
         return bool(series)
+
+    def addEnvelope(self, x: np.ndarray, minima: np.ndarray, maxima: np.ndarray, color):
+        """
+        Adds a shaded band between minima and maxima
+
+        :param x: time values
+        :param minima: minimum of every bucket
+        :param maxima: maximum of every bucket
+        :param color: color of the curve (QColor)
+        """
+
+        valid = np.isfinite(minima) & np.isfinite(maxima)
+        if not np.any(valid):
+            return
+        lower = pg.PlotDataItem(x[valid], minima[valid], pen=pg.mkPen(None))
+        upper = pg.PlotDataItem(x[valid], maxima[valid], pen=pg.mkPen(None))
+        fill_color = pg.mkColor(color)
+        fill_color.setAlpha(70)
+        band = pg.FillBetweenItem(lower, upper, brush=pg.mkBrush(fill_color))
+        for item in (lower, upper, band):
+            self.time_canvas.plotItem.addItem(item, ignoreBounds=item is band)
+            self.envelope_items.append(item)
+
+    def replot(self):
+        """Plots the loaded range again (e.g. after the min/max option changed)"""
+
+        if self.loaded_range is not None:
+            self.plotSeries(*self.loaded_range, self.loaded_bucket)
+
+    def updateFitSeries(self):
+        """Fills the curves that can be fitted (pressures first)"""
+
+        labels = [label for label, _, _ in self.current_series]
+        current = self.combobox_fit_series.getValue(text=True) if self.combobox_fit_series.entries else ''
+        self.combobox_fit_series.reinitialize(entries=labels)
+        if current in labels:
+            self.combobox_fit_series.setCurrentIndex(labels.index(current))
+        else:
+            pressures = [i for i, label in enumerate(labels) if label.startswith(self.database.pressure_table.name)]
+            if pressures:
+                self.combobox_fit_series.setCurrentIndex(pressures[0])
+
+    def clearFit(self):
+        """Removes the prediction fit from the plot"""
+
+        for item in self.fit_items:
+            self.time_canvas.plotItem.removeItem(item)
+        self.fit_items = []
+        self.label_fit_result.setText('')
+
+    def fitPrediction(self):
+        """Fits the selected curve in the visible range and draws the prediction"""
+
+        self.clearFit()
+        if not self.current_series or self.combobox_fit_series.currentIndex() < 0:
+            self.writeStatusBar('No curve to fit, load data first')
+            return
+
+        label, x, y = self.current_series[self.combobox_fit_series.currentIndex()]
+        view_start, view_end = self.time_canvas.getViewBox().viewRange()[0]
+        visible = (x >= view_start) & (x <= view_end)
+        model = self.combobox_fit_model.getValue(text=True)
+
+        try:
+            result: PressureFitResult = FIT_MODELS[model](x[visible], y[visible])
+        except (ValueError, RuntimeError) as error:
+            self.label_fit_result.setText(f'Fit failed: {error}')
+            self.writeStatusBar(f'Prediction fit failed: {error}')
+            return
+
+        # prediction from the first fitted point until 3x the fitted time span into the future
+        span = result.extra['t_span']
+        t_prediction = np.linspace(result.t_start, result.t_start + 4 * span, 500)
+        curve = pg.PlotDataItem(
+            t_prediction,
+            result.predict(t_prediction),
+            pen=pg.mkPen(color=Colors.color_red, width=2, style=Qt.PenStyle.DashLine),
+            name=f'{model} fit: {label}'
+        )
+        self.time_canvas.plotItem.addItem(curve)
+        self.fit_items.append(curve)
+
+        text = f'{model}: {result.description}'
+        target = result.p_inf * 1.1
+        reach = result.timeToReach(target)
+        if reach is not None:
+            text += f' | 1.1·p∞ reached at {datetime.fromtimestamp(reach):%Y-%m-%d %H:%M}'
+        self.label_fit_result.setText(text)
+        GlobalConf.logger.info(f'History prediction fit of "{label}": {text}')
 
     def updatePreview(self):
         """Updates the preview with given data"""
@@ -370,6 +535,7 @@ class HistoryWindow(TabWidget):
         start_time, end_time = time_range
 
         self.selected_range = time_range
+        self.clearFit()
         if not self.plotSeries(start_time, end_time, self.bucketFor(end_time - start_time)):
             self.writeStatusBar('No data selected or no datapoints available')
 
