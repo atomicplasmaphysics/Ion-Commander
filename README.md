@@ -142,7 +142,7 @@ The size of the database is shown in the menu `Database`.
 - [x] Single source for the version number (`GlobalConf.version`)
 - [x] Add `__pycache__/`, `.vs/` and `.mcp.json` to `.gitignore`
 - [ ] Unit tests for things without hardware (`parseFunctionCall`, `CommandQueue.parseScript`, `convertInChannelString`, `getPrefix`, LMF reader, pressure conversions) using the virtual devices
-- [ ] Replace `print` statements with the logger
+- [x] Replace `print` statements with the logger (remaining `print`s are only in the demo/test functions of the drivers)
 - [ ] Command-line arguments (log level, virtual devices, no CommandServer)
 - [ ] Write a short manual (sorry big boy 🐶)
 - [ ] Automatic changelog from the commit messages
