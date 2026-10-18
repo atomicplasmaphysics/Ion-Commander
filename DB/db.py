@@ -946,11 +946,15 @@ class DB:
 
             if column_name in old_labels:
                 GlobalConf.logger.info(f'DB: Label of "{table_name}.{column_name}" changed from "{old_labels[column_name][0]}" to "{label}"')
+                # a renamed label is valid from now on
+                query = self.labels_table.insert_parameterized()
+                parameters = (table_name, column_name, str(label), str(unit))
+            else:
+                # the first label of a column is valid from the beginning (time 0), so it also describes all old data
+                query = f'''INSERT INTO {self.labels_table.name} (Time, TableName, ColumnName, Label, Unit) VALUES (?, ?, ?, ?, ?);'''
+                parameters = (0, table_name, column_name, str(label), str(unit))
             try:
-                self._execute_parameterized(
-                    self.labels_table.insert_parameterized(),
-                    (table_name, column_name, str(label), str(unit))
-                )
+                self._execute_parameterized(query, parameters)
                 changed = True
             except Exception as error:
                 GlobalConf.logger.error(f'DB: Could not store label "{label}" of "{table_name}.{column_name}": {error}')

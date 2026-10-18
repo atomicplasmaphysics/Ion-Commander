@@ -26,6 +26,14 @@ If one wishes to execute the GUI without calling it from the console, [PyInstall
 After executing the `compile\pyinstaller.py` file (same packages and package PyInstaller are needed), a `Ion Commander.exe` will be created in the main folder.
 For further information read the description of the `compile\pyinstaller.py` file.
 
+## Changelog
+All changes are listed in [CHANGELOG.md](CHANGELOG.md), which is created from the commit messages with
+```bash
+>> python -m Utility.Changelog
+```
+Commit messages should start with the version (e.g. `v0.1.64 Short description`) followed by a detailed description.
+The version itself is set in `GlobalConf.version`.
+
 ## Manual
 You are a big boy 🐶, there is no manual needed, you can figure it out yourself.
 Maybe get some popcorn while figuring it out 🍿
@@ -38,6 +46,9 @@ All values are logged once per second into a [DuckDB](https://duckdb.org/) file 
   GUI (e.g. a pressure gauge in `PressureVBoxLayout.pressure_gauges` - only the name, not the database column), a new label row is
   written at the next start. The History tab always shows the current name and lists the previous names in the tooltip.
 - **`Events`**: things that happen once (interlock trips, lost connections, ...) with source, type, message and a value.
+
+Old data needs no migration: the data tables and their columns stay exactly the same, only the `Labels` and `Events` tables are
+added. The first label of a column is stored as valid from the beginning (time 0), so it also describes all data logged before.
 
 New tables are created automatically at startup, existing tables are never changed automatically.
 Adding a new column to an existing table needs `DB.addNewColumns()` (make a copy of the database file first and close the GUI,
@@ -126,6 +137,7 @@ The size of the database is shown in the menu `Database`.
 - [ ] Log more events (manual connect/disconnect, script start/end)
 - [ ] Database maintenance: archive or thin out old data (e.g. keep 1 s data for 30 days, 1 min averages afterwards)
 - [ ] Make the splitter of the History tab work as intended (stretch factors)
+- [ ] History: exponential fit of the pressure to predict the final pressure
 
 ### GUI
 - [x] Add tooltips to everything (all device panels, History, Analyse, tabs, menus, settings)
@@ -136,7 +148,6 @@ The size of the database is shown in the menu `Database`.
 - [x] Show CommandServer status (running, connected clients) in the status bar
 - [ ] Start CoboldPC from the GUI
 - [x] Remember popped out panels and their positions (move back to default if they would appear outside of the screen)
-- [ ] Window geometry handling should also be implemented in the BCA-GUIDE (see `GlobalConf.py`)
 
 ### Code quality / Project
 - [x] Single source for the version number (`GlobalConf.version`)
@@ -145,7 +156,7 @@ The size of the database is shown in the menu `Database`.
 - [x] Replace `print` statements with the logger (remaining `print`s are only in the demo/test functions of the drivers)
 - [ ] Command-line arguments (log level, virtual devices, no CommandServer)
 - [ ] Write a short manual (sorry big boy 🐶)
-- [ ] Automatic changelog from the commit messages
+- [x] Automatic changelog from the commit messages (`python -m Utility.Changelog` writes `CHANGELOG.md`)
 
 
 ## BUGs

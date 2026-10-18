@@ -223,7 +223,7 @@ class GlobalConf:
     title = 'Ion Commander'
 
     # version (single source of truth - update only here)
-    version = '0.1.63'
+    version = '0.1.64'
 
     # logger
     logger = logging.getLogger(title)
@@ -281,7 +281,6 @@ class GlobalConf:
         Returns (width, height, center_x, center_y) of window.
         Returns (GlobalConf.window_maximized_value, GlobalConf.window_maximized_value) for width and height if should be maximized.
         """
-        # TODO: should also be implemented in the BCA-GUIDE
         width = GlobalConf.settings.value(GlobalConf.window_width_name, defaultValue=GlobalConf.window_maximized_value, type=int)
         height = GlobalConf.settings.value(GlobalConf.window_height_name, defaultValue=GlobalConf.window_maximized_value, type=int)
         center_x = GlobalConf.settings.value(GlobalConf.window_center_x_name, defaultValue=0, type=int)
