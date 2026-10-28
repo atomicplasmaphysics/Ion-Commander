@@ -177,6 +177,12 @@ class CameraConnection:
                     self._camera.PixelFormat.SetValue(PySpin.PixelFormat_Mono16)
                 except PySpin.SpinnakerException:
                     pass
+                # always the newest image (default "OldestFirst" returns old buffered images -> lag)
+                try:
+                    handling = PySpin.CEnumerationPtr(self._camera.GetTLStreamNodeMap().GetNode('StreamBufferHandlingMode'))
+                    handling.SetIntValue(handling.GetEntryByName('NewestOnly').GetValue())
+                except PySpin.SpinnakerException:
+                    pass
 
             elif self.backend == 'harvesters':
                 self._harvester = Harvester()
@@ -191,6 +197,11 @@ class CameraConnection:
                         getattr(node_map, name).value = value
                     except Exception:
                         pass
+                # always the newest image (default "OldestFirst" returns old buffered images -> lag)
+                try:
+                    self._acquirer.data_streams[0].node_map.StreamBufferHandlingMode.value = 'NewestOnly'
+                except Exception as error:
+                    GlobalConf.logger.info(f'Camera: could not set the stream buffer handling mode: {error}')
 
         except ConnectionError:
             self.close()
@@ -397,24 +408,30 @@ def beamStatistics(image: np.ndarray, maximum_value: int, background_percentile:
     :returns: dictionary with maximum, saturation (fraction of saturated pixels), centroid x/y and rms width x/y (pixels)
     """
 
-    image = np.asarray(image, dtype=float)
+    image = np.asarray(image)
+    maximum = float(image.max())
+    saturation = float(np.count_nonzero(image >= maximum_value)) / image.size
 
     # background and noise from the border of the image (5 % on every side), where usually no beam is
     border = max(1, int(min(image.shape) * 0.05))
-    frame = np.concatenate([image[:border].ravel(), image[-border:].ravel(), image[:, :border].ravel(), image[:, -border:].ravel()])
+    frame = np.concatenate([image[:border].ravel(), image[-border:].ravel(), image[:, :border].ravel(), image[:, -border:].ravel()]).astype(np.float32)
     background = float(np.median(frame))
     noise = float(np.std(frame))
     if background_percentile is not None and frame.size < 10:
         background = float(np.percentile(image, background_percentile))
 
-    signal = image - background
+    # float32 and projections instead of full coordinate grids (live view: ~80 ms -> a few ms for 1440x1080)
+    signal = image.astype(np.float32)
+    signal -= background
     # only the spot: ignore pixels within the noise
     signal[signal < 3 * noise] = 0
-    total = float(signal.sum())
+    profile_x = signal.sum(axis=0, dtype=np.float64)
+    profile_y = signal.sum(axis=1, dtype=np.float64)
+    total = float(profile_x.sum())
 
     statistics = {
-        'maximum': float(image.max()),
-        'saturation': float(np.mean(image >= maximum_value)),
+        'maximum': maximum,
+        'saturation': saturation,
         'x': float('nan'),
         'y': float('nan'),
         'sigma_x': float('nan'),
@@ -423,14 +440,16 @@ def beamStatistics(image: np.ndarray, maximum_value: int, background_percentile:
     if total <= 0:
         return statistics
 
-    y, x = np.indices(signal.shape)
-    cx = float((signal * x).sum() / total)
-    cy = float((signal * y).sum() / total)
+    # the moments of the projections are the same as the moments of the image
+    x = np.arange(profile_x.size)
+    y = np.arange(profile_y.size)
+    cx = float((profile_x * x).sum() / total)
+    cy = float((profile_y * y).sum() / total)
     statistics.update({
         'x': cx,
         'y': cy,
-        'sigma_x': float(np.sqrt((signal * (x - cx) ** 2).sum() / total)),
-        'sigma_y': float(np.sqrt((signal * (y - cy) ** 2).sum() / total)),
+        'sigma_x': float(np.sqrt(max((profile_x * (x - cx) ** 2).sum() / total, 0))),
+        'sigma_y': float(np.sqrt(max((profile_y * (y - cy) ** 2).sum() / total, 0))),
     })
     return statistics
 

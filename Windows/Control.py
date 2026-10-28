@@ -83,7 +83,8 @@ class ControlWindow(TabWidget):
         self.splitter.addWidget(self.laser_parent)
 
         # PRESSURE CONTROL
-        self.pressure_vbox = VBoxTitleLayout('Pressure', parent=self, add_stretch=True, popout_enable=True)
+        # the pressures are always visible (no scrollbar)
+        self.pressure_vbox = VBoxTitleLayout('Pressure', parent=self, add_stretch=True, popout_enable=True, scrollable=False)
         self.pressure_group_vbox = PressureVBoxLayout()
 
         # Stretch to bottom

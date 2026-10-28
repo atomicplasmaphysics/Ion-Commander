@@ -1,4 +1,6 @@
+import ast
 import csv
+import operator
 import re
 from typing import Self
 from pathlib import Path
@@ -37,8 +39,129 @@ def expandArguments(arguments: list[str]) -> list[str]:
         count = int(round((stop - start) / step, 9)) + 1
         if count > 100000:
             raise ValueError(f'Range "{argument}" has too many values ({count})')
-        expanded.extend(f'{round(start + i * step, 12):g}' for i in range(count))
+        expanded.extend(formatNumber(start + i * step) for i in range(count))
     return expanded
+
+
+def formatNumber(value: float | int) -> str:
+    """Short text of a number without float noise (0.30000000000000004 -> "0.3", 2.0 -> "2", 1E-13 -> "1e-13")"""
+
+    if isinstance(value, int):
+        return str(value)
+    value = float(f'{value:.12g}')
+    if value.is_integer() and abs(value) < 1E15:
+        return str(int(value))
+    return repr(value)
+
+
+MATH_OPERATORS = {
+    ast.Add: operator.add,
+    ast.Sub: operator.sub,
+    ast.Mult: operator.mul,
+    ast.Div: operator.truediv,
+    ast.FloorDiv: operator.floordiv,
+    ast.Pow: operator.pow,
+    ast.USub: operator.neg,
+    ast.UAdd: operator.pos,
+}
+MATH_FUNCTIONS = {'abs': abs, 'round': round, 'min': min, 'max': max}
+
+
+def evaluateMath(expression: str) -> float | int:
+    """
+    Safely evaluates basic math: numbers, + - * / // **, brackets and abs(), round(), min(), max()
+
+    :param expression: e.g. "-(5)", "(5)*10+2", "max((5)-10,0)"
+    :raises ValueError: if the expression is not basic math
+    """
+
+    def evaluate(node):
+        if isinstance(node, ast.Expression):
+            return evaluate(node.body)
+        if isinstance(node, ast.Constant) and type(node.value) in (int, float):
+            return node.value
+        if isinstance(node, ast.BinOp) and type(node.op) in MATH_OPERATORS:
+            left, right = evaluate(node.left), evaluate(node.right)
+            if isinstance(node.op, ast.Pow) and abs(right) > 100:
+                raise ValueError('exponent too large')
+            return MATH_OPERATORS[type(node.op)](left, right)
+        if isinstance(node, ast.UnaryOp) and type(node.op) in MATH_OPERATORS:
+            return MATH_OPERATORS[type(node.op)](evaluate(node.operand))
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id in MATH_FUNCTIONS and not node.keywords:
+            return MATH_FUNCTIONS[node.func.id](*[evaluate(argument) for argument in node.args])
+        raise ValueError(f'"{expression}" is not basic math')
+
+    try:
+        result = evaluate(ast.parse(expression.strip(), mode='eval'))
+    except (SyntaxError, TypeError, ZeroDivisionError, OverflowError) as error:
+        raise ValueError(f'"{expression}" cannot be calculated: {error}')
+    if isinstance(result, complex):
+        raise ValueError(f'"{expression}" is complex')
+    return result
+
+
+def splitArguments(arguments: str) -> list[str]:
+    """Splits "1,'a,b',[2,3]" at the commas that are not inside brackets or quotes"""
+
+    parts = []
+    current = ''
+    depth = 0
+    quote = ''
+    for char in arguments:
+        if quote:
+            if char == quote:
+                quote = ''
+        elif char in '\'"':
+            quote = char
+        elif char in '([{':
+            depth += 1
+        elif char in ')]}':
+            depth -= 1
+        elif char == ',' and depth == 0:
+            parts.append(current)
+            current = ''
+            continue
+        current += char
+    parts.append(current)
+    return parts
+
+
+def substitutePlaceholder(command: str, value: str, placeholder: str = '%') -> str:
+    """
+    Replaces the placeholder in a command by the value. Arguments of the function with basic math are calculated:
+    "PSU:voltageSet(1,-%)" with value 5 -> "PSU:voltageSet(1,-5)", also "%+5", "%*10", "(%-1)/2", "abs(%)", "max(%,0)".
+    Arguments that are no math (e.g. strings 'file_%.lmf') or non-numeric values are simply replaced.
+    Several commands ("A(%);B(-%)") are handled separately.
+
+    :param command: command with placeholder
+    :param value: value of the placeholder
+    :param placeholder: placeholder character
+    """
+
+    try:
+        float(value)
+        numeric = True
+    except ValueError:
+        numeric = False
+
+    substituted = []
+    for single in splitCommands(command):
+        start, stop = single.find('('), single.rfind(')')
+        if not numeric or start < 0 or stop < start:
+            substituted.append(single.replace(placeholder, value))
+            continue
+
+        arguments = []
+        for argument in splitArguments(single[start + 1:stop]):
+            if placeholder in argument:
+                try:
+                    argument = formatNumber(evaluateMath(argument.replace(placeholder, f'({value})')))
+                except ValueError:
+                    argument = argument.replace(placeholder, value)
+            arguments.append(argument)
+
+        substituted.append(f'{single[:start].replace(placeholder, value)}({",".join(arguments)}){single[stop + 1:].replace(placeholder, value)}')
+    return ';'.join(substituted)
 
 
 def splitCommands(command: str) -> list[str]:
@@ -232,7 +355,7 @@ class CommandQueue:
                 if not args[0]:
                     cmd_queue.error = f'Line {line_nbr}: "{line}": "{placeholder_char}" in function, but no arguments are given'
                     return cmd_queue
-                line_commands.append((line_nbr, indent, [func_name.replace(placeholder_char, arg) for arg in args]))
+                line_commands.append((line_nbr, indent, [substitutePlaceholder(func_name, arg, placeholder_char) for arg in args]))
             else:
                 if args[0]:
                     cmd_queue.error = f'Line {line_nbr}: "{line}": arguments were given, but no "{placeholder_char}" in function'
@@ -475,6 +598,7 @@ WAIT
 
 # commands will be set one after another
 # '%' can be used as placeholder and following arguments will be placed inside
+# basic math with '%' is calculated, e.g. -%, %+5, %*10, (%-1)/2, abs(%), max(%,0) (no spaces in the command)
 LASER:rfSet(%) 23, 24
 
 # Tabs '\t' are treated as loops

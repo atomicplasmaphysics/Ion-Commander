@@ -17,7 +17,8 @@ from Utility.AutoReconnect import EventLog
 
 from Windows.Control import ControlWindow
 from Windows.Monitor import MonitorWindow
-from Windows.Measure import MeasureWindow
+# Measure tab (CoboldPC) is disabled for now
+# from Windows.Measure import MeasureWindow
 from Windows.History import HistoryWindow
 from Windows.Scripts import ScriptsWindow
 from Windows.Tips import TipsWindow
@@ -70,9 +71,9 @@ class MainWindow(QMainWindow):
         self.monitor_window = MonitorWindow(self)
         self.addTab(self.monitor_window, 'Monitor', 'Monitoring devices (power meter, electrometer, camera)')
 
-        # Add measure tab (CoboldPC)
-        self.measure_window = MeasureWindow(self, metadata_function=self.deviceSettings)
-        self.addTab(self.measure_window, 'Measure', 'Measurements with CoboldPC (fixed duration, measurement folder, device settings saved as JSON)')
+        # Add measure tab (CoboldPC), disabled for now (the COBOLD device of the CommandServer below too)
+        # self.measure_window = MeasureWindow(self, metadata_function=self.deviceSettings)
+        # self.addTab(self.measure_window, 'Measure', 'Measurements with CoboldPC (fixed duration, measurement folder, device settings saved as JSON)')
 
         # Add history tab
         self.history_window = HistoryWindow(self, self.database)
@@ -101,7 +102,7 @@ class MainWindow(QMainWindow):
             'POWER': self.monitor_window.power_meter_group_vbox.device_wrapper,
             'CAMERA': self.monitor_window.camera_group_vbox.device_wrapper,
             'ELECTROMETER': self.monitor_window.electrometer_group_vbox.device_wrapper,
-            'COBOLD': self.measure_window.cobold_group_vbox.device_wrapper
+            # 'COBOLD': self.measure_window.cobold_group_vbox.device_wrapper
         }
         if self.control_window.ebis_enabled:
             devices['EBIS'] = self.control_window.ebis_group_vbox.device_wrapper

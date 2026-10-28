@@ -1,4 +1,5 @@
 from typing import TYPE_CHECKING, Callable
+from threading import Event
 from time import time, sleep, monotonic
 
 
@@ -92,6 +93,8 @@ class ConnectionWorker(QRunnable):
         self.started = False
         self.auto_delete = auto_delete
         self.work = []
+        # set when new work arrives, so the worker does not have to poll (polling added up to 0.1 s per call)
+        self.work_event = Event()
 
     @pyqtSlot()
     def run(self):
@@ -104,7 +107,8 @@ class ConnectionWorker(QRunnable):
                 break
 
             if not self.work:
-                sleep(0.1)
+                self.work_event.wait(0.1)
+                self.work_event.clear()
                 continue
 
             callback_id, _, name, args, kwargs = self.work.pop(0)
@@ -131,6 +135,7 @@ class ConnectionWorker(QRunnable):
 
         if name == 'close':
             self.work.insert(0, (callback_id, time(), name, args, kwargs))
+            self.work_event.set()
             return callback_id
 
         if len(self.work) > self.max_queue:
@@ -160,6 +165,7 @@ class ConnectionWorker(QRunnable):
             return -1
 
         self.work.append((callback_id, time(), name, args, kwargs))
+        self.work_event.set()
         return callback_id
 
 

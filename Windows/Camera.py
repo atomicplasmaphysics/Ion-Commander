@@ -75,7 +75,7 @@ class CameraVBoxLayout(QVBoxLayout):
         self.button_connection.pressed.connect(self.manualConnect)
         self.button_connection_refresh = QPushButton()
         self.button_connection_refresh.setToolTip('Refresh camera list')
-        self.button_connection_refresh.setIcon(QIcon('icons/refresh.png'))
+        self.button_connection_refresh.setIcon(QIcon('icons/refresh.svg'))
         self.button_connection_refresh.pressed.connect(self.setCamerasComboBox)
         self.status_reading_age = ReadingAgeLabel()
         self.connection_grid.addWidgets(

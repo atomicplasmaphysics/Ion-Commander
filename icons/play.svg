@@ -1,0 +1,15 @@
+<!-- Lucide icon "play" (lucide-static v0.460.0, ISC License, see icons/LICENSE-Lucide.txt) -->
+<svg
+  class="lucide lucide-play"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="#3bb34a"
+  stroke="#3bb34a"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <polygon points="6 3 20 12 6 21 6 3" />
+</svg>

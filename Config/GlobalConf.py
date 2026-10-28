@@ -98,7 +98,8 @@ class DefaultParams:
 
     # Camera parameters
     camera_folder = 'Images'
-    camera_live_interval = 100
+    # interval of the live view in ms (only one image is requested at a time, so this is the maximum rate)
+    camera_live_interval = 30
 
     # Script parameters
     script_folder = 'Scripts'
@@ -241,7 +242,7 @@ class GlobalConf:
     title = 'Ion Commander'
 
     # version (single source of truth - update only here)
-    version = '0.1.75'
+    version = '0.1.76'
 
     # logger
     logger = logging.getLogger(title)

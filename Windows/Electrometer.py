@@ -25,7 +25,7 @@ from Utility.AutoReconnect import AutoReconnect
 from Utility.Dialogs import showMessageBox
 
 from Connection.USBPorts import getComports
-from Connection.KeithleyPAmeter import KeithleyPAmeterConnection, KeithleyReading, SIMULATION_PORT
+from Connection.KeithleyPAmeter import KeithleyPAmeterConnection, KeithleyReading
 from Connection.Threaded import ThreadedKeithleyConnection, ThreadedDummyConnection
 
 
@@ -74,7 +74,7 @@ class ElectrometerVBoxLayout(QVBoxLayout):
         self.indicator_connection.setToolTip('Green if the electrometer is connected')
         self.status_connection = QLabel('Not connected')
         self.combobox_connection = ComboBox()
-        self.combobox_connection.setToolTip('COM port of the electrometer ("simulation": simulated Keithley 6514 for testing)')
+        self.combobox_connection.setToolTip('COM port of the electrometer')
         self.combobox_baud = ComboBox(entries=self.baud_rates)
         self.combobox_baud.setToolTip('Baud rate, must be the same as in the RS-232 menu of the electrometer (SHIFT + RS-232)')
         self.button_connection = QPushButton('Connect')
@@ -82,7 +82,7 @@ class ElectrometerVBoxLayout(QVBoxLayout):
         self.button_connection.pressed.connect(self.manualConnect)
         self.button_connection_refresh = QPushButton()
         self.button_connection_refresh.setToolTip('Refresh connections list')
-        self.button_connection_refresh.setIcon(QIcon('icons/refresh.png'))
+        self.button_connection_refresh.setIcon(QIcon('icons/refresh.svg'))
         self.button_connection_refresh.pressed.connect(self.setComportsComboBox)
         self.status_reading_age = ReadingAgeLabel()
         self.connection_grid.addWidgets(
@@ -267,9 +267,9 @@ class ElectrometerVBoxLayout(QVBoxLayout):
             self.combobox_connection.setCurrentIndex(entries[comport.lower()])
 
     def setComportsComboBox(self):
-        """Sets available ports in the comports combobox (and the simulation)"""
+        """Sets available ports in the comports combobox"""
 
-        comports = getComports() + [(SIMULATION_PORT, 'Simulated Keithley 6514 (for testing)', '')]
+        comports = getComports()
         self.combobox_connection.reinitialize(
             entries=[port for port, _, _ in comports],
             tooltips=[f'{port}: {description} [{hardware_id}]' for port, description, hardware_id in comports]

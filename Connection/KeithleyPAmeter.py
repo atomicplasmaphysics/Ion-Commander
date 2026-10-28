@@ -8,16 +8,13 @@ Commands are terminated with CR (the instrument processes a command after <CR>).
 Readings are returned with the data elements READing, TIME and STATus (FORMat:ELEMents), e.g.
 "+1.040564E-06,+2.236299E+02,+1.380000E+02" = 1.04 uA, 223.6 s after power on, status word 138.
 An overflowed reading is returned as +9.9E37 (converted to nan by the read functions).
-
-Use comport "simulation" for a simulated instrument (no hardware needed).
 """
 
 import re
 import sys
 from enum import Enum, auto
 from math import isfinite, nan, sqrt
-from random import gauss
-from time import monotonic
+from time import monotonic, sleep
 from typing import NamedTuple
 
 
@@ -26,7 +23,6 @@ from Config.GlobalConf import GlobalConf
 from Connection.USBPorts import COMConnection
 
 
-SIMULATION_PORT = 'simulation'
 OVERFLOW_VALUE = 9.9E37
 
 # known instruments (identification strings)
@@ -98,7 +94,7 @@ class KeithleyPAmeterConnection(COMConnection):
     """
     Context manager for the Keithley 6514 electrometer (RS-232), built on top of the COMConnection context manager
 
-    :param comport: COM Port (or "simulation")
+    :param comport: COM Port
     :param timeout: Timeout for one character [in s]
     :param encoding: Encoding
     :param baudrate: Baud rate (must match the setting of the instrument)
@@ -187,6 +183,8 @@ class KeithleyPAmeterConnection(COMConnection):
         self.elements = 3  # READing, TIME, STATus
         self.nplc = 5.
         self.trigger_count = 1
+        # front panel mode measures continuously (ARM:COUN INF), restored on close
+        self.continuous_on_close = False
 
         super().__init__(
             comport,
@@ -202,9 +200,8 @@ class KeithleyPAmeterConnection(COMConnection):
     def open(self):
         """Opens the connection, checks the identification and sets the data format"""
 
-        if self.comport == SIMULATION_PORT and self.serial is None:
-            self.serial = Keithley6514Simulator()
         super().open()
+        self.breakOperation()
 
         # detect echo mode
         if self.echo_mode == self.EchoMode.ECHO_AUTO:
@@ -226,6 +223,7 @@ class KeithleyPAmeterConnection(COMConnection):
             raise ConnectionError(f'Device identification {identification!r} does not contain {self.strict!r}')
 
         self.setFormatElements()
+        self.setupTrigger()
         self.nplc = self.getNPLC()
         return self
 
@@ -234,6 +232,8 @@ class KeithleyPAmeterConnection(COMConnection):
 
         if self.serial is not None:
             try:
+                if self.continuous_on_close:
+                    self.presetFrontPanel()
                 self.setLocal()
             except Exception as error:
                 GlobalConf.logger.debug(f'<KeithleyPAmeterConnection> could not set local mode: {error}')
@@ -298,8 +298,9 @@ class KeithleyPAmeterConnection(COMConnection):
         return convertInUnitList(self._queryAndReturn(cmd).split(','), unit)
 
     def _readingTimeout(self, count: int = 1) -> float:
-        """Time in s that <count> readings can take (integration time + overhead, at least 2 s)"""
-        return max(2., count * (self.nplc / 50 + 0.05) * 2 + 1)
+        """Time in s that <count> readings can take (integration time + overhead, at least 10 s: the first reading after
+        switching the function/zero check with auto range took 5.4 s on the real instrument)"""
+        return max(10., count * (self.nplc / 50 + 0.05) * 2 + 1)
 
     def _parseReadings(self, response: str) -> list[KeithleyReading]:
         """Parses the reading string (data elements READing, TIME, STATus)"""
@@ -539,6 +540,39 @@ class KeithleyPAmeterConnection(COMConnection):
         self._write(f'AVER:TCON {"MOV" if moving else "REP"}')
         self._write(f'AVER {self._on_off(state)}')
 
+    def setupTrigger(self):
+        """
+        Single readings on request: aborts a running (continuous) measurement, sets arm and trigger count to 1 and
+        clears old errors. READ? is invalid with an infinite arm count (error 830, e.g. after using the front panel).
+        """
+
+        self.continuous_on_close = self._queryAndReturn('ARM:COUN?').strip().upper() in ('INF', '+9.9E37', '9.9E37', '+9.900000E+37')
+        self._write('ABOR')
+        self._write('ARM:SOUR IMM')
+        self._write('ARM:COUN 1')
+        self._write('TRIG:SOUR IMM')
+        self.setTriggerCount(1)
+        self.clearStatus()
+
+    def presetFrontPanel(self):
+        """
+        Front panel defaults like after power on (SYST:PRES): continuous readings, zero check on, auto range.
+        Do not use INIT with an infinite arm count instead, the RS-232 parser is blocked then (only ^C helps).
+        """
+
+        self._write('SYST:PRES')
+        self.trigger_count = 1
+
+    def breakOperation(self):
+        """
+        Sends ^C: clears any pending operation and output (the instrument answers "DCL"). Recovers an instrument that
+        does not answer anymore, e.g. after INIT with an infinite arm count.
+        """
+
+        self.serial.write(b'\x03')
+        sleep(0.5)
+        self.serial.reset_input_buffer()
+
     def setTriggerCount(self, count: int):
         """Number of readings per READ? (1 to 2500)"""
         count = min(max(int(count), 1), 2500)
@@ -621,192 +655,7 @@ class KeithleyPAmeterConnection(COMConnection):
         return mean, std, len(values)
 
 
-class Keithley6514Simulator:
-    """
-    Simulated Keithley 6514 that understands the SCPI commands used by <KeithleyPAmeterConnection> (for tests without
-    hardware). The simulated input current can be set with <input_current>, noise with <noise>.
-    """
-
-    identification = 'KEITHLEY INSTRUMENTS INC.,MODEL 6514,0000000,SIMULATED'
-
-    def __init__(self, input_current: float = 1.234E-9, noise: float = 1E-12, terminator: bytes = b'\r\n'):
-        self.input_current = input_current
-        self.noise = noise
-        self.terminator = terminator
-        self.timeout = 1
-        self.is_open = True
-        self.start = monotonic()
-        self.output = bytearray()
-        self.input = bytearray()
-        self.errors: list[tuple[int, str]] = []
-        self.state = {
-            'FUNC': 'CURR', 'CURR:RANG': 2E-2, 'CURR:RANG:AUTO': True, 'VOLT:NPLC': 5.0, 'SYST:ZCH': True, 'SYST:ZCOR': False,
-            'TRIG:COUN': 1, 'FORM:ELEM': 'READ,TIME,STAT', 'SYST:LFR': 50, 'REMOTE': False, 'AVER': False, 'MED': False,
-            'SENS:CURR:DAMP': False,
-        }
-        self.last_value = 0.
-
-    # serial interface
-    def write(self, data: bytes) -> int:
-        self.input += data
-        while b'\r' in self.input:
-            line, _, rest = bytes(self.input).partition(b'\r')
-            self.input = bytearray(rest)
-            self._execute(line.decode().strip())
-        return len(data)
-
-    def read(self, size: int = 1) -> bytes:
-        data = bytes(self.output[:size])
-        del self.output[:size]
-        return data
-
-    def readline(self, size: int = -1) -> bytes:
-        index = self.output.find(b'\n')
-        if index < 0:
-            return self.read(len(self.output))
-        return self.read(index + 1)
-
-    @property
-    def in_waiting(self) -> int:
-        return len(self.output)
-
-    def reset_input_buffer(self):
-        self.output.clear()
-
-    def close(self):
-        self.is_open = False
-
-    # instrument
-    def _answer(self, text: str):
-        self.output += text.encode() + self.terminator
-
-    def _reading(self) -> str:
-        if self.state['SYST:ZCH']:
-            value = gauss(0, self.noise / 10)
-        elif self.state['FUNC'] == 'CURR':
-            value = self.input_current + gauss(0, self.noise)
-            if not self.state['CURR:RANG:AUTO'] and abs(value) > self.state['CURR:RANG'] * 1.05:
-                value = 9.9E37
-        else:
-            value = gauss(0, self.noise)
-        self.last_value = value
-
-        function_bits = {'VOLT': 0, 'CURR': 1, 'RES': 2, 'CHAR': 3}[self.state['FUNC']] << 7
-        status = function_bits | (1 << 9 if self.state['SYST:ZCH'] else 0) | (1 << 10 if self.state['SYST:ZCOR'] else 0) | (1 if value == 9.9E37 else 0)
-        elements = {'READ': f'{value:+.6E}', 'TIME': f'{monotonic() - self.start:+.6E}', 'STAT': f'{status:+.6E}'}
-        return ','.join(elements[element] for element in self.state['FORM:ELEM'].split(','))
-
-    def _execute(self, command: str):
-        if not command:
-            return
-        upper = command.upper()
-        header, _, argument = upper.partition(' ')
-        argument = argument.strip().strip('"\'')
-        on = argument in ('ON', '1')
-
-        if header == '*IDN?':
-            self._answer(self.identification)
-        elif header in ('*RST', '*CLS'):
-            if header == '*CLS':
-                self.errors = []
-            else:
-                self.__init__(self.input_current, self.noise, self.terminator)
-        elif header == '*OPC?':
-            self._answer('1')
-        elif header == 'SYST:ERR?':
-            self._answer('{},"{}"'.format(*self.errors.pop(0)) if self.errors else '0,"No error"')
-        elif header in ('SYST:LOC', 'SYST:REM'):
-            self.state['REMOTE'] = header == 'SYST:REM'
-        elif header == 'FUNC':
-            for function in ('CURR', 'VOLT', 'RES', 'CHAR'):
-                if argument.startswith(function):
-                    self.state['FUNC'] = function
-        elif header == 'FUNC?':
-            self._answer(f'"{self.state["FUNC"]}:DC"' if self.state['FUNC'] in ('CURR', 'VOLT') else f'"{self.state["FUNC"]}"')
-        elif header in ('SYST:ZCH', 'SYST:ZCOR', 'SENS:CURR:DAMP', 'AVER', 'MED'):
-            self.state[header] = on
-        elif header in ('SYST:ZCH?', 'SYST:ZCOR?'):
-            self._answer('1' if self.state[header[:-1]] else '0')
-        elif header == 'CURR:RANG':
-            self.state['CURR:RANG'] = float(argument)
-            self.state['CURR:RANG:AUTO'] = False
-        elif header == 'CURR:RANG:AUTO':
-            self.state['CURR:RANG:AUTO'] = on
-        elif header == 'CURR:RANG?':
-            self._answer(f'{self.state["CURR:RANG"]:.6E}')
-        elif header == 'CURR:RANG:AUTO?':
-            self._answer('1' if self.state['CURR:RANG:AUTO'] else '0')
-        elif header in ('VOLT:NPLC', 'TRIG:COUN', 'SYST:LFR'):
-            self.state[header] = float(argument)
-        elif header in ('VOLT:NPLC?', 'SYST:LFR?'):
-            self._answer(f'{self.state[header[:-1]]:.6E}')
-        elif header == 'FORM:ELEM':
-            self.state['FORM:ELEM'] = ','.join(part.strip()[:4] for part in argument.split(','))
-        elif header == 'READ?':
-            self._answer(','.join(self._reading() for _ in range(int(self.state['TRIG:COUN']))))
-        elif header == 'SENS:DATA?':
-            self._answer(self._reading())
-        elif header in ('SYST:ZCOR:ACQ', 'INIT', 'DISP:ENAB', 'SYST:AZER', 'AVER:COUN', 'AVER:TCON', 'MED:RANK', 'SENS:CHAR:ADI:STATE',
-                        'SENS:CHAR:ADI:LEV', 'SENS:VOLT:GUAR', 'SENS:RES:GUAR', 'VOLT:RANG', 'VOLT:RANG:AUTO', 'RES:RANG', 'RES:RANG:AUTO',
-                        'CHAR:RANG', 'CHAR:RANG:AUTO', '*SAV', '*RCL', ':CAL:UNPR:IOFF', ':CAL:UNPR:VOFF'):
-            pass
-        else:
-            self.errors.append((-113, 'Undefined header'))
-
-
 # ---------------------------------------------------------------------- tests
-
-def testSimulation():
-    """Automatic tests of the driver with the simulated instrument (no hardware needed)"""
-
-    for terminator in (b'\r\n', b'\n', b'\r', b'\n\r'):
-        with KeithleyPAmeterConnection(SIMULATION_PORT, cleaning=False) as electrometer:
-            electrometer.serial.terminator = terminator
-            assert 'MODEL 6514' in electrometer.identification(), electrometer.identification()
-    print('identification with all terminators: ok')
-
-    with KeithleyPAmeterConnection(SIMULATION_PORT, cleaning=False, strict='MODEL 6514') as electrometer:
-        simulator: Keithley6514Simulator = electrometer.serial
-
-        # zero check is on after power on -> reading is not the input
-        reading = electrometer.read()
-        print('reading with zero check:', reading)
-        assert reading.zero_check and abs(reading.value) < 1E-11
-
-        electrometer.zeroCorrect()
-        assert not electrometer.getZeroCheck() and electrometer.getZeroCorrect() and electrometer.getCurrentAutoRange()
-        current = electrometer.readCurrent()
-        print(f'current: {current:.4E} A (simulated input {simulator.input_current:.4E} A)')
-        assert abs(current - simulator.input_current) < 1E-11
-
-        mean, std, count = electrometer.readAverage(20)
-        print(f'average of 20: {mean:.4E} +- {std:.1E} A ({count} readings)')
-        assert count == 20 and abs(mean - simulator.input_current) < 1E-11 and electrometer.trigger_count == 1
-
-        electrometer.setCurrentRange(KeithleyPAmeterConnection.CurrentRange._200pA)
-        print('range:', electrometer.getCurrentRange(), '| overflowed reading:', electrometer.read())
-        assert electrometer.read().overflow and electrometer.readCurrent() != electrometer.readCurrent()  # nan != nan
-
-        electrometer.configureCurrent('AUTO', nplc=1, damping=True)
-        assert electrometer.getNPLC() == 1 and electrometer.getCurrentAutoRange() and electrometer.getFunction() == 'CURR'
-
-        electrometer.selectFunction('VOLTAGE')
-        assert electrometer.getFunction() == 'VOLT'
-        electrometer.readCurrent()  # switches back
-        assert electrometer.getFunction() == 'CURR'
-
-        assert electrometer.getErrors() == []
-        electrometer._write('NONSENSE:COMMAND')
-        errors = electrometer.getErrors()
-        print('errors after an invalid command:', errors)
-        assert errors == [(-113, 'Undefined header')]
-
-        electrometer.setRemote()
-        assert simulator.state['REMOTE']
-    assert not simulator.state['REMOTE'], 'instrument must be in local mode after closing'
-    print('local mode after closing: ok')
-    print('All simulation tests passed')
-
 
 def testDevice(comport: str = 'COM6', baudrate: int = 9600, readings: int = 10):
     """
@@ -849,10 +698,6 @@ def testDevice(comport: str = 'COM6', baudrate: int = 9600, readings: int = 10):
 
 
 if __name__ == '__main__':
-    # python -m Connection.KeithleyPAmeter          -> tests with the simulated instrument
     # python -m Connection.KeithleyPAmeter COM6     -> test routine with the real instrument on COM6
     # python -m Connection.KeithleyPAmeter COM6 19200
-    if len(sys.argv) > 1:
-        testDevice(sys.argv[1], int(sys.argv[2]) if len(sys.argv) > 2 else 9600)
-    else:
-        testSimulation()
+    testDevice(sys.argv[1] if len(sys.argv) > 1 else 'COM6', int(sys.argv[2]) if len(sys.argv) > 2 else 9600)

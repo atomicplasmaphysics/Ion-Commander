@@ -21,6 +21,7 @@ Optional (for the camera in the Monitor tab, the Spinnaker SDK/SpinView must be 
 - `harvesters` (`pip install harvesters`): uses the GenTL producer of the installed Spinnaker SDK (`Spinnaker_GenTL_*.cti`)
 
 Without them only the virtual camera (simulated laser spot) is available.
+With `harvesters` the Blackfly S (BFS-U3-16S2M, 1440x1080) delivers ~200 fps; the live view shows ~30 fps (`DefaultParams.camera_live_interval`).
 
 To execute the GUI, download all files from this repository and execute the `main.py` file from the console.
 ```bash
@@ -40,15 +41,23 @@ the functions are the ones of the classes in `Connection/`). Devices: `PSU`, `EB
 TIME 3                                         # first line: interval between the steps in seconds
 WAIT                                           # one step without command
 LASER:rfSet(%) 23, 24                          # "%" is replaced by every value -> one step per value
-PSU:voltageSet(0,%);PSU:voltageSet(1,%) 0:10:0.5   # ";" = several commands in ONE step, "start:stop:step" = range (stop included)
+PSU:voltageSet(0,%);PSU:voltageSet(1,-%) 0:10:0.5  # ";" = several commands in ONE step, "start:stop:step" = range (stop included)
 	WAIT                                       # tab = nested loop: executed for every value of the line above
 	ELECTROMETER:readAverage(10)               # next step: mean, std and number of 10 electrometer readings
 ```
+Basic math with `%` inside the function arguments is calculated: `-%`, `%+5`, `%-5`, `%*10`, `%/2`, `(%-1)*2`, `%**2`,
+`abs(%)`, `round(%,1)`, `min(%,10)`, `max(%,0)` (e.g. with 2.5: `PSU:voltageSet(1,-%*2+1)` -> `PSU:voltageSet(1,-4)`).
+No spaces inside the command (the space separates the command from the values). Arguments that are no math (e.g. `'run_%.lmf'`)
+are only replaced. Wien filter scan: `PSU:voltageSet(0,%);PSU:voltageSet(1,-%) 0:50:0.5` plus an electrometer reading per step
+(a negative voltage needs a channel with electronic polarity (EPU), otherwise set the polarity in the PSU panel and use `%`).
+
 Every command and its answer is written to `Scripts/results/<script>_<date>_<time>.csv`
 (columns `time_s, step, command, state, answer, value`; `value` is the first number of the answer, e.g. the current).
 Example: `Scripts/PSU ramp electrometer.lsd` (symmetric ramp of two PSU channels, electrometer read after every step).
 
 ## Measurements with CoboldPC
+**The tab `Measure` is disabled for now** (commented out in `Windows/Main.py`, also the CommandServer device `COBOLD`).
+
 The tab `Measure` controls CoboldPC (RoentDek) with `CoboldPCCMD.exe`, which sends commands to the command line of the running CoboldPC:
 1. Start CoboldPC (button `Start CoboldPC` - CoboldPC executes its `Startup.ccf`, which may already start an acquisition)
 2. Select the measurement folder, enter name, duration (0 = until stopped) and comment
@@ -67,6 +76,10 @@ All changes are listed in [CHANGELOG.md](CHANGELOG.md), which is created from th
 ```
 Commit messages should start with the version (e.g. `v0.1.64 Short description`) followed by a detailed description.
 The version itself is set in `GlobalConf.version`.
+
+## Icons
+Icons: [Lucide](https://lucide.dev) (ISC License, Copyright (c) Lucide Contributors 2022, portions Copyright (c) Cole Bemis 2013-2022
+as part of Feather (MIT)), see `icons/LICENSE-Lucide.txt`. Logo and splash screens are our own.
 
 ## Manual
 You are a big boy 🐶, there is no manual needed, you can figure it out yourself.
@@ -102,6 +115,7 @@ The size of the database is shown in the menu `Database`.
 - [x] Build a laser subtab
 - [x] Make better logo and splash screen
 - [x] Start TDC software automatic with a button press and safe it automatically (CoboldPC: start, timed measurement, naming format)
+- [ ] Enable the `Measure` tab again (CoboldPC, currently commented out in `Windows/Main.py`)
 - [ ] CoboldPC: test with the real TDC (only tested with a simulated CoboldPC) and check the return value of `CoboldPCCMD -DAqState`
 - [ ] CoboldPC: save the Cobold document (.dcf) after a measurement (command not documented for the command line, configurable in the preferences)
 - [x] No focus on any button (especially not the "connect"/"disconnect" button on popped out panels)
@@ -121,9 +135,14 @@ The size of the database is shown in the menu `Database`.
 - [ ] Integrate the Adjustable Delay Stage (`Threaded` wrapper, `DeviceWrapper`, GUI panel, CommandServer entry, DB logging, position in mm/ps instead of steps)
 - [x] Implement Keithley PicoAmp meter in the Monitor tab (panel "Electrometer", DB table `Electrometer`, CommandServer `ELECTROMETER`)
 - [x] Keithley PicoAmp meter: set instrument back to local mode on close (`KeithleyPAmeter.py`)
-- [x] Keithley PicoAmp meter: check return values of `setCurrentRange`/`getLastData` (`KeithleyPAmeter.py`, rewritten after the manual, simulator + tests: `python -m Connection.KeithleyPAmeter [COMx]`)\n- [ ] Keithley 6514: run the device test routine with the real instrument (`python -m Connection.KeithleyPAmeter COM6`)
+- [x] Keithley PicoAmp meter: check return values of `setCurrentRange`/`getLastData` (`KeithleyPAmeter.py`, rewritten after the manual, test: `python -m Connection.KeithleyPAmeter [COMx]`)
+- [x] Keithley 6514: run the device test routine with the real instrument (COM6, 9600 baud; READ? needs arm count 1, ^C recovers a blocked instrument, front panel defaults on close)
+- [ ] Keithley 6514: measure with a real current source (only the open input, ~1E-13 A, was measured) and check the zero correct procedure
+- [ ] Keithley 6514: offer the data elements/units in the CSV of the scripts (mean, std, n as separate columns)
 - [x] Implement camera in the Monitor tab (FLIR/Teledyne via PySpin or harvesters, virtual camera, beam statistics, CommandServer `CAMERA`)
-- [ ] Camera: test with the real camera (only tested with the virtual camera), log beam position/width to the database, ROI selection
+- [x] Camera: test with the real camera (Blackfly S via harvesters; live view lagged: old buffered images, slow beam statistics, 0.1 s worker polling)
+- [ ] Camera: log beam position/width to the database, ROI selection (smaller images = higher frame rate), exposure/gain limits from the camera
+- [ ] Camera: compute the beam statistics in the worker thread and optionally on a downsampled image
 - [x] EBIS: use a `DeviceWrapper` like the PSU so it can be controlled via CommandServer/Scripts
 - [x] Add EBIS to the CommandServer (device name `EBIS`, the pressure interlock still limits the heating current)
 - [ ] EBIS via CommandServer: map logical channels (Cathode, DT1, ...) to the physical MICC channels, like the GUI does
@@ -144,11 +163,17 @@ The size of the database is shown in the menu `Database`.
 ### Scripts / CommandServer
 - [ ] Add message framing to the socket protocol (e.g. newline-terminated), so multiple commands sent quickly are not merged into one `recv`
 - [ ] Add a timeout for answers in the ScriptServer, so a non-answering device does not block the script forever
-- [x] Ranges for scans in scripts (`start:stop:step`) and results of every command saved as CSV\n- [ ] Conditions in scripts (wait-until e.g. `WAIT_UNTIL PRESSURE < 1E-8`) and variables
+- [x] Ranges for scans in scripts (`start:stop:step`) and results of every command saved as CSV
+- [x] Basic math with the placeholder in scripts (`-%`, `%+5`, `%*10`, `abs(%)`, ...)
+- [ ] Several placeholders per line (e.g. `%1`, `%2` for 2D scans) and named variables
+- [ ] Conditions in scripts (wait-until e.g. `WAIT_UNTIL PRESSURE < 1E-8`) and variables
 - [ ] Syntax check / dry-run of scripts before starting, with highlighting of the faulty line
 - [ ] Progress bar with timer until the next command (see TODO in `Scripts.py`)
 - [x] Allow multiple commands at each timestep (`A;B`)
-- [x] Write a short documentation of the script language (README section "Scripts")\n- [ ] Documentation of the CommandServer protocol with a small python client example\n- [ ] Wien filter: linked positive/negative PSU channels in the GUI (step both with one control, e.g. 0.5 V) - requirements to be clarified
+- [x] Write a short documentation of the script language (README section "Scripts")
+- [ ] Documentation of the CommandServer protocol with a small python client example
+- [ ] Wien filter: live plot of the electrometer current vs. voltage while a script runs (from the results CSV)
+- [ ] Wien filter: linked positive/negative PSU channels in the GUI (step both with one control, e.g. 0.5 V) - requirements to be clarified
 - [ ] Optional access control for the CommandServer (it currently accepts every local client and can switch high voltages)
 - [ ] Restart button for the CommandServer if it could not be started (e.g. port in use)
 
@@ -183,7 +208,11 @@ The size of the database is shown in the menu `Database`.
 - [x] Tooltips for the Scripts/Tips/Simulation tabs and the fit parameter widgets
 - [x] Reduce code duplication of the channel rows in `PSU.py`/`EBIS.py` (`Utility/ChannelRows.py`: `VoltageChannelRow`, `CurrentLimitRow`)
 - [x] Settings dialog for `DefaultParams` (update interval, limits, laser IP, server port) instead of editing the code (menu `Settings > Preferences...`)
-- [ ] Apply changed preferences without restarting the application\n- [x] Scrollbars for panels that are larger than the screen (only shown if needed, also in popped out windows)
+- [ ] Apply changed preferences without restarting the application
+- [x] Scrollbars for panels that are larger than the screen (only shown if needed, also in popped out windows)
+- [x] Pressure panel always fully visible (no scrollbar), short reading age ("1.2 s" instead of "Last reading 1.2 s ago")
+- [x] Icons from Lucide (SVG, sharp at every size)
+- [ ] Icons for a dark theme (the icons are black/colored, `currentColor` of the SVGs is replaced when creating them)
 - [x] Show CommandServer status (running, connected clients) in the status bar
 - [x] Start CoboldPC from the GUI
 - [x] Remember popped out panels and their positions (move back to default if they would appear outside of the screen)
@@ -191,6 +220,7 @@ The size of the database is shown in the menu `Database`.
 ### Code quality / Project
 - [x] Single source for the version number (`GlobalConf.version`)
 - [x] Add `__pycache__/`, `.vs/` and `.mcp.json` to `.gitignore`
+- [x] Threaded workers wake up immediately on new work (no 0.1 s polling, faster camera, scripts and GUI updates)
 - [ ] Unit tests for things without hardware (`parseFunctionCall`, `CommandQueue.parseScript`, `convertInChannelString`, `getPrefix`, LMF reader, pressure conversions) using the virtual devices
 - [x] Replace `print` statements with the logger (remaining `print`s are only in the demo/test functions of the drivers)
 - [ ] Command-line arguments (log level, virtual devices, no CommandServer)

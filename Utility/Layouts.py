@@ -189,6 +189,7 @@ class VBoxTitleLayout(QVBoxLayout):
     :param spacing: spacing of widgets
     :param add_stretch: if bool: addStretch(1) after title if True, else do nothing
                         if integer: addSpacing(addStretch) after title
+    :param scrollable: if the body can be scrolled when it does not fit (False: always fully visible, e.g. the pressures)
     """
 
     # all layouts that can be popped out (to store/restore popped out panels)
@@ -203,10 +204,12 @@ class VBoxTitleLayout(QVBoxLayout):
         busy_symbol: str = '⧖',
         popout_enable: bool = False,
         spacing: int = 0,
-        add_stretch: bool | int = 0
+        add_stretch: bool | int = 0,
+        scrollable: bool = True
     ):
         super().__init__(parent)
         self.parent = parent
+        self.scrollable = scrollable
         self.title_str = title
         self.title_style = title_style
         self.title_style_busy = title_style_busy
@@ -227,7 +230,7 @@ class VBoxTitleLayout(QVBoxLayout):
             VBoxTitleLayout.popout_instances.append(self)
             self.popout_button = QPushButton(self.parent)
             self.popout_button.setToolTip('Pop out the panel into its own window (click again to put it back)')
-            self.popout_button.setIcon(QIcon('icons/open_external.png'))
+            self.popout_button.setIcon(QIcon('icons/open_external.svg'))
             self.popout_button.setStyleSheet(title_style)
             self.popout_button.clicked.connect(self._popout)
             self.header_layout.addWidget(self.popout_button)
@@ -246,7 +249,9 @@ class VBoxTitleLayout(QVBoxLayout):
         self.body_scroll.setWidgetResizable(True)
         self.body_scroll.setFrameShape(QFrame.Shape.NoFrame)
         self.body_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
-        self.body_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        self.body_scroll.setVerticalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAsNeeded if scrollable else Qt.ScrollBarPolicy.ScrollBarAlwaysOff
+        )
         self.body_scroll.setWidget(self.body_widget)
         self.addWidget(self.body_scroll)
 
@@ -262,6 +267,9 @@ class VBoxTitleLayout(QVBoxLayout):
     def setBodyLayout(self, layout):
         """Sets the layout of the body"""
         self.body_widget.setLayout(layout)
+        if not self.scrollable:
+            # the panel (and the window) cannot get smaller than the body, nothing can be scrolled away
+            self.body_scroll.setMinimumHeight(self.body_widget.minimumSizeHint().height())
 
     def busy(self, busy: bool = True, busy_text: str = ''):
         """
@@ -1038,7 +1046,7 @@ class FilePath(QWidget):
         self.button = QPushButton()
         if self.function is not None:
             if icon is None:
-                icon = QIcon('icons/open.png')
+                icon = QIcon('icons/open.svg')
             self.button.setIcon(icon)
             self.button.setMinimumSize(40, 10)
             self.button.setMaximumSize(40, 30)
@@ -1498,7 +1506,7 @@ class DateTimeEdit(QWidget):
         self.main_layout.addWidget(self.date_time_edit, stretch=1)
 
         self.calendar_button = QPushButton()
-        self.calendar_button.setIcon(QIcon('icons/calendar.png'))
+        self.calendar_button.setIcon(QIcon('icons/calendar.svg'))
         self.calendar_button.setToolTip('Select Date and Time')
         self.calendar_button.clicked.connect(self._selectionPopup)
         self.main_layout.addWidget(self.calendar_button, stretch=0)
@@ -1758,7 +1766,7 @@ class ReadingAgeLabel(QLabel):
         super().__init__(*args, **kwargs)
         self.warn_time = warn_time
         self.error_time = error_time
-        self.setToolTip('Time since the last successful reading of the device (watchdog)')
+        self.setToolTip('Time since the last successful reading of the device (watchdog, orange/red if too old)')
         self.setAge(None, connected=False)
 
     def setAge(self, age: float | None, connected: bool = True):
@@ -1775,10 +1783,10 @@ class ReadingAgeLabel(QLabel):
             return
 
         if age is None:
-            self.setText('No reading yet')
+            self.setText('no data')
             color = Colors.color_orange
         else:
-            self.setText(f'Last reading {age:.1f} s ago')
+            self.setText(f'{age:.1f} s' if age < 100 else f'{age:.0f} s')
             color = ''
             if age >= self.error_time:
                 color = Colors.color_red
@@ -2219,11 +2227,11 @@ class PolarityButton(QWidget):
         self.setLayout(self.main_layout)
 
         self.positive_button = QPushButton(self)
-        self.positive_button.setIcon(QIcon('icons/positive.png'))
+        self.positive_button.setIcon(QIcon('icons/positive.svg'))
         self.main_layout.addWidget(self.positive_button)
 
         self.negative_button = QPushButton(self)
-        self.negative_button.setIcon(QIcon('icons/negative.png'))
+        self.negative_button.setIcon(QIcon('icons/negative.svg'))
         self.main_layout.addWidget(self.negative_button)
 
         if connected_buttons:
@@ -2509,7 +2517,7 @@ class DeleteWidgetListItem(QWidget):
         self.setLayout(self.main_layout)
 
         self.delete_button = QPushButton(self)
-        self.delete_button.setIcon(QIcon('icons/delete.png'))
+        self.delete_button.setIcon(QIcon('icons/delete.svg'))
         self.delete_button.setIconSize(QSize(10, 10))
         self.delete_button.setContentsMargins(0, 0, 0, 0)
         self.delete_button.clicked.connect(lambda: self.deleted.emit())
@@ -2751,7 +2759,7 @@ class FilesList(QListWidget):
 
             button_delete = QPushButton()
             button_delete.setToolTip('Delete Script')
-            button_delete.setIcon(QIcon('icons/delete.png'))
+            button_delete.setIcon(QIcon('icons/delete.svg'))
             button_delete.setIconSize(QSize(10, 10))
             button_delete.setContentsMargins(0, 0, 0, 0)
             layout.addWidget(button_delete, alignment=Qt.AlignmentFlag.AlignLeft)
@@ -2759,7 +2767,7 @@ class FilesList(QListWidget):
 
             button_rename = QPushButton()
             button_rename.setToolTip('Rename Script')
-            button_rename.setIcon(QIcon('icons/rename.png'))
+            button_rename.setIcon(QIcon('icons/rename.svg'))
             button_rename.setIconSize(QSize(10, 10))
             button_rename.setContentsMargins(0, 0, 0, 0)
             layout.addWidget(button_rename, alignment=Qt.AlignmentFlag.AlignLeft)

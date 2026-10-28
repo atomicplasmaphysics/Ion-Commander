@@ -119,7 +119,7 @@ class AnalyseWindow(TabWidget):
 
         self.fitting_parameters_box = QGroupBox('Fitting Parameters')
         self.fitting_parameters_copy_button = QPushButton(self)
-        self.fitting_parameters_copy_button.setIcon(QIcon('icons/copy.png'))
+        self.fitting_parameters_copy_button.setIcon(QIcon('icons/copy.svg'))
         self.fitting_parameters_copy_button.setToolTip('Copy fitting parameters (not available)')
         self.fitting_parameters_copy_button.setDisabled(True)
         self.fitting_parameters_copy_button.clicked.connect(self.copyFittingParameters)

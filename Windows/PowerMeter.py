@@ -75,7 +75,7 @@ class PowerMeterVBoxLayout(QVBoxLayout):
 
         self.button_connection_refresh = QPushButton()
         self.button_connection_refresh.setToolTip('Refresh connections list')
-        self.button_connection_refresh.setIcon(QIcon('icons/refresh.png'))
+        self.button_connection_refresh.setIcon(QIcon('icons/refresh.svg'))
         self.button_connection_refresh.pressed.connect(self.setPortsComboBox)
         self.connection_hbox_selection.addWidget(self.button_connection_refresh)
 

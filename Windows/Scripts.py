@@ -65,7 +65,7 @@ class ScriptsWindow(TabWidget):
 
         # Update button
         self.script_update_button = QPushButton()
-        self.script_update_button.setIcon(QIcon('icons/refresh.png'))
+        self.script_update_button.setIcon(QIcon('icons/refresh.svg'))
         self.script_update_button.setToolTip('Update list')
         self.script_add_update_hbox.addWidget(self.script_update_button, alignment=Qt.AlignmentFlag.AlignHCenter)
 
@@ -123,12 +123,12 @@ class ScriptsWindow(TabWidget):
         self.script_editor_bottom_vbox.addWidget(self.toolbar)
 
         # Run script toolbar: start
-        self.script_action_run = self.toolbar.addAction(QIcon('icons/play.png'), 'Run')
+        self.script_action_run = self.toolbar.addAction(QIcon('icons/play.svg'), 'Run')
         self.script_action_run.setToolTip('<b>Run</b> the current selected script')
         self.script_action_run.triggered.connect(lambda: self.runScript())
 
         # Run script toolbar: abort
-        self.script_action_abort = self.toolbar.addAction(QIcon('icons/abort.png'), 'Abort')
+        self.script_action_abort = self.toolbar.addAction(QIcon('icons/abort.svg'), 'Abort')
         self.script_action_abort.setToolTip('<b>Abort</b> the currently running script')
         self.script_action_abort.setEnabled(False)
         self.script_action_abort.triggered.connect(lambda: self.abortScript())

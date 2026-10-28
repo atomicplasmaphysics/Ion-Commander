@@ -92,7 +92,7 @@ class LaserVBoxLayout(QVBoxLayout):
         self.button_connection.pressed.connect(self.manualConnect)
         self.button_connection_settings = QPushButton()
         self.button_connection_settings.setToolTip('Set IP address and port of the laser')
-        self.button_connection_settings.setIcon(QIcon('icons/preferences.png'))
+        self.button_connection_settings.setIcon(QIcon('icons/preferences.svg'))
         self.button_connection_settings.pressed.connect(self.connectionPreferences)
         self.connection_grid.addWidgets(
             self.label_connection,

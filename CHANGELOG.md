@@ -2,9 +2,54 @@
 
 *Automatically created from the commit messages with `python -m Utility.Changelog` - do not edit by hand.*
 
+## v0.1.76 (2026-10-28)
+
+**Script math with %, Keithley on real hardware, faster camera, Lucide icons, pressure always visible**
+
+Scripts:
+- Basic math with the placeholder inside the function arguments is calculated (Socket/ScriptServer.py:
+  substitutePlaceholder, evaluateMath with a safe AST evaluator, splitArguments, formatNumber):
+  -%, %+5, %-5, %*10, %/2, (%-1)*2, %**2, abs(%), round(%,1), min(%,10), max(%,0).
+  Example: PSU:voltageSet(0,%);PSU:voltageSet(1,-%) 0:10:0.5 -> symmetric Wien filter ramp.
+  Arguments that are no math (e.g. 'run_%.lmf') or non-numeric values are only replaced.
+- Numbers are formatted without float noise and without losing small values (ranges like 0:3e-13:1e-13
+  were rounded to 0 before, :g also cut to 6 digits).
+
+Keithley 6514 electrometer (tested on the real instrument, COM6, 9600 baud, open input ~1E-13 A):
+- Simulator (Keithley6514Simulator, port "simulation") and its tests removed, also from the GUI panel.
+- READ? failed with error 830 "Invalid with INFinite ARM:COUNT" (front panel/power-on mode). open() now sets
+  ABOR, ARM:SOUR IMM, ARM:COUN 1, TRIG:SOUR IMM, TRIG:COUN 1 and clears old errors (setupTrigger).
+- A bus INIT with an infinite arm count blocks the RS-232 parser (no answers anymore); open() sends ^C first
+  (breakOperation, the instrument answers "DCL") so a blocked instrument is recovered.
+- close() restores the front panel defaults with SYST:PRES (continuous readings) if the instrument was in
+  continuous mode before, then local mode.
+- Reading timeout at least 10 s: the first reading after switching to current with auto range took 5.4 s.
+- Device routine python -m Connection.KeithleyPAmeter [COMx] [baud] passes; the Electrometer panel, zero correct,
+  DB logging (scratch DB) and the CommandServer were tested with the real instrument.
+
+Camera (Blackfly S BFS-U3-16S2M via harvesters, measured on the real camera):
+- The lag came from old buffered images (stream mode OldestFirst): now NewestOnly (harvesters and PySpin).
+- beamStatistics used full coordinate grids in float64 (65-80 ms per 1440x1080 image); now float32 and
+  projections, same results, ~8 ms.
+- Threaded workers polled their queue every 0.1 s, which limited the live view to <10 fps. They now wake up
+  immediately via a threading.Event (Connection/Threaded.py) - also faster for all devices and scripts
+  (commands of one script step are now ~10 ms apart instead of ~100 ms).
+- Live interval 30 ms: the GUI shows ~32 fps (was ~6-10 fps), grabbing alone reaches ~200 fps.
+
+GUI:
+- Measure tab (CoboldPC) commented out in Windows/Main.py, also the CommandServer device COBOLD.
+- Icons replaced by Lucide icons (SVG, ISC License, icons/LICENSE-Lucide.txt, credit in the README); old PNG
+  icons removed, logo and splash screens unchanged.
+- Reading age is short now ("1.2 s" / "no data" instead of "Last reading 1.2 s ago").
+- Pressure panel is never scrollable (VBoxTitleLayout(scrollable=False)), the pressures are always visible.
+
+README: script math, Lucide credit, Measure tab disabled, camera frame rates; TODOs updated and extended
+(Keithley/camera follow-ups, several placeholders, Wien filter live plot, dark theme icons); literal "\n" in
+several TODO lines fixed.
+
 ## v0.1.75 (2026-10-28)
 
-**Scripts: several commands per step, ranges, results as CSV, PSU ramp + electrometer example**
+**Scripts: several commands per step, ranges, results as CSV, PSU ramp + electrometer example** (ddc41c7)
 
 Script language (Socket/ScriptServer.py):
 - "A;B" executes several commands in one step (";" inside brackets or
