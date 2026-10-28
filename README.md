@@ -104,8 +104,8 @@ The size of the database is shown in the menu `Database`.
 ### Hardware / Devices
 - [ ] Integrate the Adjustable Delay Stage (`Threaded` wrapper, `DeviceWrapper`, GUI panel, CommandServer entry, DB logging, position in mm/ps instead of steps)
 - [ ] Implement Keithley PicoAmp meter in the Monitor tab (driver already exists)
-- [ ] Keithley PicoAmp meter: set instrument back to local mode on close (`KeithleyPAmeter.py`)
-- [ ] Keithley PicoAmp meter: check return values of `setCurrentRange`/`getLastData` (`KeithleyPAmeter.py`)
+- [x] Keithley PicoAmp meter: set instrument back to local mode on close (`KeithleyPAmeter.py`)
+- [x] Keithley PicoAmp meter: check return values of `setCurrentRange`/`getLastData` (`KeithleyPAmeter.py`, rewritten after the manual, simulator + tests: `python -m Connection.KeithleyPAmeter [COMx]`)\n- [ ] Keithley 6514: run the device test routine with the real instrument (`python -m Connection.KeithleyPAmeter COM6`)
 - [x] Implement camera in the Monitor tab (FLIR/Teledyne via PySpin or harvesters, virtual camera, beam statistics, CommandServer `CAMERA`)
 - [ ] Camera: test with the real camera (only tested with the virtual camera), log beam position/width to the database, ROI selection
 - [x] EBIS: use a `DeviceWrapper` like the PSU so it can be controlled via CommandServer/Scripts

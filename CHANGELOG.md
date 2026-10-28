@@ -2,9 +2,47 @@
 
 *Automatically created from the commit messages with `python -m Utility.Changelog` - do not edit by hand.*
 
+## v0.1.73 (2026-10-28)
+
+**Keithley 6514 electrometer driver rewritten after the manual, simulator and tests**
+
+Connection/KeithleyPAmeter.py (Keithley 6514, RS-232/SCPI, manual
+"D:/Datasheets/Keithley 6514.pdf"):
+- Set commands are only written; before, every command waited for an
+  answer that never came (1 s timeout per command).
+- Responses are read until CR or LF, so every terminator setting of the
+  instrument (LF, CR, CRLF, LFCR) works (pyserial readline only knows LF).
+  Longer timeouts for READ? depending on NPLC and number of readings.
+- Data format is set on connect: FORM:ELEM READ,TIME,STAT. New
+  KeithleyReading (value, timestamp, status word) with overflow,
+  zero_check, zero_correct and function from the status bits; overflow
+  (+9.9E37) is returned as nan.
+- New: read(), readAll(), readValue(), readCurrent() (switches to the
+  current function if needed, warns if zero check is on), readAverage(n)
+  (one READ? with trigger count n -> mean, std, number of valid readings),
+  configureCurrent(range, nplc, damping), zeroCorrect() (procedure from
+  the manual), set/getNPLC, median and average filter, trigger count,
+  getFunction, getCurrentRange/AutoRange, get/setZeroCheck/Correct,
+  getError()/getErrors() (SYST:ERR?), *OPC?, display on/off, setRemote.
+- Ranges accept the enums, a value in base units or 'AUTO'.
+- close() puts the instrument back into local mode (SYST:LOC), so the
+  front panel can be used again (TODO resolved).
+- Baud rate is a parameter (default 9600).
+- Keithley6514Simulator: simulated instrument (comport "simulation") with
+  settable input current and noise, zero check, ranges with overflow,
+  error queue, all terminators.
+- Tests: "python -m Connection.KeithleyPAmeter" runs automatic tests with
+  the simulator, "python -m Connection.KeithleyPAmeter COM6 [baud]" runs a
+  test routine with the real instrument (identification, error queue,
+  single reading with status, average, timing for NPLC 0.1/1/10, local).
+  The previous main()/average() test functions (COM6) are replaced by it.
+
+Tested with the simulator (all tests pass). The real instrument was not
+connected (no COM6), so testDevice() has not been run yet.
+
 ## v0.1.72 (2026-10-28)
 
-**EBIS heating off is immediate, scrollbars for large panels**
+**EBIS heating off is immediate, scrollbars for large panels** (33841f7)
 
 EBIS heating current:
 - Only increasing the heating current is ramped. Lowering it (e.g.
