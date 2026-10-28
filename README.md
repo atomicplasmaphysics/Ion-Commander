@@ -13,8 +13,12 @@ numpy       1.24.3
 scipy       1.10.1
 matplotlib  3.8.3
 pyserial    3.5
-duckdb      1.3.2
+duckdb      1.3.2 (< 2, see requirements.txt)
 ```
+`pip install -r requirements.txt` installs all of them.
+**Close Ion Commander before updating packages**: Windows cannot replace files of packages that are loaded by a running
+program, pip then leaves half-installed packages behind (e.g. `No module named 'matplotlib.backends.registry'`).
+Repair: delete the broken package folder and the `~...` folders in `venv/Lib/site-packages` and install the package again.
 
 Optional (for the camera in the Monitor tab, the Spinnaker SDK/SpinView must be installed), one of:
 - `spinnaker_python` (PySpin): wheel from the Teledyne website, must match the installed Spinnaker version and the Python version
@@ -117,6 +121,7 @@ The size of the database is shown in the menu `Database`.
 - [x] Logg everything in the control-tab
 - [ ] Build a measure subtab (for TAC)
 - [x] Build a measure subtab (for TDC) - tab `Measure` with CoboldPC
+- [ ] Test the CoboldPC interface and make it functional with CCF-files
 - [ ] Build a measure subtab (for NDIGO - if NDIGO is built)
 - [x] Build a laser subtab
 - [x] Make better logo and splash screen
@@ -242,6 +247,9 @@ The size of the database is shown in the menu `Database`.
 - [ ] Unit tests for things without hardware (`parseFunctionCall`, `CommandQueue.parseScript`, `convertInChannelString`, `getPrefix`, LMF reader, pressure conversions) using the virtual devices
 - [x] Replace `print` statements with the logger (remaining `print`s are only in the demo/test functions of the drivers)
 - [ ] Command-line arguments (log level, virtual devices, no CommandServer)
+- [x] Broken package update (matplotlib half-installed because the GUI was running), DuckDB pinned to < 2 (nanobind leak warnings on exit), `DB.close()` closes the connection
+- [ ] DuckDB 2.0: check again if a later release does not print the nanobind leak warnings on exit (the database file stays readable with 1.x, tested)
+- [ ] Warn on startup if a package is missing or broken (instead of a traceback), e.g. a check in `main.py`
 - [ ] Write a short manual (sorry big boy 🐶)
 - [x] Automatic changelog from the commit messages (`python -m Utility.Changelog` writes `CHANGELOG.md`)
 

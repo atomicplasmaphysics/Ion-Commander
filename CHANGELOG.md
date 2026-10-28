@@ -2,9 +2,35 @@
 
 *Automatically created from the commit messages with `python -m Utility.Changelog` - do not edit by hand.*
 
+## v0.1.78 (2026-10-28)
+
+**Fix broken package update (matplotlib), DuckDB pinned to < 2, DB.close() closes the connection**
+
+Startup failed after updating all packages with "No module named 'matplotlib.backends.registry'":
+- Cause: Ion Commander was running during the update. Windows cannot replace files of loaded packages, so pip left
+  half-installed packages behind (matplotlib 3.11.2 without RECORD and with missing files, plus "~..." backup folders
+  of matplotlib, pillow, numpy, scipy, kiwisolver and PyQt6-Qt6).
+- venv repaired (not part of the repository): matplotlib deleted and installed again, the "~..." folders removed, all
+  installed packages checked against their RECORD files (all complete), pip check ok.
+- Tested with the new versions (PyQt6 6.12, numpy 2.5, scipy 1.18, matplotlib 3.11, pyqtgraph 0.14): main window,
+  scripts (fake devices), History (fits, electrometer data), pressure panel - all ok.
+
+DuckDB:
+- duckdb 2.0 (now built with nanobind) prints ~20 lines "nanobind: leaked 27 instances/6 types/85 functions" when the
+  GUI is closed: objects of the PyQt widgets that are not freed at interpreter exit still reference DuckDB's module
+  objects (not a real leak, also with a fake database). Downgraded to 1.5.6 (latest 1.x), requirements.txt: duckdb<2.
+- Compatibility checked with scratch files only (the live database was not touched, it is locked by the running
+  instance): duckdb 2.0 keeps the storage version of files written by 1.2/1.5, they stay readable by 1.x afterwards,
+  and 2.0 replays a WAL written by 1.5.
+- DB.close() now also closes the cursor and the connection (before it only committed); all DB methods already check
+  for a closed connection.
+
+README: package update note (close the GUI first, how to repair), requirements, TODOs.
+Also contains the README TODO "Test the CoboldPC interface and make it functional with CCF-files" (added by hand).
+
 ## v0.1.77 (2026-10-28)
 
-**Script WAIT <s>/PRINT/output folder, History fit toggle, pressure digit, label colors, electrometer cleanup**
+**Script WAIT <s>/PRINT/output folder, History fit toggle, pressure digit, label colors, electrometer cleanup** (5a934a2)
 
 Scripts (Socket/ScriptServer.py, Windows/Scripts.py):
 - WAIT <seconds>: the step takes the given time instead of the interval (plain WAIT = one interval as before).

@@ -242,7 +242,7 @@ class GlobalConf:
     title = 'Ion Commander'
 
     # version (single source of truth - update only here)
-    version = '0.1.77'
+    version = '0.1.78'
 
     # logger
     logger = logging.getLogger(title)

@@ -1038,6 +1038,11 @@ class DB:
             return
 
         self.connection.commit()
+        # close the connection (writes a checkpoint, DuckDB >= 2.0 reports objects alive at exit as leaks otherwise)
+        self.cursor.close()
+        self.connection.close()
+        self.cursor = None
+        self.connection = None
 
 
 def main():
