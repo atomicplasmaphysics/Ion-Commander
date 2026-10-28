@@ -2,9 +2,42 @@
 
 *Automatically created from the commit messages with `python -m Utility.Changelog` - do not edit by hand.*
 
+## v0.1.75 (2026-10-28)
+
+**Scripts: several commands per step, ranges, results as CSV, PSU ramp + electrometer example**
+
+Script language (Socket/ScriptServer.py):
+- "A;B" executes several commands in one step (";" inside brackets or
+  quotes is kept), e.g. "PSU:voltageSet(0,%);PSU:voltageSet(1,%) 0, 10"
+  sets two PSU channels to the same value in each step (symmetric ramp of
+  a positive and a negative channel). Resolves the "multiple commands at
+  each timestep" TODO.
+- Ranges "start:stop:step" (stop included, also negative steps) in the
+  argument list, e.g. "0:100:0.5" instead of 201 values.
+- Errors in ranges are reported with line number before the start.
+
+Results:
+- Every sent command and its answer is written to
+  Scripts/results/<script>_<date>_<time>.csv with the columns time_s,
+  step, command, state, answer, value (value = first number of the answer,
+  e.g. the current of ELECTROMETER:readCurrent() or the mean of
+  ELECTROMETER:readAverage(10)). The Scripts tab shows the file name.
+
+Example (local file, the Scripts folder is not versioned):
+Scripts/PSU ramp electrometer.lsd - channel 0 and 1 of the PSU are ramped
+0 ... 10 V in 0.5 V steps, after every step one interval is waited and the
+electrometer is read (mean of 10 readings), finally both are set to 0.
+
+README: new section "Scripts" describing the script language; TODOs
+updated (Wien filter GUI linking added as open point).
+
+Tested: parser (";", quotes, ranges), end-to-end run through a
+CommandServer on a spare port with a fake PSU and the simulated
+electrometer (current follows the voltage), CSV content checked.
+
 ## v0.1.74 (2026-10-28)
 
-**Electrometer (Keithley 6514) panel in the Monitor tab, logging, CommandServer**
+**Electrometer (Keithley 6514) panel in the Monitor tab, logging, CommandServer** (2c5e9a4)
 
 GUI (new Windows/Electrometer.py, Monitor tab between power meter and
 camera):

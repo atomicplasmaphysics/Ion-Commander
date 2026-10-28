@@ -1,4 +1,7 @@
+import csv
+import re
 from typing import Self
+from pathlib import Path
 from socket import socket, AF_INET, SOCK_STREAM
 from time import time, sleep
 
@@ -7,6 +10,67 @@ from PyQt6.QtCore import pyqtSignal, QObject, QRunnable, pyqtSlot, QThreadPool
 
 
 from Config.GlobalConf import GlobalConf, DefaultParams
+
+
+RANGE_PATTERN = re.compile(r'^\s*(-?[\d.]+(?:[eE][-+]?\d+)?)\s*:\s*(-?[\d.]+(?:[eE][-+]?\d+)?)\s*:\s*(-?[\d.]+(?:[eE][-+]?\d+)?)\s*$')
+NUMBER_PATTERN = re.compile(r'[-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?')
+
+
+def expandArguments(arguments: list[str]) -> list[str]:
+    """
+    Expands ranges "start:stop:step" (stop is included) into single values, other arguments are kept
+
+    Example: ["0:1:0.5", "5"] -> ["0", "0.5", "1", "5"]
+
+    :param arguments: list of arguments
+    """
+
+    expanded = []
+    for argument in arguments:
+        match = RANGE_PATTERN.match(argument)
+        if match is None:
+            expanded.append(argument.strip())
+            continue
+        start, stop, step = (float(value) for value in match.groups())
+        if step == 0 or (stop - start) / step < 0:
+            raise ValueError(f'Invalid range "{argument}" (step must not be 0 and must point from start to stop)')
+        count = int(round((stop - start) / step, 9)) + 1
+        if count > 100000:
+            raise ValueError(f'Range "{argument}" has too many values ({count})')
+        expanded.extend(f'{round(start + i * step, 12):g}' for i in range(count))
+    return expanded
+
+
+def splitCommands(command: str) -> list[str]:
+    """
+    Splits "A(1);B(2)" into ["A(1)", "B(2)"] - several commands in one step (";" inside brackets or quotes is kept)
+
+    :param command: command string
+    """
+
+    commands = []
+    current = ''
+    depth = 0
+    quote = ''
+    for char in command:
+        if quote:
+            if char == quote:
+                quote = ''
+        elif char in '\'"':
+            quote = char
+        elif char in '([{':
+            depth += 1
+        elif char in ')]}':
+            depth -= 1
+        elif char == ';' and depth == 0:
+            if current.strip():
+                commands.append(current.strip())
+            current = ''
+            continue
+        current += char
+    if current.strip():
+        commands.append(current.strip())
+    return commands
 
 
 class CommandQueue:
@@ -40,7 +104,6 @@ class CommandQueue:
         """Returns the queue"""
         return self.queue
 
-    # TODO: also allow multiple commands to be set at each timestep
     @staticmethod
     def _buildCommands(indent_commands: list[tuple[int, list[str]]]) -> tuple[int, list[str | list[str]]]:
         """
@@ -151,6 +214,11 @@ class CommandQueue:
                 return cmd_queue
             func_name = args[0]
             args = ''.join(args[1:]).split(',')
+            try:
+                args = expandArguments(args) if args[0] else args
+            except ValueError as error:
+                cmd_queue.error = f'Line {line_nbr}: "{line}": {error}'
+                return cmd_queue
 
             if func_name.upper() == 'TIME':
                 cmd_queue.error = f'Line {line_nbr}: "{line}": TIME already set in line 1'
@@ -200,10 +268,12 @@ class ScriptServerWorkerSignals(QObject):
 
     log: log messages
     finish: only signal on finish
+    result: (elapsed time, step, command, answer) of every sent command
     """
 
     log = pyqtSignal(str)
     finish = pyqtSignal()
+    result = pyqtSignal(float, int, str, str)
 
 
 class ScriptServerWorker(QRunnable):
@@ -264,14 +334,16 @@ class ScriptServerWorker(QRunnable):
         commands = self.command_queue.queue[self.command_queue_idx]
         if not isinstance(commands, list):
             commands = [commands]
-        for command in commands:
+        # several commands in one step: nested loops and "A;B"
+        for command in [single for command in commands for single in splitCommands(command)]:
             if command == 'WAIT':
                 continue
             self.socket_connection.sendall(command.encode(self.encoding))
             elapsed_time = time() - self.command_queue.start_time
             self.command_queue.command_times.append(elapsed_time)
-            recv_msg = self.socket_connection.recv(1024).decode(self.encoding)
+            recv_msg = self.socket_connection.recv(4096).decode(self.encoding)
             self.signal.log.emit(f'ScriptServer sent "{command}" at {elapsed_time:.3f} seconds and received "{recv_msg}"')
+            self.signal.result.emit(elapsed_time, self.command_queue_idx, command, recv_msg)
 
         self.command_queue_idx += 1
 
@@ -289,10 +361,13 @@ class ScriptServer(QObject):
     :param port: port that the server will run on
     :param encoding: used encoding
     :param debug: if debug messages should be displayed
+    :param results_file: CSV file where every command and its answer is written to (None: no file)
     """
 
     log = pyqtSignal(str)
     finish = pyqtSignal()
+
+    results_header = ['time_s', 'step', 'command', 'state', 'answer', 'value']
 
     def __init__(
         self,
@@ -301,9 +376,11 @@ class ScriptServer(QObject):
         port: int = DefaultParams.cs_port,
         encoding: str = DefaultParams.cs_encoding,
         debug: bool = False,
+        results_file: str | Path | None = None
     ):
         super().__init__()
         self.script = script
+        self.results_file = Path(results_file) if results_file is not None else None
 
         self.command_queue = CommandQueue.parseScript(script)
         if self.command_queue.error or self.command_queue.interval == -1:
@@ -322,6 +399,27 @@ class ScriptServer(QObject):
         self.worker = ScriptServerWorker(self.command_queue, self.socket)
         self.worker.signal.log.connect(self.handleLog)
         self.worker.signal.finish.connect(self.handleFinish)
+        self.worker.signal.result.connect(self.handleResult)
+
+        if self.results_file is not None:
+            self.results_file.parent.mkdir(parents=True, exist_ok=True)
+            with open(self.results_file, 'w', newline='', encoding='utf-8') as file:
+                csv.writer(file).writerow(self.results_header)
+
+    @pyqtSlot(float, int, str, str)
+    def handleResult(self, elapsed_time: float, step: int, command: str, answer: str):
+        """Writes the answer of a command into the results file (state = 0 means no error, value = first number of the answer)"""
+
+        if self.results_file is None:
+            return
+        state, _, answer_text = answer.partition(':')
+        numbers = NUMBER_PATTERN.findall(answer_text) if state == '0' else []
+        value = numbers[0] if numbers and answer_text.strip() not in ('None', 'Ok') else ''
+        try:
+            with open(self.results_file, 'a', newline='', encoding='utf-8') as file:
+                csv.writer(file).writerow([f'{elapsed_time:.3f}', step + 1, command, state, answer_text, value])
+        except OSError as error:
+            GlobalConf.logger.error(f'ScriptServer: could not write results to "{self.results_file}": {error}')
 
     @pyqtSlot(str)
     def handleLog(self, log: str):

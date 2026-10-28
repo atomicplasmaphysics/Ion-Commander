@@ -32,6 +32,22 @@ If one wishes to execute the GUI without calling it from the console, [PyInstall
 After executing the `compile\pyinstaller.py` file (same packages and package PyInstaller are needed), a `Ion Commander.exe` will be created in the main folder.
 For further information read the description of the `compile\pyinstaller.py` file.
 
+## Scripts
+Scripts (tab `Scripts`, files `Scripts/*.lsd`) send commands to the devices via the CommandServer (`DEVICE:function(arguments)`,
+the functions are the ones of the classes in `Connection/`). Devices: `PSU`, `EBIS`, `LASER`, `PRESSURE`, `POWER`, `ELECTROMETER`,
+`CAMERA`, `COBOLD`.
+```
+TIME 3                                         # first line: interval between the steps in seconds
+WAIT                                           # one step without command
+LASER:rfSet(%) 23, 24                          # "%" is replaced by every value -> one step per value
+PSU:voltageSet(0,%);PSU:voltageSet(1,%) 0:10:0.5   # ";" = several commands in ONE step, "start:stop:step" = range (stop included)
+	WAIT                                       # tab = nested loop: executed for every value of the line above
+	ELECTROMETER:readAverage(10)               # next step: mean, std and number of 10 electrometer readings
+```
+Every command and its answer is written to `Scripts/results/<script>_<date>_<time>.csv`
+(columns `time_s, step, command, state, answer, value`; `value` is the first number of the answer, e.g. the current).
+Example: `Scripts/PSU ramp electrometer.lsd` (symmetric ramp of two PSU channels, electrometer read after every step).
+
 ## Measurements with CoboldPC
 The tab `Measure` controls CoboldPC (RoentDek) with `CoboldPCCMD.exe`, which sends commands to the command line of the running CoboldPC:
 1. Start CoboldPC (button `Start CoboldPC` - CoboldPC executes its `Startup.ccf`, which may already start an acquisition)
@@ -128,11 +144,11 @@ The size of the database is shown in the menu `Database`.
 ### Scripts / CommandServer
 - [ ] Add message framing to the socket protocol (e.g. newline-terminated), so multiple commands sent quickly are not merged into one `recv`
 - [ ] Add a timeout for answers in the ScriptServer, so a non-answering device does not block the script forever
-- [ ] Support reading values in scripts (conditions, wait-until e.g. `WAIT_UNTIL PRESSURE < 1E-8`) and variables/ranges (`linspace`) for scans
+- [x] Ranges for scans in scripts (`start:stop:step`) and results of every command saved as CSV\n- [ ] Conditions in scripts (wait-until e.g. `WAIT_UNTIL PRESSURE < 1E-8`) and variables
 - [ ] Syntax check / dry-run of scripts before starting, with highlighting of the faulty line
 - [ ] Progress bar with timer until the next command (see TODO in `Scripts.py`)
-- [ ] Allow multiple commands at each timestep (see TODO in `ScriptServer.py`)
-- [ ] Write a short documentation of the script language and the CommandServer protocol (plus a small python client example)
+- [x] Allow multiple commands at each timestep (`A;B`)
+- [x] Write a short documentation of the script language (README section "Scripts")\n- [ ] Documentation of the CommandServer protocol with a small python client example\n- [ ] Wien filter: linked positive/negative PSU channels in the GUI (step both with one control, e.g. 0.5 V) - requirements to be clarified
 - [ ] Optional access control for the CommandServer (it currently accepts every local client and can switch high voltages)
 - [ ] Restart button for the CommandServer if it could not be started (e.g. port in use)
 

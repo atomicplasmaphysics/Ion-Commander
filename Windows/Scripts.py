@@ -1,3 +1,7 @@
+from datetime import datetime
+from pathlib import Path
+
+
 from os import makedirs
 from os.path import join, exists, abspath
 
@@ -267,8 +271,12 @@ class ScriptsWindow(TabWidget):
 
         self.script_output.clear()
 
+        script_name = Path(self.script_editor_path).stem if self.script_editor_path else 'script'
+        results_file = Path(self.path_scripts) / 'results' / f'{script_name}_{datetime.now():%Y%m%d_%H%M%S}.csv'
+
         try:
-            self.script_server = ScriptServer(self.script_editor.toPlainText())
+            self.script_server = ScriptServer(self.script_editor.toPlainText(), results_file=results_file)
+            self.script_output.appendPlainText(f'Results (every command and its answer) are written to "{results_file.resolve()}"')
             self.script_server.log.connect(self.processLogScript)
             self.script_server.finish.connect(self.processFinishScript)
             self.script_server.start()
