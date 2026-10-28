@@ -99,7 +99,7 @@ The size of the database is shown in the menu `Database`.
 - [ ] Show the age of the last reading for Laser and Power Meter as well (PSU, EBIS and Pressure done)
 - [ ] Optionally also check the other gauges (not only the selected one)
 - [ ] Interlock self-test button (simulate a trip without hardware) and a "reset/re-arm" confirmation
-- [x] Ramp the heating current down/up slowly instead of jumping (cathode lifetime) - "Ramp [A/min]", the interlock still lowers immediately
+- [x] Ramp the heating current up slowly instead of jumping (cathode lifetime) - "Ramp [A/min]"; lowering/switching off and the interlock are immediate
 
 ### Hardware / Devices
 - [ ] Integrate the Adjustable Delay Stage (`Threaded` wrapper, `DeviceWrapper`, GUI panel, CommandServer entry, DB logging, position in mm/ps instead of steps)
@@ -167,7 +167,7 @@ The size of the database is shown in the menu `Database`.
 - [x] Tooltips for the Scripts/Tips/Simulation tabs and the fit parameter widgets
 - [x] Reduce code duplication of the channel rows in `PSU.py`/`EBIS.py` (`Utility/ChannelRows.py`: `VoltageChannelRow`, `CurrentLimitRow`)
 - [x] Settings dialog for `DefaultParams` (update interval, limits, laser IP, server port) instead of editing the code (menu `Settings > Preferences...`)
-- [ ] Apply changed preferences without restarting the application
+- [ ] Apply changed preferences without restarting the application\n- [x] Scrollbars for panels that are larger than the screen (only shown if needed, also in popped out windows)
 - [x] Show CommandServer status (running, connected clients) in the status bar
 - [x] Start CoboldPC from the GUI
 - [x] Remember popped out panels and their positions (move back to default if they would appear outside of the screen)

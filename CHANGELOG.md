@@ -2,9 +2,31 @@
 
 *Automatically created from the commit messages with `python -m Utility.Changelog` - do not edit by hand.*
 
+## v0.1.72 (2026-10-28)
+
+**EBIS heating off is immediate, scrollbars for large panels**
+
+EBIS heating current:
+- Only increasing the heating current is ramped. Lowering it (e.g.
+  switching the cathode heating off) is set immediately, also while a
+  ramp up is running (the ramp is stopped). The pressure interlock was
+  already immediate. Tooltip of "Ramp [A/min]" updated.
+- Cathode current limit input range up to 10 mA (change by Alexander).
+
+Scrollbars (Utility/Layouts.py, VBoxTitleLayout):
+- The body of every panel (PSU, EBIS, Laser, Pressure, Power Meter,
+  Camera, CoboldPC) is placed in a QScrollArea without frame. Scrollbars
+  only appear if the panel does not fit (e.g. the EBIS panel on a small
+  screen); otherwise nothing changes.
+- Popping out moves the scroll area into the popout window; the popout
+  window is as large as the content but at most 90 % of the screen.
+
+Tested offscreen with the EBIS panel: 700x400 window -> scrollbars,
+1400x1600 window -> none, pop out/restore.
+
 ## v0.1.71 (2026-10-18)
 
-**Measure tab: timed CoboldPC measurements with naming format and metadata**
+**Measure tab: timed CoboldPC measurements with naming format and metadata** (591f267)
 
 CoboldPC remote control (new Connection/Cobold.py):
 - Uses CoboldPCCMD.exe of the installed CoboldPC (found automatically in

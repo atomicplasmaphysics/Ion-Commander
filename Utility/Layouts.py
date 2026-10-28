@@ -21,7 +21,7 @@ from PyQt6.QtWidgets import (
     QHBoxLayout, QLabel, QWidget, QVBoxLayout, QSpinBox, QDoubleSpinBox, QCheckBox, QComboBox, QLineEdit, QPushButton,
     QListWidget, QListWidgetItem, QApplication, QStyleOption, QTableWidget, QTableWidgetItem, QAbstractItemView,
     QGridLayout, QLCDNumber, QFrame, QTextEdit, QMenuBar, QMessageBox, QInputDialog, QMenu, QColorDialog, QDialog,
-    QGroupBox, QDateTimeEdit, QCalendarWidget, QDial, QHeaderView, QPlainTextEdit
+    QGroupBox, QDateTimeEdit, QCalendarWidget, QDial, QHeaderView, QPlainTextEdit, QScrollArea
 )
 from PyQt6.QtSvgWidgets import QSvgWidget
 from PyQt6.QtSvg import QSvgRenderer
@@ -143,8 +143,13 @@ class PopoutWidget(QDialog):
         self.vbox_layout = QVBoxLayout()
         self.setLayout(self.vbox_layout)
 
-        self.vbox_title_layout.body_widget.setParent(self)
-        self.vbox_layout.addWidget(self.vbox_title_layout.body_widget)
+        self.vbox_title_layout.body_scroll.setParent(self)
+        self.vbox_layout.addWidget(self.vbox_title_layout.body_scroll)
+
+        # as large as the content, but not larger than the screen (scrollbars appear if needed)
+        content_size = self.vbox_title_layout.body_widget.sizeHint() + QSize(40, 40)
+        screen = (self.vbox_title_layout.parent.screen() if self.vbox_title_layout.parent is not None else QApplication.primaryScreen()).availableGeometry()
+        self.resize(min(content_size.width(), int(screen.width() * 0.9)), min(content_size.height(), int(screen.height() * 0.9)))
 
     def closeEvent(self, event):
         """Called when close button is pressed"""
@@ -235,7 +240,15 @@ class VBoxTitleLayout(QVBoxLayout):
         self.addLayout(self.header_layout)
 
         self.body_widget = QGroupBox(self.parent)
-        self.addWidget(self.body_widget)
+
+        # the body is inside a scroll area: scrollbars only appear if the panel does not fit on the screen
+        self.body_scroll = QScrollArea(self.parent)
+        self.body_scroll.setWidgetResizable(True)
+        self.body_scroll.setFrameShape(QFrame.Shape.NoFrame)
+        self.body_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        self.body_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        self.body_scroll.setWidget(self.body_widget)
+        self.addWidget(self.body_scroll)
 
         self.body_replacement_widget = QGroupBox(self.parent)
         self.body_replacement_layout = QVBoxLayout(self.parent)
@@ -273,8 +286,8 @@ class VBoxTitleLayout(QVBoxLayout):
         """Removes all widgets from this QVBoxTitleLayout and stores them in the popout widget"""
 
         if self.popout_widget is None:
-            self.removeWidget(self.body_widget)
-            self.body_widget.setParent(None)
+            self.removeWidget(self.body_scroll)
+            self.body_scroll.setParent(None)
 
             self.popout_widget = PopoutWidget(self)
             self.popout_widget.show()
@@ -325,7 +338,7 @@ class VBoxTitleLayout(QVBoxLayout):
         if self.popout_widget:
             self.popout_widget.close()
             self.popout_widget = None
-        self.addWidget(self.body_widget)
+        self.addWidget(self.body_scroll)
 
 
 class InsertingGridLayout(QGridLayout):

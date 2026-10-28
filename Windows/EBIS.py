@@ -178,7 +178,7 @@ class EBISVBoxLayout(QVBoxLayout):
 
         # TODO: global values for input ranges
         self.limit_rows = [
-            CurrentLimitRow(self.limits_grid, name, channel, self.setCurrentLimit, input_range=(0.002, 2 if channel == 0 else 1))
+            CurrentLimitRow(self.limits_grid, name, channel, self.setCurrentLimit, input_range=(0.002, 10 if channel == 0 else 1))
             for channel, name in enumerate(self.channel_names)
         ]
 
@@ -238,8 +238,8 @@ class EBISVBoxLayout(QVBoxLayout):
             buttons=False
         )
         self.spinbox_heating_ramp.setToolTip(
-            'Speed of the heating current ramp in A/min (0: the current is set immediately).\n'
-            'The pressure interlock always lowers the current immediately.'
+            'Speed of the heating current ramp in A/min when the current is increased (0: set immediately).\n'
+            'Lowering the current (and the pressure interlock) is always immediate.'
         )
         self.spinbox_heating_ramp.editingFinished.connect(self.saveHeatingRamp)
         self.status_heating_ramp = QLabel('')
@@ -575,8 +575,9 @@ class EBISVBoxLayout(QVBoxLayout):
                 self.active_message_box = False
             current = trip_current
 
-        # heating current is ramped (if enabled and the current set in the device is known)
-        if channel == 5 and self.spinbox_heating_ramp.value() > 0 and self.heating_setpoint is not None:
+        # only increasing the heating current is ramped (if enabled and the current set in the device is known),
+        # lowering/switching off is always immediate
+        if channel == 5 and self.spinbox_heating_ramp.value() > 0 and self.heating_setpoint is not None and current > self.heating_setpoint:
             self.startHeatingRamp(current)
             return
 
