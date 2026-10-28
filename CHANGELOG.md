@@ -2,9 +2,40 @@
 
 *Automatically created from the commit messages with `python -m Utility.Changelog` - do not edit by hand.*
 
+## v0.1.74 (2026-10-28)
+
+**Electrometer (Keithley 6514) panel in the Monitor tab, logging, CommandServer**
+
+GUI (new Windows/Electrometer.py, Monitor tab between power meter and
+camera):
+- Connection: COM port (+ "simulation" for the simulated instrument),
+  baud rate (must match the RS-232 menu of the instrument), reading age;
+  port and baud rate are remembered, automatic reconnect.
+- Settings: current range (AUTO, 20 pA ... 20 mA), NPLC, damping, zero
+  check (shows the state of the instrument), "Zero correct" (procedure
+  from the manual), "Live" (continuous readings, one request at a time).
+- Display: last reading with SI prefix, warnings for overflow, zero check
+  on and wrong function (red), plot of the last 5 minutes.
+- On connect the instrument is configured for current measurement with
+  the selected range/NPLC/damping; zero check stays on (safe state) until
+  the user switches it off or runs a zero correction.
+
+Database: new table "Electrometer" (Current in A, created automatically
+on the next start, existing tables unchanged); only valid readings are
+logged (no overflow, no zero check). Label "Electrometer Current [A]".
+
+CommandServer/Scripts: device "ELECTROMETER" (ThreadedKeithleyConnection,
+DeviceKeithleyWrapper), e.g. "ELECTROMETER:readCurrent()" or
+"ELECTROMETER:readAverage(10)" -> (mean, std, n).
+Measurement metadata (CoboldPC JSON) includes the electrometer.
+
+Tested offscreen with the simulated instrument: connect, live readings,
+zero check warning, zero correction, DB logging (scratch DB), readCurrent
+and readAverage through a CommandServer on a spare port.
+
 ## v0.1.73 (2026-10-28)
 
-**Keithley 6514 electrometer driver rewritten after the manual, simulator and tests**
+**Keithley 6514 electrometer driver rewritten after the manual, simulator and tests** (d192651)
 
 Connection/KeithleyPAmeter.py (Keithley 6514, RS-232/SCPI, manual
 "D:/Datasheets/Keithley 6514.pdf"):

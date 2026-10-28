@@ -68,7 +68,7 @@ class MainWindow(QMainWindow):
 
         # Add monitor tab
         self.monitor_window = MonitorWindow(self)
-        self.addTab(self.monitor_window, 'Monitor', 'Monitoring devices (power meter, camera)')
+        self.addTab(self.monitor_window, 'Monitor', 'Monitoring devices (power meter, electrometer, camera)')
 
         # Add measure tab (CoboldPC)
         self.measure_window = MeasureWindow(self, metadata_function=self.deviceSettings)
@@ -100,6 +100,7 @@ class MainWindow(QMainWindow):
             'PRESSURE': self.control_window.pressure_group_vbox.device_wrapper,
             'POWER': self.monitor_window.power_meter_group_vbox.device_wrapper,
             'CAMERA': self.monitor_window.camera_group_vbox.device_wrapper,
+            'ELECTROMETER': self.monitor_window.electrometer_group_vbox.device_wrapper,
             'COBOLD': self.measure_window.cobold_group_vbox.device_wrapper
         }
         if self.control_window.ebis_enabled:
@@ -225,6 +226,14 @@ class MainWindow(QMainWindow):
             'pulse_width_fs': laser.status_settings_pulsewidth.value,
         }
 
+        electrometer = self.monitor_window.electrometer_group_vbox
+        settings['Electrometer'] = {
+            'connected': electrometer.indicator_connection.value(),
+            'current_A': electrometer.currentForLog(),
+            'range': electrometer.combobox_range.getValue(save=True),
+            'nplc': electrometer.spinbox_nplc.value(),
+        }
+
         power_meter = self.monitor_window.power_meter_group_vbox
         settings['PowerMeter'] = {
             'connected': power_meter.indicator_connection.value(),
@@ -240,6 +249,7 @@ class MainWindow(QMainWindow):
 
         self.database.updateLabels(self.database.pressure_table.name, PressureVBoxLayout.databaseLabels())
         self.database.updateLabels(self.database.psu_table.name, self.control_window.psu_group_vbox.databaseLabels())
+        self.database.updateLabels(self.database.electrometer_table.name, {'Current': ('Electrometer Current', 'A')})
 
     def updateServerStatus(self):
         """Updates the CommandServer status in the status bar"""

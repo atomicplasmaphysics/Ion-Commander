@@ -8,6 +8,7 @@ from Utility.Layouts import TabWidget, VBoxTitleLayout
 
 from Windows.PowerMeter import PowerMeterVBoxLayout
 from Windows.Camera import CameraVBoxLayout
+from Windows.Electrometer import ElectrometerVBoxLayout
 
 
 class MonitorWindow(TabWidget):
@@ -17,7 +18,6 @@ class MonitorWindow(TabWidget):
     :param parent: parent widget
     """
 
-    # TODO: implement Keithley PicoAmp meter
 
     def __init__(self, parent):
         super().__init__(parent)
@@ -44,6 +44,17 @@ class MonitorWindow(TabWidget):
         self.power_meter_vbox_parent.setLayout(self.power_meter_vbox)
         self.splitter.addWidget(self.power_meter_vbox_parent)
 
+        # ELECTROMETER (Keithley 6514)
+        self.electrometer_vbox = VBoxTitleLayout('Electrometer', parent=self, add_stretch=True, popout_enable=True)
+        self.electrometer_group_vbox = ElectrometerVBoxLayout()
+        self.electrometer_group_vbox.addStretch(1)
+        self.electrometer_group_vbox.setAlignment(Qt.AlignmentFlag.AlignTop)
+
+        self.electrometer_vbox_parent = QWidget(self)
+        self.electrometer_vbox.setBodyLayout(self.electrometer_group_vbox)
+        self.electrometer_vbox_parent.setLayout(self.electrometer_vbox)
+        self.splitter.addWidget(self.electrometer_vbox_parent)
+
         # CAMERA
         self.camera_vbox = VBoxTitleLayout('Camera', parent=self, add_stretch=True, popout_enable=True)
         self.camera_group_vbox = CameraVBoxLayout()
@@ -56,12 +67,14 @@ class MonitorWindow(TabWidget):
 
         # Division between columns
         self.splitter.setStretchFactor(0, 30)
-        self.splitter.setStretchFactor(1, 70)
+        self.splitter.setStretchFactor(1, 30)
+        self.splitter.setStretchFactor(2, 40)
 
     def closeEvent(self, event):
         """Closes all connections"""
         self.power_meter_group_vbox.closeEvent()
         self.camera_group_vbox.closeEvent()
+        self.electrometer_group_vbox.closeEvent()
 
     def log(self, db: DB):
         """
@@ -71,3 +84,4 @@ class MonitorWindow(TabWidget):
         """
 
         self.power_meter_group_vbox.log(db)
+        self.electrometer_group_vbox.log(db)

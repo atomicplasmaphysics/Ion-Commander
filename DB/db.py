@@ -271,6 +271,17 @@ class EBISTable(Tables):
         super().__init__()
 
 
+class ElectrometerTable(Tables):
+    name = 'Electrometer'
+    structure = {
+        'Time': '''BIGINT DEFAULT CAST(EXTRACT(EPOCH FROM now()) AS BIGINT)''',
+        'Current': 'FLOAT default 0',
+    }
+
+    def __init__(self):
+        super().__init__()
+
+
 class EventsTable(Tables):
     """
     Events like interlock trips, (lost) connections or script starts.
@@ -375,12 +386,14 @@ class DB:
         self.laser_table = LaserTable()
         self.power_meter_table = PowerMeterTable()
         self.ebis_table = EBISTable()
+        self.electrometer_table = ElectrometerTable()
         self.tables = [
             self.pressure_table,
             self.psu_table,
             self.laser_table,
             self.power_meter_table,
-            self.ebis_table
+            self.ebis_table,
+            self.electrometer_table
         ]
 
         # tables with meta information (not plottable in the History tab)
@@ -825,6 +838,31 @@ class DB:
         """
 
         return self.getData(self.tables.index(self.ebis_table), columns, start_time, end_time)
+
+    def insertElectrometer(self, current: float):
+        """
+        Inserts electrometer values
+
+        :param current: current in [A]
+        """
+
+        self._execute(self.electrometer_table.insert(current))
+
+    def getElectrometer(
+        self,
+        columns: int | tuple[int] | list[str] | None = None,
+        start_time: int | None = None,
+        end_time: int | None = None
+    ) -> bool | tuple[list, np.ndarray]:
+        """
+        Get electrometer values
+
+        :param columns: list of name of columns, tuple of ids of columns or None(=all columns)
+        :param start_time: start time as timestamp
+        :param end_time: end time as timestamp
+        """
+
+        return self.getData(self.tables.index(self.electrometer_table), columns, start_time, end_time)
 
     def insertEvent(self, source: str, event_type: str, message: str = '', value: float = 0., force_commit: bool = True):
         """

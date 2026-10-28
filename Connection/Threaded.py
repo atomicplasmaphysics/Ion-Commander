@@ -18,6 +18,7 @@ from Connection.Monaco import MonacoConnection
 from Connection.TLPMx import TLPMxConnection
 from Connection.Camera import CameraConnection
 from Connection.Cobold import CoboldConnection
+from Connection.KeithleyPAmeter import KeithleyPAmeterConnection
 
 
 if TYPE_CHECKING:
@@ -29,6 +30,7 @@ if TYPE_CHECKING:
     base_tlpmx = TLPMxConnection
     base_camera = CameraConnection
     base_cobold = CoboldConnection
+    base_keithley = KeithleyPAmeterConnection
 else:
     base_iseg = object
     base_thyracont = object
@@ -38,6 +40,7 @@ else:
     base_tlpmx = object
     base_camera = object
     base_cobold = object
+    base_keithley = object
 
 
 class CallbackId:
@@ -369,6 +372,17 @@ class ThreadedMonacoConnection(ThreadedConnection, base_monaco):
     """
 
     def __init__(self, connection: MonacoConnection, *args, **kwargs):
+        super().__init__(connection, *args, **kwargs)
+
+
+class ThreadedKeithleyConnection(ThreadedConnection, base_keithley):
+    """
+    Threaded connection for <KeithleyPAmeterConnection>
+
+    :param connection: KeithleyPAmeterConnection
+    """
+
+    def __init__(self, connection: KeithleyPAmeterConnection, *args, **kwargs):
         super().__init__(connection, *args, **kwargs)
 
 
