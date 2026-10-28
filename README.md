@@ -36,23 +36,29 @@ For further information read the description of the `compile\pyinstaller.py` fil
 ## Scripts
 Scripts (tab `Scripts`, files `Scripts/*.lsd`) send commands to the devices via the CommandServer (`DEVICE:function(arguments)`,
 the functions are the ones of the classes in `Connection/`). Devices: `PSU`, `EBIS`, `LASER`, `PRESSURE`, `POWER`, `ELECTROMETER`,
-`CAMERA`, `COBOLD`.
+`CAMERA` (`COBOLD` is not available while the Measure tab is disabled).
 ```
 TIME 3                                         # first line: interval between the steps in seconds
-WAIT                                           # one step without command
+PRINT Wien filter scan                         # writes the text into the output and the results (takes no time)
+WAIT                                           # one step without command (one interval)
+WAIT 10                                        # this step takes 10 s instead of the interval
 LASER:rfSet(%) 23, 24                          # "%" is replaced by every value -> one step per value
 PSU:voltageSet(0,%);PSU:voltageSet(1,-%) 0:10:0.5  # ";" = several commands in ONE step, "start:stop:step" = range (stop included)
-	WAIT                                       # tab = nested loop: executed for every value of the line above
+	WAIT                                       # tab = nested loop: executed for every value of the line directly above
 	ELECTROMETER:readAverage(10)               # next step: mean, std and number of 10 electrometer readings
 ```
+Lines on the same level are executed one after another; an indented block only belongs to the line directly above it
+(the first step of the block is executed together with that line).
 Basic math with `%` inside the function arguments is calculated: `-%`, `%+5`, `%-5`, `%*10`, `%/2`, `(%-1)*2`, `%**2`,
 `abs(%)`, `round(%,1)`, `min(%,10)`, `max(%,0)` (e.g. with 2.5: `PSU:voltageSet(1,-%*2+1)` -> `PSU:voltageSet(1,-4)`).
 No spaces inside the command (the space separates the command from the values). Arguments that are no math (e.g. `'run_%.lmf'`)
 are only replaced. Wien filter scan: `PSU:voltageSet(0,%);PSU:voltageSet(1,-%) 0:50:0.5` plus an electrometer reading per step
 (a negative voltage needs a channel with electronic polarity (EPU), otherwise set the polarity in the PSU panel and use `%`).
 
-Every command and its answer is written to `Scripts/results/<script>_<date>_<time>.csv`
-(columns `time_s, step, command, state, answer, value`; `value` is the first number of the answer, e.g. the current).
+Every command and its answer is written to `<output folder>/<script>_<date>_<time>.csv`
+(columns `time_s, step, command, state, answer, value`; `value` is the first number of the answer, e.g. the current;
+`PRINT` texts are rows with the command `PRINT`), the output of the run to `<script>_<date>_<time>.log`.
+The output folder is selected in the Scripts tab (default `Scripts/results`, remembered).
 Example: `Scripts/PSU ramp electrometer.lsd` (symmetric ramp of two PSU channels, electrometer read after every step).
 
 ## Measurements with CoboldPC
@@ -135,7 +141,7 @@ The size of the database is shown in the menu `Database`.
 - [ ] Integrate the Adjustable Delay Stage (`Threaded` wrapper, `DeviceWrapper`, GUI panel, CommandServer entry, DB logging, position in mm/ps instead of steps)
 - [x] Implement Keithley PicoAmp meter in the Monitor tab (panel "Electrometer", DB table `Electrometer`, CommandServer `ELECTROMETER`)
 - [x] Keithley PicoAmp meter: set instrument back to local mode on close (`KeithleyPAmeter.py`)
-- [x] Keithley PicoAmp meter: check return values of `setCurrentRange`/`getLastData` (`KeithleyPAmeter.py`, rewritten after the manual, test: `python -m Connection.KeithleyPAmeter [COMx]`)
+- [x] Keithley PicoAmp meter: check return values of `setCurrentRange`/`getLastData` (`KeithleyPAmeter.py`, rewritten after the manual, test: `python -m Connection.KeithleyPAmeter`, port `TEST_COMPORT` and `BAUDRATE` (9600) in the source code)
 - [x] Keithley 6514: run the device test routine with the real instrument (COM6, 9600 baud; READ? needs arm count 1, ^C recovers a blocked instrument, front panel defaults on close)
 - [ ] Keithley 6514: measure with a real current source (only the open input, ~1E-13 A, was measured) and check the zero correct procedure
 - [ ] Keithley 6514: offer the data elements/units in the CSV of the scripts (mean, std, n as separate columns)
@@ -166,6 +172,9 @@ The size of the database is shown in the menu `Database`.
 - [x] Ranges for scans in scripts (`start:stop:step`) and results of every command saved as CSV
 - [x] Basic math with the placeholder in scripts (`-%`, `%+5`, `%*10`, `abs(%)`, ...)
 - [ ] Several placeholders per line (e.g. `%1`, `%2` for 2D scans) and named variables
+- [x] `WAIT <seconds>` and `PRINT <text>` in scripts, selectable output folder (results CSV and log)
+- [x] Script loops: an indented block only belongs to the line directly above it (before, all lines of the same level got the block)
+- [ ] `WAIT %` (wait times as loop values) and a total duration estimate before starting a script
 - [ ] Conditions in scripts (wait-until e.g. `WAIT_UNTIL PRESSURE < 1E-8`) and variables
 - [ ] Syntax check / dry-run of scripts before starting, with highlighting of the faulty line
 - [ ] Progress bar with timer until the next command (see TODO in `Scripts.py`)
@@ -201,6 +210,9 @@ The size of the database is shown in the menu `Database`.
 - [ ] Database maintenance: archive or thin out old data (e.g. keep 1 s data for 30 days, 1 min averages afterwards)
 - [x] Make the splitter of the History tab work as intended (stretch factors, sizes are remembered)
 - [x] History: exponential fit of the pressure to predict the final pressure (also power law for outgassing, `Utility/PressureFit.py`)
+- [x] History: fit on/off button ("Fit"), the fit stays on with auto update/zoom; models exponential, power law, linear, Gaussian, log-normal
+- [ ] History: several fits at the same time (one per curve) and fit results as CSV
+- [ ] Electrometer: log values with zero check on as well (with a flag), so the History shows that the instrument was connected
 - [ ] History: store prediction fits as events/notes and show the predicted curve after a restart
 
 ### GUI
@@ -210,7 +222,13 @@ The size of the database is shown in the menu `Database`.
 - [x] Settings dialog for `DefaultParams` (update interval, limits, laser IP, server port) instead of editing the code (menu `Settings > Preferences...`)
 - [ ] Apply changed preferences without restarting the application
 - [x] Scrollbars for panels that are larger than the screen (only shown if needed, also in popped out windows)
-- [x] Pressure panel always fully visible (no scrollbar), short reading age ("1.2 s" instead of "Last reading 1.2 s ago")
+- [x] Pressure panel never scrolls horizontally (always full width, vertical scrolling if needed), short reading age ("1.2 s")
+- [x] Pressure digit: only the magnitude of the exponent, positive exponents (>= 10 mbar) in red
+- [x] Colored value fields (`DisplayLabel`): margins kept the old color (only the text area was repainted)
+- [x] Script editor: line highlight is a light tint of the background (readable in dark mode)
+- [x] History: auto update button after the end time ("Now")
+- [x] Electrometer: fixed baud rate 9600 (no setting), live plot of the last minute
+- [ ] Theme switch (light/dark) in the preferences, colors of the plots and icons adapted
 - [x] Icons from Lucide (SVG, sharp at every size)
 - [ ] Icons for a dark theme (the icons are black/colored, `currentColor` of the SVGs is replaced when creating them)
 - [x] Show CommandServer status (running, connected clients) in the status bar

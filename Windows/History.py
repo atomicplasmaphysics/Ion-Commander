@@ -1,3 +1,4 @@
+import re
 import numpy as np
 from math import ceil
 from datetime import datetime, timedelta
@@ -21,7 +22,7 @@ from Utility.Functions import mergeArraysFirstColumn
 from Utility.FileDialogs import selectFileDialog
 from Utility.Dialogs import showMessageBox
 from Utility.Layouts import TabWidget, TimeCanvas, IndicatorLedButton, DateTimeEdit, FilePath, ComboBox
-from Utility.PressureFit import FIT_MODELS, PressureFitResult, formatDuration
+from Utility.PressureFit import FIT_MODELS, FINAL_VALUE_MODELS, PressureFitResult, formatDuration
 
 
 class HistoryWindow(TabWidget):
@@ -111,12 +112,6 @@ class HistoryWindow(TabWidget):
         self.export_title_hbox.setAlignment(Qt.AlignmentFlag.AlignLeft)
         self.preview_export_vbox.addLayout(self.export_title_hbox)
 
-        # Auto update button
-        self.auto_update_button = IndicatorLedButton('Auto update')
-        self.auto_update_button.setToolTip('Will show last 10 minutes')
-        self.auto_update_button.clicked.connect(self.autoUpdate)
-        self.export_title_hbox.addWidget(self.auto_update_button, alignment=Qt.AlignmentFlag.AlignLeft)
-
         # Update preview button
         self.button_update_preview = QPushButton('Update Preview')
         self.button_update_preview.setToolTip('Loads the selected data. Long time ranges are averaged (downsampled) - zoom in to see all data points')
@@ -143,6 +138,12 @@ class HistoryWindow(TabWidget):
         )
         self.end_datetime_widget.setToolTip('End of the time range')
         self.export_title_hbox.addWidget(self.end_datetime_widget, alignment=Qt.AlignmentFlag.AlignLeft)
+
+        # Auto update button
+        self.auto_update_button = IndicatorLedButton('Auto update')
+        self.auto_update_button.setToolTip('Shows the last 10 minutes and updates every second')
+        self.auto_update_button.clicked.connect(self.autoUpdate)
+        self.export_title_hbox.addWidget(self.auto_update_button, alignment=Qt.AlignmentFlag.AlignLeft)
 
         self.export_title_hbox.addStretch()
 
@@ -177,31 +178,34 @@ class HistoryWindow(TabWidget):
         self.fit_hbox.setAlignment(Qt.AlignmentFlag.AlignLeft)
         self.preview_export_vbox.addLayout(self.fit_hbox)
 
-        self.label_fit = QLabel('Prediction fit:')
-        self.label_fit.setToolTip(
-            'Fits the visible part of a curve to predict its final value (e.g. the final pressure after pumping down):\n'
-            'Exponential: p(t) = p∞ + A·exp(-t/τ) (pumping of the gas volume)\n'
-            'Power law: p(t) = p∞ + A·(t + t1)^-n (outgassing of the walls, usually better for long times)'
+        self.button_fit_enable = IndicatorLedButton('Fit')
+        self.button_fit_enable.setToolTip(
+            'Fits the visible part of the selected curve (dashed line). The fit stays on and is updated with every update,\n'
+            'zoom or auto update until it is switched off:\n'
+            'Exponential: p(t) = p∞ + A·exp(-t/τ) (pumping of the gas volume, prediction of the final pressure)\n'
+            'Power law: p(t) = p∞ + A·(t + t1)^-n (outgassing of the walls, usually better for long times)\n'
+            'Linear: y(t) = a + b·t (drift, slope per hour)\n'
+            'Gaussian: y(t) = c + A·exp(-(t - t0)²/(2σ²)) (peak or dip)\n'
+            'Log-normal: asymmetric peak with a long tail\n'
+            'Exponential, power law and linear are extrapolated into the future.'
         )
-        self.fit_hbox.addWidget(self.label_fit)
+        self.button_fit_enable.clicked.connect(self.toggleFit)
+        self.fit_hbox.addWidget(self.button_fit_enable)
         self.combobox_fit_model = ComboBox(entries=list(FIT_MODELS.keys()))
-        self.combobox_fit_model.setToolTip(self.label_fit.toolTip())
+        self.combobox_fit_model.setToolTip(self.button_fit_enable.toolTip())
+        self.combobox_fit_model.currentIndexChanged.connect(self.updateFit)
         self.fit_hbox.addWidget(self.combobox_fit_model)
         self.combobox_fit_series = ComboBox(entries=[])
         self.combobox_fit_series.setToolTip('Curve that is fitted')
         self.combobox_fit_series.setMinimumWidth(200)
+        self.combobox_fit_series.currentIndexChanged.connect(self.updateFit)
         self.fit_hbox.addWidget(self.combobox_fit_series)
-        self.button_fit = QPushButton('Fit visible range')
-        self.button_fit.setToolTip('Fit the selected curve in the visible time range and draw the prediction (dashed)')
-        self.button_fit.clicked.connect(self.fitPrediction)
-        self.fit_hbox.addWidget(self.button_fit)
-        self.button_fit_clear = QPushButton('Clear fit')
-        self.button_fit_clear.setToolTip('Remove the prediction from the plot')
-        self.button_fit_clear.clicked.connect(self.clearFit)
-        self.fit_hbox.addWidget(self.button_fit_clear)
         self.label_fit_result = QLabel('')
-        self.label_fit_result.setToolTip('Result of the prediction fit')
+        self.label_fit_result.setToolTip('Result of the fit')
         self.fit_hbox.addWidget(self.label_fit_result)
+        self.fit_widgets = [self.combobox_fit_model, self.combobox_fit_series, self.label_fit_result]
+        for widget in self.fit_widgets:
+            widget.setVisible(False)
 
         # Plotting canvas
         self.time_canvas = TimeCanvas([], grid=True)
@@ -475,52 +479,65 @@ class HistoryWindow(TabWidget):
                 self.combobox_fit_series.setCurrentIndex(pressures[0])
 
     def clearFit(self):
-        """Removes the prediction fit from the plot"""
+        """Removes the fit from the plot"""
 
         for item in self.fit_items:
             self.time_canvas.plotItem.removeItem(item)
         self.fit_items = []
         self.label_fit_result.setText('')
 
-    def fitPrediction(self):
-        """Fits the selected curve in the visible range and draws the prediction"""
+    def toggleFit(self):
+        """Fit switched on/off: the fit selection is only shown if the fit is on"""
+
+        enabled = self.button_fit_enable.value()
+        for widget in self.fit_widgets:
+            widget.setVisible(enabled)
+        if enabled:
+            self.updateFit()
+        else:
+            self.clearFit()
+
+    def updateFit(self, *args):
+        """Fits the selected curve in the visible range and draws it (only if the fit is switched on)"""
+
+        if self.plotting or not self.button_fit_enable.value():
+            return
 
         self.clearFit()
-        if not self.current_series or self.combobox_fit_series.currentIndex() < 0:
-            self.writeStatusBar('No curve to fit, load data first')
+        if not self.current_series or not 0 <= self.combobox_fit_series.currentIndex() < len(self.current_series):
+            self.label_fit_result.setText('No curve to fit, load data first')
             return
 
         label, x, y = self.current_series[self.combobox_fit_series.currentIndex()]
         view_start, view_end = self.time_canvas.getViewBox().viewRange()[0]
         visible = (x >= view_start) & (x <= view_end)
         model = self.combobox_fit_model.getValue(text=True)
+        unit = re.search(r'\[(.*)]\s*$', label)
 
         try:
-            result: PressureFitResult = FIT_MODELS[model](x[visible], y[visible])
+            result: PressureFitResult = FIT_MODELS[model](x[visible], y[visible], unit=unit.group(1) if unit else '')
         except (ValueError, RuntimeError) as error:
             self.label_fit_result.setText(f'Fit failed: {error}')
-            self.writeStatusBar(f'Prediction fit failed: {error}')
             return
 
-        # prediction from the first fitted point until 3x the fitted time span into the future
+        # predictions from the first fitted point until 3x the fitted time span into the future, peaks only over the fitted range
         span = result.extra['t_span']
-        t_prediction = np.linspace(result.t_start, result.t_start + 4 * span, 500)
+        t_fit = np.linspace(result.t_start, result.t_start + (4 if result.prediction else 1) * span, 500)
         curve = pg.PlotDataItem(
-            t_prediction,
-            result.predict(t_prediction),
+            t_fit,
+            result.predict(t_fit),
             pen=pg.mkPen(color=Colors.color_red, width=2, style=Qt.PenStyle.DashLine),
             name=f'{model} fit: {label}'
         )
-        self.time_canvas.plotItem.addItem(curve)
+        self.time_canvas.plotItem.addItem(curve, ignoreBounds=True)
         self.fit_items.append(curve)
 
         text = f'{model}: {result.description}'
-        target = result.p_inf * 1.1
-        reach = result.timeToReach(target)
-        if reach is not None:
-            text += f' | 1.1·p∞ reached at {datetime.fromtimestamp(reach):%Y-%m-%d %H:%M}'
+        if model in FINAL_VALUE_MODELS:
+            reach = result.timeToReach(result.p_inf * 1.1)
+            if reach is not None:
+                text += f' | 1.1·p∞ reached at {datetime.fromtimestamp(reach):%Y-%m-%d %H:%M}'
         self.label_fit_result.setText(text)
-        GlobalConf.logger.info(f'History prediction fit of "{label}": {text}')
 
     def updatePreview(self):
         """Updates the preview with given data"""
@@ -535,7 +552,6 @@ class HistoryWindow(TabWidget):
         start_time, end_time = time_range
 
         self.selected_range = time_range
-        self.clearFit()
         if not self.plotSeries(start_time, end_time, self.bucketFor(end_time - start_time)):
             self.writeStatusBar('No data selected or no datapoints available')
 
@@ -543,6 +559,8 @@ class HistoryWindow(TabWidget):
         self.time_canvas.setXRange(start_time, end_time, padding=0)
         self.plotting = False
         self.updateEvents()
+        # the fit stays on: fitted again with the new data
+        self.updateFit()
 
     def viewRangeChanged(self, *args):
         """Called when the visible x-range changes (zoom/pan)"""
@@ -567,14 +585,15 @@ class HistoryWindow(TabWidget):
         covered = self.loaded_range[0] <= view_start and view_end <= self.loaded_range[1]
         finer_needed = wanted_bucket * 2 <= self.loaded_bucket
         coarser_needed = wanted_bucket >= self.loaded_bucket * 4
-        if covered and not finer_needed and not coarser_needed:
-            return
+        if not covered or finer_needed or coarser_needed:
+            # load a bit more than visible, so small pans do not need to load again
+            margin = (view_end - view_start) * 0.5
+            load_start = int(max(self.selected_range[0], view_start - margin))
+            load_end = int(min(self.selected_range[1], view_end + margin))
+            self.plotSeries(load_start, load_end, wanted_bucket)
 
-        # load a bit more than visible, so small pans do not need to load again
-        margin = (view_end - view_start) * 0.5
-        load_start = int(max(self.selected_range[0], view_start - margin))
-        load_end = int(min(self.selected_range[1], view_end + margin))
-        self.plotSeries(load_start, load_end, wanted_bucket)
+        # the fit uses the visible range
+        self.updateFit()
 
     def updateEvents(self):
         """Marks the events of the selected time range as vertical lines"""

@@ -16,7 +16,8 @@ from PyQt6.QtCore import Qt
 
 from Config.GlobalConf import GlobalConf, DefaultParams
 
-from Utility.Layouts import TabWidget, VBoxTitleLayout, FilesList, FileEditor
+from Utility.Layouts import TabWidget, VBoxTitleLayout, FilesList, FileEditor, FilePath
+from Utility.FileDialogs import selectFolderDialog
 
 from Socket.ScriptServer import ScriptServer
 
@@ -140,6 +141,19 @@ class ScriptsWindow(TabWidget):
         self.script_run_progress.setMaximumWidth(400)
         self.toolbar.addWidget(self.script_run_progress)
 
+        # Output folder for the results (CSV) and the output (log) of every run
+        self.output_hbox = QHBoxLayout()
+        self.script_editor_bottom_vbox.addLayout(self.output_hbox)
+        self.output_label = QLabel('Output folder:')
+        self.output_hbox.addWidget(self.output_label)
+        self.output_folder = FilePath(placeholder='Folder for the results and logs of the scripts', function=self.selectOutputFolder)
+        self.output_folder.setToolTip(
+            'Every run writes <script>_<date>_<time>.csv (every command and its answer, PRINT texts) and\n'
+            '<script>_<date>_<time>.log (the output below) into this folder'
+        )
+        self.output_folder.setPath(GlobalConf.settings.value(self.output_folder_name, defaultValue=str(Path(self.path_scripts) / 'results'), type=str))
+        self.output_hbox.addWidget(self.output_folder)
+
         # Script output
         self.script_output = FileEditor(self, line_numbering=False, highlighting=False)
         self.script_output.setToolTip('Output (log) of the running script')
@@ -161,6 +175,17 @@ class ScriptsWindow(TabWidget):
 
         # set up editor
         self.editScript(self.script_selection_list.currentRow())
+
+    output_folder_name = 'script_output_folder'
+
+    def selectOutputFolder(self) -> str | None:
+        """Folder dialog for the output folder (None if cancelled), the folder is remembered"""
+
+        folder = selectFolderDialog(self, 'Select the output folder for the results and logs of the scripts', self.output_folder.path or None)
+        if not folder:
+            return None
+        GlobalConf.settings.setValue(self.output_folder_name, folder)
+        return folder
 
     def addNewScript(self):
         """Add new script"""
@@ -254,6 +279,7 @@ class ScriptsWindow(TabWidget):
 
         self.script_selection_list.setDisabled(state)
         self.script_editor.setDisabled(state)
+        self.output_folder.setDisabled(state)
 
         self.script_action_run.setDisabled(state)
         self.script_action_abort.setEnabled(state)
@@ -272,11 +298,15 @@ class ScriptsWindow(TabWidget):
         self.script_output.clear()
 
         script_name = Path(self.script_editor_path).stem if self.script_editor_path else 'script'
-        results_file = Path(self.path_scripts) / 'results' / f'{script_name}_{datetime.now():%Y%m%d_%H%M%S}.csv'
+        output_folder = Path(self.output_folder.path or Path(self.path_scripts) / 'results')
+        results_file = output_folder / f'{script_name}_{datetime.now():%Y%m%d_%H%M%S}.csv'
 
         try:
             self.script_server = ScriptServer(self.script_editor.toPlainText(), results_file=results_file)
-            self.script_output.appendPlainText(f'Results (every command and its answer) are written to "{results_file.resolve()}"')
+            self.script_output.appendPlainText(
+                f'Results (every command and its answer) are written to "{results_file.resolve()}", '
+                f'the output to "{results_file.with_suffix(".log").name}"'
+            )
             self.script_server.log.connect(self.processLogScript)
             self.script_server.finish.connect(self.processFinishScript)
             self.script_server.start()

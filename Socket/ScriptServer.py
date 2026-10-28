@@ -1,5 +1,6 @@
 import ast
 import csv
+from datetime import datetime
 import operator
 import re
 from typing import Self
@@ -164,6 +165,19 @@ def substitutePlaceholder(command: str, value: str, placeholder: str = '%') -> s
     return ';'.join(substituted)
 
 
+def isPrint(command: str) -> bool:
+    """True for "PRINT <text>" (the text is not split at ";")"""
+    return command == 'PRINT' or command.startswith('PRINT ')
+
+
+def waitSeconds(command: str) -> float | None:
+    """Seconds of "WAIT <seconds>", None for other commands (also for the plain "WAIT")"""
+
+    if not command.startswith('WAIT '):
+        return None
+    return float(command[len('WAIT '):])
+
+
 def splitCommands(command: str) -> list[str]:
     """
     Splits "A(1);B(2)" into ["A(1)", "B(2)"] - several commands in one step (";" inside brackets or quotes is kept)
@@ -228,46 +242,33 @@ class CommandQueue:
         return self.queue
 
     @staticmethod
-    def _buildCommands(indent_commands: list[tuple[int, list[str]]]) -> tuple[int, list[str | list[str]]]:
+    def _buildCommands(lines: list[tuple[int, list[str]]], index: int = 0) -> tuple[list[str | list[str]], int]:
         """
-        Builds commands from given indent_commands
+        Builds the steps from the lines (indent, [commands of the line]). An indented block is a loop: it is executed for
+        every command of the line directly above it (the first step of the block is combined with that command).
+        Lines on the same level are executed one after another.
 
-        :param indent_commands: list of tuple(indent, [list of commands])
+        :param lines: list of (indent, [commands]) in the order of the script
+        :param index: index of the first line of this level
+        :returns: (steps, index of the first line that does not belong to this level anymore)
         """
 
-        if not indent_commands:
-            return 0, []
-
-        if len(indent_commands) == 1:
-            return 1, indent_commands[0][1]
-
-        indent_command = indent_commands[0]
-        next_command = indent_commands[1]
-        if next_command[0] < indent_command[0]:
-            return 1, indent_commands[0][1]
-
-        commands = []
-        skip, next_commands = CommandQueue._buildCommands(indent_commands[1:])
-        for ic in indent_command[1]:
-            nc0 = next_commands[0]
-            if not isinstance(nc0, list):
-                nc0 = [nc0]
+        steps = []
+        level = lines[index][0] if index < len(lines) else 0
+        while index < len(lines) and lines[index][0] == level:
+            commands = lines[index][1]
+            if index + 1 < len(lines) and lines[index + 1][0] > level:
+                block, next_index = CommandQueue._buildCommands(lines, index + 1)
+                for command in commands:
+                    first = block[0].copy() if isinstance(block[0], list) else [block[0]]
+                    first.insert(0, command)
+                    steps.append(first)
+                    steps.extend(block[1:])
+                index = next_index
             else:
-                nc0 = nc0.copy()
-            nc0.insert(0, ic)
-            commands.append(nc0)
-            commands.extend(next_commands[1:])
-
-        next_command = indent_commands[skip + 1:]
-        if not next_command:
-            return skip + 1, commands
-        next_command = next_command[0]
-        if next_command and next_command[0] < indent_command[0]:
-            return skip + 1, commands
-
-        skip2, commands2 = CommandQueue._buildCommands(indent_commands[skip + 1:])
-        commands.extend(commands2)
-        return skip + skip2 + 1, commands
+                steps.extend(commands)
+                index += 1
+        return steps, index
 
     @classmethod
     def parseScript(
@@ -331,6 +332,11 @@ class CommandQueue:
             if not line or line.startswith(comment_char):
                 continue
 
+            # PRINT <text>: the text is shown in the output and written to the results (spaces are kept)
+            if line.split(' ')[0].upper() == 'PRINT':
+                line_commands.append((line_nbr, indent, [f'PRINT {line[len("PRINT"):].strip()}'.rstrip()]))
+                continue
+
             args = line.split(' ')
             if not args:
                 cmd_queue.error = f'Line {line_nbr}: "{line}": unsplittable line "{line}"'
@@ -347,9 +353,23 @@ class CommandQueue:
                 cmd_queue.error = f'Line {line_nbr}: "{line}": TIME already set in line 1'
                 return cmd_queue
 
-            if func_name.upper().startswith('WAIT') and len(line) != len('WAIT'):
-                cmd_queue.error = f'Line {line_nbr}: "{line}": WAIT statement has no allowed arguments'
-                return cmd_queue
+            # WAIT: one interval, WAIT <seconds>: this step takes the given time instead of the interval
+            if func_name.upper().startswith('WAIT'):
+                if func_name.upper() != 'WAIT':
+                    cmd_queue.error = f'Line {line_nbr}: "{line}": unknown statement, did you mean "WAIT" or "WAIT <seconds>"?'
+                    return cmd_queue
+                if not args[0]:
+                    line_commands.append((line_nbr, indent, ['WAIT']))
+                    continue
+                try:
+                    seconds = float(args[0])
+                    if len(args) != 1 or seconds < 0:
+                        raise ValueError
+                except ValueError:
+                    cmd_queue.error = f'Line {line_nbr}: "{line}": "WAIT <seconds>" expects one number >= 0'
+                    return cmd_queue
+                line_commands.append((line_nbr, indent, [f'WAIT {formatNumber(seconds)}']))
+                continue
 
             if placeholder_char in func_name:
                 if not args[0]:
@@ -362,25 +382,13 @@ class CommandQueue:
                     return cmd_queue
                 line_commands.append((line_nbr, indent, [func_name]))
 
-        # concatenate lines if they are on the same level
-        indent_commands = []
-        current_group = []
-        current_number = None
-
-        for _, number, commands in line_commands:
-            if number != current_number:
-                if current_group:
-                    indent_commands.append((current_number, current_group))
-                current_group = []
-                current_number = number
-
-            current_group.extend(commands)
-
-        if current_group:
-            indent_commands.append((current_number, current_group))
-
-        # command builder
-        _, cmd_queue.queue = cls._buildCommands(indent_commands)
+        # command builder (indented blocks are loops of the line above)
+        lines = [(indent, commands) for _, indent, commands in line_commands]
+        cmd_queue.queue, index = cls._buildCommands(lines)
+        if index < len(lines):
+            line_nbr = line_commands[index][0]
+            cmd_queue.error = f'Line {line_nbr}: indentation is less than in the first line of the script'
+            return cmd_queue
 
         return cmd_queue
 
@@ -423,6 +431,21 @@ class ScriptServerWorker(QRunnable):
 
         self.command_queue_idx = 0
         self.is_running = False
+        # time (time()) when the next step is executed
+        self.next_time = 0.
+
+    def stepDuration(self, commands: list[str]) -> float:
+        """
+        Duration of a step: "WAIT <seconds>" (the longest one if there are several), 0 if the step only prints,
+        else the interval of the script (TIME)
+        """
+
+        waits = [seconds for seconds in (waitSeconds(command) for command in commands) if seconds is not None]
+        if waits:
+            return max(waits)
+        if commands and all(isPrint(command) for command in commands):
+            return 0.
+        return self.command_queue.interval
 
     @pyqtSlot()
     def run(self):
@@ -430,13 +453,10 @@ class ScriptServerWorker(QRunnable):
 
         self.is_running = True
         self.command_queue.start_time = time()
-        self.nextCommand()
+        self.next_time = self.command_queue.start_time
 
-        while True:
-            if not self.is_running:
-                break
-
-            if self.command_queue_idx * self.command_queue.interval > time() - self.command_queue.start_time:
+        while self.is_running:
+            if time() < self.next_time:
                 sleep(0.001)
                 continue
 
@@ -458,8 +478,19 @@ class ScriptServerWorker(QRunnable):
         if not isinstance(commands, list):
             commands = [commands]
         # several commands in one step: nested loops and "A;B"
-        for command in [single for command in commands for single in splitCommands(command)]:
-            if command == 'WAIT':
+        commands = [single for command in commands for single in ([command] if isPrint(command) else splitCommands(command))]
+        # the time of the next step is counted from the planned time of this step (no drift)
+        self.next_time += self.stepDuration(commands)
+
+        for command in commands:
+            if command == 'WAIT' or waitSeconds(command) is not None:
+                continue
+            if isPrint(command):
+                elapsed_time = time() - self.command_queue.start_time
+                text = command[len('PRINT'):].strip()
+                self.signal.log.emit(f'PRINT at {elapsed_time:.3f} seconds: {text}')
+                # empty state: no command was sent
+                self.signal.result.emit(elapsed_time, self.command_queue_idx, 'PRINT', f':{text}')
                 continue
             self.socket_connection.sendall(command.encode(self.encoding))
             elapsed_time = time() - self.command_queue.start_time
@@ -484,7 +515,8 @@ class ScriptServer(QObject):
     :param port: port that the server will run on
     :param encoding: used encoding
     :param debug: if debug messages should be displayed
-    :param results_file: CSV file where every command and its answer is written to (None: no file)
+    :param results_file: CSV file where every command and its answer is written to (None: no file), the output (log) of the
+                         script is written to a file with the same name and the extension ".log"
     """
 
     log = pyqtSignal(str)
@@ -504,6 +536,7 @@ class ScriptServer(QObject):
         super().__init__()
         self.script = script
         self.results_file = Path(results_file) if results_file is not None else None
+        self.log_file = self.results_file.with_suffix('.log') if self.results_file is not None else None
 
         self.command_queue = CommandQueue.parseScript(script)
         if self.command_queue.error or self.command_queue.interval == -1:
@@ -546,9 +579,15 @@ class ScriptServer(QObject):
 
     @pyqtSlot(str)
     def handleLog(self, log: str):
-        """Handles log signals"""
+        """Handles log signals (also written to the log file)"""
         if self.debug:
             GlobalConf.logger.debug(log)
+        if self.log_file is not None:
+            try:
+                with open(self.log_file, 'a', encoding='utf-8') as file:
+                    file.write(f'{datetime.now():%Y-%m-%d %H:%M:%S.%f}'[:-3] + f' {log}\n')
+            except OSError as error:
+                GlobalConf.logger.error(f'ScriptServer: could not write the log to "{self.log_file}": {error}')
         self.log.emit(log)
 
     @pyqtSlot()
@@ -595,6 +634,10 @@ TIME 10
 
 # sleep statement does nothing for a 'cycle'
 WAIT
+# waits 5 seconds (this step takes 5 s instead of the interval)
+WAIT 5
+# PRINT writes the text into the output and the results (takes no time)
+PRINT starting the laser scan
 
 # commands will be set one after another
 # '%' can be used as placeholder and following arguments will be placed inside

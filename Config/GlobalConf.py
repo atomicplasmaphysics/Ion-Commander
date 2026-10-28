@@ -242,7 +242,7 @@ class GlobalConf:
     title = 'Ion Commander'
 
     # version (single source of truth - update only here)
-    version = '0.1.76'
+    version = '0.1.77'
 
     # logger
     logger = logging.getLogger(title)
@@ -269,7 +269,6 @@ class GlobalConf:
     connection_power_meter_port_name = 'connection_power_meter_port'
     connection_camera_name = 'connection_camera'
     connection_electrometer_name = 'connection_electrometer'
-    connection_electrometer_baud_name = 'connection_electrometer_baud'
     cobold_measurement_folder_name = 'cobold_measurement_folder'
 
     # popped out panels

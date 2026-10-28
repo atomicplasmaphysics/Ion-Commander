@@ -2,9 +2,59 @@
 
 *Automatically created from the commit messages with `python -m Utility.Changelog` - do not edit by hand.*
 
+## v0.1.77 (2026-10-28)
+
+**Script WAIT <s>/PRINT/output folder, History fit toggle, pressure digit, label colors, electrometer cleanup**
+
+Scripts (Socket/ScriptServer.py, Windows/Scripts.py):
+- WAIT <seconds>: the step takes the given time instead of the interval (plain WAIT = one interval as before).
+  Steps are now scheduled one after another (next step = planned time of this step + its duration, no drift).
+- PRINT <text>: writes the text into the output (with the elapsed time) and as a row with the command PRINT into
+  the results CSV; spaces and ";" in the text are kept; a step that only prints takes no time.
+- Output folder selectable in the Scripts tab (FilePath with folder dialog, remembered in the settings, default
+  Scripts/results). Every run writes <script>_<date>_<time>.csv and <script>_<date>_<time>.log (the output).
+- Loops: an indented block only belongs to the line directly above it. Before, all consecutive lines of the same
+  level got the block (e.g. a PRINT or WAIT line above a scan also ran the whole inner block), which also
+  contradicted the documented example. New recursive builder, error for lines indented less than the first line.
+- Clear errors for "WAIT x", "WAIT -1" and unknown statements like "WAITS".
+- Editor: the current line is highlighted with 20 % of the highlight color mixed into the background (read from
+  the palette every time) instead of a full complementary color - readable in light and dark mode.
+
+History (Windows/History.py, Utility/PressureFit.py):
+- "Fit" on/off button (LED). Only if it is on, the model and the curve can be selected; the fit stays on and is
+  recalculated after every update, auto update, zoom/pan and selection change (before, every auto update cleared it).
+  "Fit visible range"/"Clear fit" buttons removed.
+- New fit models for any curve (also negative values): Linear (slope per hour), Gaussian (peak/dip: peak value,
+  time, FWHM, background) and Log-normal (asymmetric peak); exponential/power law/linear are extrapolated, the peaks
+  only drawn over the fitted range; the unit is taken from the curve label; tests in python -m Utility.PressureFit.
+- Auto update button moved behind the end time ("Now" button).
+- Electrometer data in the History: loading, downsampling and plotting of the Electrometer table were tested with a
+  scratch database (2 days of 1E-13 A values) and work; values are only logged while zero check is off (after
+  connecting, zero check is on) - see README TODO.
+
+Pressure:
+- No horizontal scrolling of the Pressure panel (minimum width = content), vertical scrolling is possible again
+  (VBoxTitleLayout(scroll_horizontal=False) replaces scrollable=False of v0.1.76).
+- The big digit is always the magnitude of the exponent; positive exponents (>= 10 mbar) are shown in red,
+  negative ones in the default color (StackWidget.setDigitColor).
+
+Colored value fields (DisplayLabel): QLabel.setText only repaints the contents rect (and nothing if the text did
+not change), but the colored background also covers the 5 px margins, so the margins kept an old color (e.g. green
+frame around a yellow text area). The whole label is repainted now.
+
+Electrometer:
+- No baud rate setting anymore, always 9600 (KeithleyPAmeter.BAUDRATE), baud rate setting removed from QSettings.
+- python -m Connection.KeithleyPAmeter takes no arguments, uses TEST_COMPORT = 'COM6' from the source code.
+- Live plot shows the last minute only.
+
+Icons: old icon sources (icons/src, .ai/.svg of the replaced icons) removed; the remaining logo/splash images are our
+own artwork and stay.
+
+README: script statements (PRINT, WAIT <s>, loop rule, output folder), TODOs updated and extended.
+
 ## v0.1.76 (2026-10-28)
 
-**Script math with %, Keithley on real hardware, faster camera, Lucide icons, pressure always visible**
+**Script math with %, Keithley on real hardware, faster camera, Lucide icons, pressure always visible** (0801865)
 
 Scripts:
 - Basic math with the placeholder inside the function arguments is calculated (Socket/ScriptServer.py:

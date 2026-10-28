@@ -1,7 +1,7 @@
 """
 Keithley Model 6514 System Electrometer via RS-232 (SCPI), see the manual "D:/Datasheets/Keithley 6514.pdf".
 
-RS-232 settings of the instrument (front panel: SHIFT + RS-232): baud rate (default here 9600), 8 data bits, no parity,
+RS-232 settings of the instrument (front panel: SHIFT + RS-232): baud rate 9600 , 8 data bits, no parity,
 no flow control. The response terminator (LF, CR, CRLF or LFCR) can be chosen freely, all of them are accepted.
 Commands are terminated with CR (the instrument processes a command after <CR>).
 
@@ -11,7 +11,6 @@ An overflowed reading is returned as +9.9E37 (converted to nan by the read funct
 """
 
 import re
-import sys
 from enum import Enum, auto
 from math import isfinite, nan, sqrt
 from time import monotonic, sleep
@@ -23,15 +22,7 @@ from Config.GlobalConf import GlobalConf
 from Connection.USBPorts import COMConnection
 
 
-OVERFLOW_VALUE = 9.9E37
-
-# known instruments (identification strings)
-KNOWN_INSTRUMENTS = [
-    'KEITHLEY INSTRUMENTS INC.,MODEL 6514,4310331,A13',
-    'KEITHLEY INSTRUMENTS INC.,MODEL 6514,1210037,A11',
-]
-
-NUMBER_PATTERN = re.compile(r'[-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?')
+KEITHLEY_NUMBER_PATTERN = re.compile(r'[-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?')
 
 
 def convertInUnitList(data: list, unit: str = '') -> list[str | float]:
@@ -53,7 +44,7 @@ def convertToString(inp: float | int, precision: int = 6):
 
 def parseNumbers(response: str) -> list[float]:
     """Returns all numbers of a response (units or suffixes like "NADC" are ignored)"""
-    return [float(number) for number in NUMBER_PATTERN.findall(response)]
+    return [float(number) for number in KEITHLEY_NUMBER_PATTERN.findall(response)]
 
 
 class KeithleyReading(NamedTuple):
@@ -97,7 +88,6 @@ class KeithleyPAmeterConnection(COMConnection):
     :param comport: COM Port
     :param timeout: Timeout for one character [in s]
     :param encoding: Encoding
-    :param baudrate: Baud rate (must match the setting of the instrument)
     :param echo: If device has echo. Will be checked
     :param cleaning: If output cache should be cleared when entering and exiting
     :param strict: If identification string should contain <strict>-string
@@ -173,7 +163,6 @@ class KeithleyPAmeterConnection(COMConnection):
         comport: str,
         timeout: float = 1,
         encoding: str = 'utf-8',
-        baudrate: int = 9600,
         echo: EchoMode = EchoMode.ECHO_AUTO,
         cleaning: bool = True,
         strict: str = ''
@@ -190,7 +179,7 @@ class KeithleyPAmeterConnection(COMConnection):
             comport,
             timeout=timeout,
             encoding=encoding,
-            baudrate=baudrate,
+            baudrate=9600,
             tx_term='\r',
             echo=True if echo == self.EchoMode.ECHO_ENABLED else False,
             cleaning=cleaning
@@ -314,7 +303,7 @@ class KeithleyPAmeterConnection(COMConnection):
         readings = []
         for i in range(0, len(numbers), self.elements):
             value = numbers[i]
-            if abs(value) >= OVERFLOW_VALUE * 0.99:
+            if abs(value) >= 9.9E37 * 0.99:  # overflow value
                 value = nan
             timestamp = numbers[i + 1] if self.elements > 1 else nan
             status = int(numbers[i + 2]) if self.elements > 2 else 0
@@ -655,19 +644,16 @@ class KeithleyPAmeterConnection(COMConnection):
         return mean, std, len(values)
 
 
-# ---------------------------------------------------------------------- tests
-
-def testDevice(comport: str = 'COM6', baudrate: int = 9600, readings: int = 10):
+def testDevice(comport: str = 'COM6', readings: int = 10):
     """
     Test routine for the real instrument (the input should be connected to the experiment or capped)
 
     :param comport: COM port of the electrometer
-    :param baudrate: baud rate (RS-232 menu of the instrument)
     :param readings: number of readings for the average test
     """
 
-    print(f'***** Keithley 6514 on {comport} ({baudrate} baud) *****')
-    with KeithleyPAmeterConnection(comport, baudrate=baudrate, strict='MODEL 6514') as electrometer:
+    print(f'***** Keithley 6514 on {comport} (9600 baud) *****')
+    with KeithleyPAmeterConnection(comport, strict='MODEL 6514') as electrometer:
         print(f'identification: {electrometer.identification()}')
         print(f'echo: {electrometer.echo}, line frequency: {electrometer.getLineFrequency()} Hz, NPLC: {electrometer.getNPLC()}')
         print(f'errors in queue: {electrometer.getErrors()}')
@@ -698,6 +684,4 @@ def testDevice(comport: str = 'COM6', baudrate: int = 9600, readings: int = 10):
 
 
 if __name__ == '__main__':
-    # python -m Connection.KeithleyPAmeter COM6     -> test routine with the real instrument on COM6
-    # python -m Connection.KeithleyPAmeter COM6 19200
-    testDevice(sys.argv[1] if len(sys.argv) > 1 else 'COM6', int(sys.argv[2]) if len(sys.argv) > 2 else 9600)
+    testDevice()

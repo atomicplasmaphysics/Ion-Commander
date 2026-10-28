@@ -34,9 +34,8 @@ class ElectrometerVBoxLayout(QVBoxLayout):
     Panel for the Keithley 6514 electrometer (current measurement): live reading, range, NPLC, zero check/correct
     """
 
-    baud_rates = ['9600', '19200', '38400', '57600', '4800', '2400', '1200']
     current_ranges = ['AUTO'] + [member.value for name, member in KeithleyPAmeterConnection.CurrentRange.__members__.items() if name != 'AUTO']
-    history_seconds = 300
+    history_seconds = 60
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -75,8 +74,6 @@ class ElectrometerVBoxLayout(QVBoxLayout):
         self.status_connection = QLabel('Not connected')
         self.combobox_connection = ComboBox()
         self.combobox_connection.setToolTip('COM port of the electrometer')
-        self.combobox_baud = ComboBox(entries=self.baud_rates)
-        self.combobox_baud.setToolTip('Baud rate, must be the same as in the RS-232 menu of the electrometer (SHIFT + RS-232)')
         self.button_connection = QPushButton('Connect')
         self.button_connection.setToolTip('Connect to / disconnect from the selected port')
         self.button_connection.pressed.connect(self.manualConnect)
@@ -90,7 +87,6 @@ class ElectrometerVBoxLayout(QVBoxLayout):
             self.indicator_connection,
             (self.status_connection, 2),
             self.combobox_connection,
-            self.combobox_baud,
             self.button_connection,
             self.button_connection_refresh,
             self.status_reading_age
@@ -144,16 +140,13 @@ class ElectrometerVBoxLayout(QVBoxLayout):
 
         self.time_canvas = TimeCanvas([], grid=True, legend=False, time_fmt='%H:%M:%S')
         self.time_canvas.setMinimumHeight(200)
-        self.time_canvas.setToolTip(f'Readings of the last {self.history_seconds // 60} minutes')
+        self.time_canvas.setToolTip(f'Readings of the last {self.history_seconds} seconds')
         self.time_canvas.plot(np.array([]), np.array([]))
         self.display_vbox.addWidget(self.time_canvas)
 
         self.reset()
 
         last_connection = GlobalConf.getConnection('electrometer')
-        baud = GlobalConf.settings.value(GlobalConf.connection_electrometer_baud_name, defaultValue='9600', type=str)
-        if baud in self.baud_rates:
-            self.combobox_baud.setCurrentIndex(self.baud_rates.index(baud))
         if last_connection:
             self.connect(last_connection, False)
 
@@ -208,7 +201,7 @@ class ElectrometerVBoxLayout(QVBoxLayout):
         if not connect:
             return
 
-        self.connection = KeithleyPAmeterConnection(comport, baudrate=int(self.combobox_baud.getValue(text=True)), strict='MODEL 6514')
+        self.connection = KeithleyPAmeterConnection(comport, strict='MODEL 6514')
         try:
             self.connection.open()
             self.device_wrapper.threaded_connection = ThreadedKeithleyConnection(self.connection, self.connectionLost)
@@ -216,7 +209,6 @@ class ElectrometerVBoxLayout(QVBoxLayout):
             self.indicator_connection.setValue(True)
             self.status_connection.setText('Connected')
             self.combobox_connection.setEnabled(False)
-            self.combobox_baud.setEnabled(False)
             self.button_connection_refresh.setEnabled(False)
             self.button_connection.setText('Disconnect')
 
@@ -284,7 +276,6 @@ class ElectrometerVBoxLayout(QVBoxLayout):
         self.status_connection.setText('Not connected')
         self.button_connection.setText('Connect')
         self.combobox_connection.setEnabled(True)
-        self.combobox_baud.setEnabled(True)
         self.button_connection_refresh.setEnabled(True)
         self.label_current.setText('-')
         self.label_status.setText('')
@@ -412,7 +403,6 @@ class ElectrometerVBoxLayout(QVBoxLayout):
                 pass
 
         GlobalConf.updateConnections(electrometer=last_connection)
-        GlobalConf.settings.setValue(GlobalConf.connection_electrometer_baud_name, self.combobox_baud.getValue(text=True))
 
     def log(self, db: DB):
         """Logs the current (only valid readings)"""

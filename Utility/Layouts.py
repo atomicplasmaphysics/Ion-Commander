@@ -189,7 +189,8 @@ class VBoxTitleLayout(QVBoxLayout):
     :param spacing: spacing of widgets
     :param add_stretch: if bool: addStretch(1) after title if True, else do nothing
                         if integer: addSpacing(addStretch) after title
-    :param scrollable: if the body can be scrolled when it does not fit (False: always fully visible, e.g. the pressures)
+    :param scroll_horizontal: if the body can be scrolled horizontally (False: the panel is never narrower than its content,
+                              e.g. the pressures are always fully visible in width)
     """
 
     # all layouts that can be popped out (to store/restore popped out panels)
@@ -205,11 +206,11 @@ class VBoxTitleLayout(QVBoxLayout):
         popout_enable: bool = False,
         spacing: int = 0,
         add_stretch: bool | int = 0,
-        scrollable: bool = True
+        scroll_horizontal: bool = True
     ):
         super().__init__(parent)
         self.parent = parent
-        self.scrollable = scrollable
+        self.scroll_horizontal = scroll_horizontal
         self.title_str = title
         self.title_style = title_style
         self.title_style_busy = title_style_busy
@@ -248,10 +249,10 @@ class VBoxTitleLayout(QVBoxLayout):
         self.body_scroll = QScrollArea(self.parent)
         self.body_scroll.setWidgetResizable(True)
         self.body_scroll.setFrameShape(QFrame.Shape.NoFrame)
-        self.body_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
-        self.body_scroll.setVerticalScrollBarPolicy(
-            Qt.ScrollBarPolicy.ScrollBarAsNeeded if scrollable else Qt.ScrollBarPolicy.ScrollBarAlwaysOff
+        self.body_scroll.setHorizontalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAsNeeded if scroll_horizontal else Qt.ScrollBarPolicy.ScrollBarAlwaysOff
         )
+        self.body_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         self.body_scroll.setWidget(self.body_widget)
         self.addWidget(self.body_scroll)
 
@@ -267,9 +268,10 @@ class VBoxTitleLayout(QVBoxLayout):
     def setBodyLayout(self, layout):
         """Sets the layout of the body"""
         self.body_widget.setLayout(layout)
-        if not self.scrollable:
-            # the panel (and the window) cannot get smaller than the body, nothing can be scrolled away
-            self.body_scroll.setMinimumHeight(self.body_widget.minimumSizeHint().height())
+        if not self.scroll_horizontal:
+            # the panel cannot get narrower than the body (plus a possible vertical scrollbar), nothing is cut off at the side
+            scrollbar_width = self.body_scroll.verticalScrollBar().sizeHint().width()
+            self.body_scroll.setMinimumWidth(self.body_widget.minimumSizeHint().width() + scrollbar_width)
 
     def busy(self, busy: bool = True, busy_text: str = ''):
         """
@@ -1730,7 +1732,7 @@ class PressureWidget(QWidget):
         self.pressure = pressure
         percentage = 1
         label_text = 'No pressure available'
-        stack_widget_value = -self.input_range_exponents[0] - 1
+        stack_widget_value = abs(self.input_range_exponents[0]) + 1
 
         self.stack_widget.enableDigit(bool(pressure))
         if pressure:
@@ -1742,14 +1744,19 @@ class PressureWidget(QWidget):
             percentage = max(percentage, 0)
             percentage = min(percentage, 1)
 
-            stack_widget_value = -exponent
+            # the big digit is always the magnitude of the exponent, a positive exponent (>= 10 mbar) is shown in red
+            stack_widget_value = abs(exponent)
+            digit_color = Colors.color_red if exponent > 0 else None
             if pressure >= self.input_range[0]:
                 stack_widget_value = 'OR'
             elif pressure <= self.input_range[1]:
                 stack_widget_value = 'UR'
+        else:
+            digit_color = None
 
         self.pressure_label.setText(label_text)
         self.stack_widget.changePercentage(percentage)
+        self.stack_widget.setDigitColor(digit_color)
         self.stack_widget.setValue(stack_widget_value)
 
 
@@ -1846,6 +1853,9 @@ class StackWidget(QLCDNumber):
         self.changePercentage(percentage_grey)
 
         self.setAutoFillBackground(True)
+        # palette with the default digit color (restored by setDigitColor(None))
+        self.default_palette = QPalette(self.palette())
+        self.digit_color: QColor | None = None
 
     def sizeHint(self) -> QSize:
         """Returns the optimal size of the widget"""
@@ -1866,6 +1876,24 @@ class StackWidget(QLCDNumber):
 
         self.setDigitCount(len(str(value)))
         self.display(value)
+
+    def setDigitColor(self, color: QColor | Qt.GlobalColor | str | None = None):
+        """
+        Sets the color of the digits
+
+        :param color: color of the digits (None: default color of the application)
+        """
+
+        color = QColor(color) if color is not None else None
+        if color == self.digit_color:
+            return
+        self.digit_color = color
+        palette = QPalette(self.default_palette)
+        if color is not None:
+            for role in (QPalette.ColorRole.WindowText, QPalette.ColorRole.Light, QPalette.ColorRole.Dark):
+                palette.setColor(role, color)
+        self.setPalette(palette)
+        self.update()
 
     def enableDigit(self, enable_digits: bool):
         """
@@ -2040,6 +2068,10 @@ class DisplayLabel(QLabel):
 
         elif self.description:
             super().setToolTip(self.description)
+
+        # QLabel.setText only repaints the contents rect (and nothing if the text is unchanged), but the colored background
+        # also covers the margins: repaint everything, otherwise the margins keep the old color
+        self.update()
 
     def setValue(self, value: float):
         """
@@ -3164,17 +3196,8 @@ class FileEditor(QPlainTextEdit):
 
         self.pen_color = palette.color(QPalette.ColorRole.Text)
 
-        if color_highlight is None:
-            self.color_highlight = palette.color(QPalette.ColorRole.Highlight)
-            hsv = self.color_highlight.getHsv()
-            self.color_highlight.setHsv(
-                (hsv[0] + 128) % 256,
-                hsv[1],
-                hsv[2],
-                hsv[3],
-            )
-        else:
-            self.color_highlight = QColor(color_highlight)
+        # None: a light tint of the background (readable in light and dark mode), see highlightColor()
+        self.color_highlight = QColor(color_highlight) if color_highlight is not None else None
 
         if color_line_number is None:
             self.color_line_number = palette.color(QPalette.ColorRole.Light)
@@ -3264,6 +3287,17 @@ class FileEditor(QPlainTextEdit):
             bottom = top + self.blockBoundingRect(block).height()
             block_number += 1
 
+    def highlightColor(self) -> QColor:
+        """
+        Color of the highlighted line: the given color, or 20 % of the highlight color mixed into the background,
+        so the text keeps its contrast in light and dark mode (the palette is read every time, the theme may change)
+        """
+
+        if self.color_highlight is not None:
+            return self.color_highlight
+        palette = self.palette()
+        return linearInterpolateColor(palette.color(QPalette.ColorRole.Base), palette.color(QPalette.ColorRole.Highlight), 0.2)
+
     def highlightCurrentLine(self):
         """Highlight current line"""
         selections = []
@@ -3282,8 +3316,9 @@ class FileEditor(QPlainTextEdit):
             selection.cursor = new_text_cursor
             selections.append(selection)
 
+        color_highlight = self.highlightColor()
         for selection in selections:
-            selection.format.setBackground(self.color_highlight)
+            selection.format.setBackground(color_highlight)
             selection.format.setProperty(QTextFormat.Property.FullWidthSelection, True)
 
         self.setExtraSelections(selections)
