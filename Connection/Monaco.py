@@ -228,6 +228,24 @@ class MonacoReprate(NamedTuple):
     name: str
 
 
+class MonacoHistoryEntry(NamedTuple):
+    """One entry of the fault/warning history (?FH, ?WH), e.g. "2026-06-25 19:01.56  16 - FAULT: Baseplate temperature" """
+    time: datetime
+    code: int
+    type: str  # "FAULT", "WARNING", ...
+    description: str
+
+
+class MonacoSession(NamedTuple):
+    """One connection of ?SESSIONS, e.g. "*USB  No  Customer  2026-10-29 07:58.55  0" """
+    source: str  # e.g. "USB"
+    controlling: bool  # this connection has the control of the laser
+    access: str  # access level, e.g. "Customer"
+    active: datetime | None  # last activity
+    heartbeat: str
+    current: bool  # the connection of this program (marked with "*")
+
+
 class MonacoDatalogEntry(NamedTuple):
     """One row of the datalogger (?DATA), e.g. "2019-11-06 15:53.06 310" """
     time: datetime
@@ -270,15 +288,14 @@ def parseTexts(response: str, ok_texts: tuple[str, ...] = ('SYSTEM OK', 'NO ACTI
 
 def parseTimezones(response: str) -> list[str]:
     """
-    Parses the list of time zones (?TIMEZONES). The separator is not documented: one zone per line, separated by "&",
-    or several zones in one line like "(UTC-12:00) International Date Line West, (UTC-11:00) Coordinated ..." (the
-    names contain commas, so a line is only split in front of "(UTC")
+    Parses the list of time zones (?TIMEZONES): one zone per line, e.g. "(UTC-08:00) Pacific Time (US & Canada)"
+    (the names contain "&" and commas, a line with several zones is only split in front of "(UTC")
 
     :param response: response of the laser
     """
 
     timezones = []
-    for line in parseTexts(response, ok_texts=()):
+    for line in response.replace('\r', '').split('\n'):
         for timezone in re.split(r'[,;]?\s*(?=\(UTC)', line):
             timezone = timezone.strip(' ,;')
             if timezone:
@@ -286,35 +303,115 @@ def parseTimezones(response: str) -> list[str]:
     return timezones
 
 
-def parseDatalog(response: str) -> list[MonacoDatalogEntry]:
+TIMESTAMP_PATTERN = re.compile(
+    r'^\s*(?P<date>\d{4}-\d{1,2}-\d{1,2})[ T]+(?P<hour>\d{1,2}):(?P<minute>\d{2})'
+    r'(?:[.:](?P<second>\d{2})(?:\.(?P<fraction>\d+))?)?\s*(?P<text>.*)$'
+)
+
+
+def parseTimestamp(line: str) -> tuple[datetime, str] | None:
     """
-    Parses the output of the datalogger (?DATA PARAM ...), one row per line: date, time and value, e.g.
-    "2019-11-06 15:53.06 310" or "2019-11-06 15:54.12 SYSTEM OK" (example of the manual, time as hh:mm.ss).
-    Times as hh:mm:ss, hh:mm:ss.fff and hh:mm are accepted as well; lines without date (e.g. a help text) are skipped.
+    Splits a line that starts with a time stamp of the laser ("2026-06-25 19:01.56 ...", time as hh:mm.ss, also
+    hh:mm:ss(.fff) and hh:mm) into the time and the rest of the line (None if the line does not start with a time stamp)
+
+    :param line: one line of the response
+    """
+
+    match = TIMESTAMP_PATTERN.match(line)
+    if match is None:
+        return None
+    try:
+        time = datetime.strptime(match['date'], '%Y-%m-%d').replace(
+            hour=int(match['hour']),
+            minute=int(match['minute']),
+            second=int(match['second'] or 0),
+            microsecond=int((match['fraction'] or '0')[:6].ljust(6, '0'))
+        )
+    except ValueError:
+        return None
+    return time, match['text'].strip()
+
+
+def parseHistory(response: str) -> list[MonacoHistoryEntry]:
+    """
+    Parses the fault/warning history (?FH, ?WH), one entry per line (newest first), e.g.
+    "2026-06-25 19:01.56  16 - FAULT: Baseplate temperature" or "2026-10-28 13:20.57 504 - WARNING: State machine had a
+    timeout"; "SYSTEM OK" (empty history) gives an empty list
 
     :param response: response of the laser
     """
 
-    pattern = re.compile(
-        r'^\s*(?P<date>\d{4}-\d{1,2}-\d{1,2})[ T]+(?P<hour>\d{1,2}):(?P<minute>\d{2})'
-        r'(?:[.:](?P<second>\d{2})(?:\.(?P<fraction>\d+))?)?\s*(?P<text>.*)$'
-    )
-
     entries = []
+    for line in response.replace('\r', '').split('\n'):
+        parsed = parseTimestamp(line)
+        if parsed is None:
+            continue
+        time, text = parsed
+        match = re.match(r'^(-?\d+)\s*-?\s*(?:([A-Z][A-Z ]*?):\s*)?(.*)$', text)
+        if match is None:
+            continue
+        entries.append(MonacoHistoryEntry(time, int(match[1]), match[2] or '', match[3].strip()))
+    return entries
+
+
+def parseSessions(response: str) -> list[MonacoSession]:
+    """
+    Parses the table of the active connections (?SESSIONS):
+    " SOURCE      CONTROLLING  ACCESS             ACTIVE               HB"
+    "*USB             No       Customer           2026-10-29 07:58.55  0"  ("*" = connection of this program)
+
+    :param response: response of the laser
+    """
+
+    pattern = re.compile(r'^\s*(?P<current>\*)?\s*(?P<source>\S+)\s+(?P<controlling>Yes|No)\s+(?P<rest>.*)$', re.IGNORECASE)
+    sessions = []
     for line in response.replace('\r', '').split('\n'):
         match = pattern.match(line)
         if match is None:
             continue
-        try:
-            time = datetime.strptime(match['date'], '%Y-%m-%d').replace(
-                hour=int(match['hour']),
-                minute=int(match['minute']),
-                second=int(match['second'] or 0),
-                microsecond=int((match['fraction'] or '0')[:6].ljust(6, '0'))
-            )
-        except ValueError:
+        # access level, time stamp of the last activity and heartbeat
+        rest = re.match(r'^(?P<access>.*?)\s+(?P<active>\d{4}-\d{1,2}-\d{1,2}\s+\d{1,2}:\d{2}(?:[.:]\d{2})?)\s*(?P<heartbeat>\S*)\s*$', match['rest'])
+        if rest is None:
+            access, active, heartbeat = match['rest'].strip(), None, ''
+        else:
+            parsed = parseTimestamp(rest['active'])
+            access, active, heartbeat = rest['access'].strip(), parsed[0] if parsed else None, rest['heartbeat']
+        sessions.append(MonacoSession(match['source'], match['controlling'].lower() == 'yes', access, active, heartbeat, bool(match['current'])))
+    return sessions
+
+
+def parseFaultTable(response: str) -> dict[int, tuple[str, str]]:
+    """
+    Parses the table of all fault/warning codes of the laser (?FAULTS):
+    "FAULT TYPE     DESCRIPTION", "16    FAULT    FAULT: Baseplate temperature", "500   WARNING  WARNING: Relative humidity"
+
+    :param response: response of the laser
+    :returns: {code: (type, description)}
+    """
+
+    faults = {}
+    for line in response.replace('\r', '').split('\n'):
+        match = re.match(r'^\s*(-?\d+)\s+(\S+)\s*(.*)$', line)
+        if match is not None:
+            faults[int(match[1])] = (match[2], match[3].strip())
+    return faults
+
+
+def parseDatalog(response: str) -> list[MonacoDatalogEntry]:
+    """
+    Parses the output of the datalogger (?DATA PARAM ...), one row per line: date, time and value, e.g.
+    "2019-11-06 15:53.06 310", "2026-06-25 20:00.16 17&51" or "2019-11-06 15:54.12 SYSTEM OK" (time as hh:mm.ss).
+    Lines without time stamp (e.g. 'No data was found. Try using "?F ROWS=1"') are skipped.
+
+    :param response: response of the laser
+    """
+
+    entries = []
+    for line in response.replace('\r', '').split('\n'):
+        parsed = parseTimestamp(line)
+        if parsed is None:
             continue
-        text = match['text'].strip()
+        time, text = parsed
         try:
             value = float(text)
         except ValueError:
@@ -886,17 +983,17 @@ class MonacoConnection(TelnetConnection):
         """Acknowledge faults and return the laser to a ready state if the fault condition is lifted"""
         self._queryAndReturn('FACK=1')
 
-    def faultsGet(self) -> list[int]:
-        """Returns a list of numbered codes of all active faults (empty if "System OK")"""
-        return parseCodes(self._queryAndReturn('?FAULTS'))
+    def faultsGet(self) -> dict[int, tuple[str, str]]:
+        """Returns all fault/warning codes the laser knows as {code: (type, description)} (not only the active ones)"""
+        return parseFaultTable(self._queryAndReturn('?FAULTS'))
 
-    def fhGet(self) -> list[int]:
+    def fhGet(self) -> list[MonacoHistoryEntry]:
         """
-        Returns the fault history as list of codes (empty if "SYSTEM OK").
+        Returns the fault history (newest first, empty if "SYSTEM OK").
         Faults are recorded in chronological order since last AC power up or last FHC command.
         Fault history is limited to the last 20 faults.
         """
-        return parseCodes(self._queryAndReturn('?FH'))
+        return parseHistory(self._queryAndReturn('?FH'))
 
     def fhcSet(self):
         """Clears the fault history"""
@@ -1109,14 +1206,12 @@ class MonacoConnection(TelnetConnection):
         """
         self._queryAndReturn(f'LOCKOUT={int(mode)}')
 
-    def lockoutGet(self) -> int:
+    def lockoutGet(self) -> str:
         """
-        Returns LOCKOUT state of laser control:
-            0 = laser is unlocked from current connection for control by another remote control device or connection.
-            1 = laser remote control is locked out: only current connection has exclusive control of the laser
-            x = a connection from device X has exclusive control of the laser
+        Returns LOCKOUT state of laser control as text (manual: 0 = unlocked, 1 = only the current connection has the
+        control, the laser answers e.g. "A connection from USB has exclusive control of the laser")
         """
-        return self._queryAndReturnInt('?LOCKOUT')
+        return self._queryAndReturn('?LOCKOUT')
 
     def lookupRepratesNamesGet(self) -> list[MonacoReprate]:
         """Returns a list of the available laser repetition rates (in kHz), seeder burst lengths and names"""
@@ -1367,9 +1462,9 @@ class MonacoConnection(TelnetConnection):
         """
         return self._queryAndReturnInt('?SE')
 
-    def sessionsGet(self) -> list[str]:
+    def sessionsGet(self) -> list[MonacoSession]:
         """Lists the active connections"""
-        return parseTexts(self._queryAndReturn('?SESSIONS'), ok_texts=())
+        return parseSessions(self._queryAndReturn('?SESSIONS'))
 
     def setSet(
         self,
@@ -1575,9 +1670,9 @@ class MonacoConnection(TelnetConnection):
             ret[w] = (res[0].strip(), str(':'.join(res[1:]).strip()))
         return ret
 
-    def whGet(self) -> list[int]:
-        """Displays the warning history as list of codes (empty if "SYSTEM OK")"""
-        return parseCodes(self._queryAndReturn('?WH'))
+    def whGet(self) -> list[MonacoHistoryEntry]:
+        """Returns the warning history (newest first, empty if "SYSTEM OK")"""
+        return parseHistory(self._queryAndReturn('?WH'))
 
     def whcSet(self):
         """Clears the warning history"""
@@ -1600,39 +1695,33 @@ class MonacoConnection(TelnetConnection):
         return fres, wres
 
 
-def main():
-    with MonacoConnection(host='169.254.21.151', port=23) as monaco:
-        print('***** GENERAL VALUES *****')
-        print(f'{monaco.identification() = }')
-        print(f'\n')
+def main(host: str = '169.254.21.151', port: int = 23):
+    """
+    Reads the status of the laser (only queries: the laser, the shutter and the pulsing are NOT changed)
 
-        print('***** READ VALUES *****')
-        print(f'keyswitch: {monaco.kGet() = }')
-        print(f'shutter: {monaco.sGet() = }')
-        print(f'pulse control: {monaco.pcGet() = }')
-        print(f'system status: {monaco.readyGet() = }')
-        print(f'laser status: {monaco.lGet() = }')
-        print(f'chiller temperature: {monaco.chtGet() = }')
-        print(f'chiller set point: {monaco.chstGet() = }')
-        print(f'baseplate temperature: {monaco.btGet() = }')
-        print(f'chiller flow: {monaco.chfGet() = }')
-        print(f'faults: {monaco.fGet() = }')
-        print(f'fault list: {monaco.dafGet() = }')
-        print(f'chiller faults: {monaco.chfaultGet() = }')
-        print(f'warnings: {monaco.wGet() = }')
-        for warning in monaco.wGet():
-            print(f'warning #{warning}: {monaco.fnameGet(warning)}')
-        print(f'warnings: {monaco.wGetInfo() = }')
-        print(f'warnings history: {monaco.whGet() = }')
-        print(f'Rep Rate: {monaco.mrrGet() = }')
-        print(f'stats: {monaco.setGet() = }')
-        print(f'RF level: {monaco.rlGet() = }')
-        print('\n')
+    :param host: IP address of the laser
+    :param port: port of the laser
+    """
 
-        monaco.sSet(0)
-        monaco.pcSet(0)
-        monaco.fackSet()
-        monaco.lSet(1)
+    with MonacoConnection(host=host, port=port) as monaco:
+        print(f'{monaco.identification()}, state: {monaco.stGet()} ({monaco.lGetInfo()})')
+        print(f'key switch: {monaco.kGet()}, shutter: {monaco.sGet()}, pulse control: {monaco.pcGet()}, ready: {monaco.readyGet()}')
+        print(f'control: {monaco.lockoutGet()}')
+        for session in monaco.sessionsGet():
+            print(f'  session {session.source}{" (this program)" if session.current else ""}: controlling {session.controlling}, last active {session.active}')
+        print(f'chiller: {monaco.chtGet()} °C (set point {monaco.chstGet()} °C), flow {monaco.chfGet()} lpm, chiller faults: {monaco.chfaultGet() or "none"}')
+        print(f'baseplate: {monaco.btGet()} °C, repetition rate {monaco.mrrGet()} kHz, settings {monaco.setGet()}, RF level {monaco.rlGet()} %')
+
+        print(f'active faults: {monaco.fGetInfo() or "none"}, descriptions: {monaco.dafGet() or "none"}')
+        print(f'active warnings: {monaco.wGetInfo() or "none"}')
+        for name, history in (('fault', monaco.fhGet()), ('warning', monaco.whGet())):
+            print(f'{name} history ({len(history)} entries):')
+            for entry in history[:5]:
+                print(f'  {entry.time:%Y-%m-%d %H:%M:%S} #{entry.code} {entry.type}: {entry.description}')
+
+        print('datalogger, last chiller temperatures and faults:')
+        for entry in monaco.dataGet('CHT', rows=3) + monaco.dataGet('F', rows=3):
+            print(f'  {entry.time:%Y-%m-%d %H:%M:%S} {entry.text}')
 
 
 def toggleLaserAndReadStatus():
@@ -1651,24 +1740,11 @@ def toggleLaserAndReadStatus():
             sleep(0.1)
 
 
-def readErrorStatus():
-    with MonacoConnection(host='169.254.21.151', port=23) as monaco:
-        print(f'faults: {monaco.fGet() = }')
-        print(f'fault list: {monaco.dafGet() = }')
-        print(f'chiller faults: {monaco.chfaultGet() = }')
-        print(f'warnings: {monaco.wGet() = }')
-        print(f'warnings: {monaco.wGetInfo() = }')
-        print(f'warnings history: {monaco.whGet() = }')
-
-
 def readOutValues():
     with MonacoConnection(host='169.254.21.151', port=23) as monaco:
         for func in dir(monaco):
             if not func.endswith('Get'):
                 continue
-            if func in ['faultsGet', 'helpGet', 'newGet', 'sessionsGet', 'timezonesGet']:
-                continue
-
             try:
                 print(f'{func}: {getattr(monaco, func)()}')
             except (TypeError, ConnectionError):
@@ -1805,74 +1881,5 @@ def readOutValues():
     """
 
 
-RAW_QUERIES = ('?DAF', '?F', '?FH', '?W', '?WH', '?CHFAULT', '?NEW', '?SESSIONS', '?TIMEZONE', '?TIMEZONES', '?DATA F DAYS=10', '?DATA CHT ROWS=5')
-
-
-def captureRawOutputs(host: str = '169.254.21.151', port: int = 23, file: str = 'monaco_raw_output.txt'):
-    """
-    Sends only queries (nothing is changed at the laser) and writes the raw answers (repr, with all separators) into
-    <file>, to check the parsing of the formats that are not documented in the manual (?NEW, ?SESSIONS, ?TIMEZONES,
-    ?DAF with active faults). Run it while the GUI is not connected to the laser: python -m Connection.Monaco --raw
-    """
-
-    with MonacoConnection(host=host, port=port) as monaco, open(file, 'w', encoding='utf-8') as output:
-        for query in RAW_QUERIES:
-            try:
-                answer = repr(monaco._queryAndReturn(query))
-            except (ConnectionError, OSError) as error:
-                answer = f'ERROR {error!r}'
-            line = f'{query}: {answer}'
-            print(line)
-            output.write(line + '\n')
-    print(f'written to {file}')
-
-
-def testParsers():
-    """Tests of the parsers with the examples of the manual and the recorded answers (no laser needed)"""
-
-    # ?DATA F DAYS=10, example of the manual (time as hh:mm.ss)
-    entries = parseDatalog(
-        '2019-11-06 15:53.06 310\r\n2019-11-06 15:54.12 SYSTEM OK\r\n2019-11-06 16:06.36 SYSTEM OK\r\n'
-        '2019-11-06 16:06.56 38\r\n2019-11-06 16:07.07 38\r\n2019-11-06 16:07.11 SYSTEM OK'
-    )
-    assert len(entries) == 6, entries
-    assert entries[0] == MonacoDatalogEntry(datetime(2019, 11, 6, 15, 53, 6), '310', 310.0), entries[0]
-    assert entries[1].text == 'SYSTEM OK' and entries[1].value is None, entries[1]
-    assert entries[3].time == datetime(2019, 11, 6, 16, 6, 56) and entries[3].value == 38, entries[3]
-    # other time formats, echoed command and help text are skipped
-    entries = parseDatalog('?DATA CHT ROWS=2\r\n2023-12-28 13:33:23 28.0\r\n2023-12-28 13:34:23.5 28.1\r\nROWS=n Shows last n entries')
-    assert [(e.time, e.value) for e in entries] == [(datetime(2023, 12, 28, 13, 33, 23), 28.0), (datetime(2023, 12, 28, 13, 34, 23, 500000), 28.1)], entries
-
-    # ?DAF without faults (recorded: "SYSTEM OK-"), with faults (format not documented)
-    assert parseTexts('SYSTEM OK-') == []
-    assert parseTexts('310: Fault: Chiller flow low&38: Fault: Interlock open') == ['310: Fault: Chiller flow low', '38: Fault: Interlock open']
-    assert parseTexts('310: Chiller flow low\r\nSYSTEM OK-') == ['310: Chiller flow low']
-    assert parseTexts('There are no active chiller faults') == []
-
-    # ?TIMEZONES: one per line or several in one line
-    zones = ['(UTC-12:00) International Date Line West', '(UTC+01:00) Amsterdam, Berlin, Bern, Rome, Stockholm, Vienna']
-    assert parseTimezones('\r\n'.join(zones)) == zones
-    assert parseTimezones(', '.join(zones)) == zones
-    assert parseTimezones('&'.join(zones)) == zones
-
-    # ?NEW: key/value pairs, commas inside values are kept
-    assert parseKeyValues('CHT=28.0&BT=27.582') == {'CHT': '28.0', 'BT': '27.582'}
-    assert parseKeyValues('CHT=28.0,BT=27.582') == {'CHT': '28.0', 'BT': '27.582'}
-    assert parseKeyValues('TIMEZONE=(UTC+01:00) Amsterdam, Berlin\r\nS=1') == {'TIMEZONE': '(UTC+01:00) Amsterdam, Berlin', 'S': '1'}
-    assert parseKeyValues('SV=HD:42.4.462, A1:91.0, IM:2.1') == {'SV': 'HD:42.4.462, A1:91.0, IM:2.1'}
-
-    # ?SESSIONS: one connection per entry
-    assert parseTexts('169.254.21.10:52134\r\n169.254.21.11:52200', ok_texts=()) == ['169.254.21.10:52134', '169.254.21.11:52200']
-
-    print('All Monaco parser tests passed')
-
-
 if __name__ == '__main__':
-    import sys
-
-    if '--raw' in sys.argv:
-        captureRawOutputs()
-    elif '--test' in sys.argv:
-        testParsers()
-    else:
-        readErrorStatus()
+    main()

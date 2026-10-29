@@ -18,7 +18,7 @@ from Socket.CommandServer import DeviceISEGWrapper
 from Utility.Layouts import InsertingGridLayout, IndicatorLed, DoubleSpinBox, DisplayLabel, SpinBox, ComboBox, ReadingAgeLabel
 from Utility.AutoReconnect import AutoReconnect
 from Utility.Dialogs import showMessageBox
-from Utility.ChannelRows import VoltageChannelRow, CurrentLimitRow
+from Utility.ChannelRows import nominalMaxima, VoltageChannelRow, CurrentLimitRow
 from Utility.Icons import getIcon
 
 from Connection.USBPorts import getComports
@@ -339,6 +339,32 @@ class PSUVBoxLayout(QVBoxLayout):
             return
 
         self.updateLoop()
+
+        # limit the input fields to the nominal values of the channels (before the set values are read)
+        def nominalVoltages(voltages: list[float]):
+            maxima = nominalMaxima(voltages, len(self.channel_rows), [self.voltage_maximum] * len(self.channel_rows))
+            if maxima is None:
+                return
+            for row, maximum in zip(self.channel_rows, maxima):
+                row.setVoltageMaximum(maximum)
+            self.spinbox_ramp_voltage.setMaximum(max(maxima))
+
+        self.device_wrapper.threaded_connection.callback(
+            nominalVoltages,
+            self.device_wrapper.threaded_connection.readVoltageNominal(self.all_channels_selector)
+        )
+
+        def nominalCurrents(currents: list[float]):
+            maxima = nominalMaxima(currents, len(self.limit_rows), [DefaultParams.psu_current_limit_maximum] * len(self.limit_rows), 1000)
+            if maxima is None:
+                return
+            for row, maximum in zip(self.limit_rows, maxima):
+                row.setLimitMaximum(maximum)
+
+        self.device_wrapper.threaded_connection.callback(
+            nominalCurrents,
+            self.device_wrapper.threaded_connection.readCurrentNominal(self.all_channels_selector)
+        )
 
         def readVoltage(voltages: list[float]):
             if len(voltages) != len(self.spinbox_voltages) != len(self.status_voltages):

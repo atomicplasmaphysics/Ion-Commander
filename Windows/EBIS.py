@@ -18,7 +18,7 @@ from Socket.CommandServer import DeviceISEGWrapper
 from Utility.Layouts import InsertingGridLayout, IndicatorLed, DoubleSpinBox, DisplayLabel, ComboBox, ScientificDoubleSpinBox, ReadingAgeLabel
 from Utility.AutoReconnect import AutoReconnect
 from Utility.Dialogs import showMessageBox
-from Utility.ChannelRows import VoltageChannelRow, CurrentLimitRow
+from Utility.ChannelRows import nominalMaxima, VoltageChannelRow, CurrentLimitRow
 from Utility.Interlock import PressureInterlock, InterlockLimits, InterlockResult
 from Utility.Icons import getIcon
 
@@ -511,6 +511,35 @@ class EBISVBoxLayout(QVBoxLayout):
             return
 
         self.updateLoop()
+
+        # limit the input fields to the nominal values of the channels (before the set values are read),
+        # the last channel is the cathode heating (voltage row and heating current)
+        def nominalVoltages(voltages: list[float]):
+            maxima = [self.voltage_maximum] * (len(self.channel_rows) - 1) + [DefaultParams.ebis_heating_voltage_maximum]
+            maxima = nominalMaxima(voltages, len(self.channel_rows), maxima)
+            if maxima is None:
+                return
+            for row, maximum in zip(self.channel_rows, maxima):
+                row.setVoltageMaximum(maximum)
+
+        self.threaded_connection.callback(nominalVoltages, self.threaded_connection.readVoltageNominal(self.all_channels_selector))
+
+        def nominalCurrents(currents: list[float]):
+            if not isinstance(currents, list) or len(currents) != len(self.limit_rows) + 1:
+                GlobalConf.logger.error(f'Nominal currents cannot be used, got {currents!r}')
+                return
+            maxima = [DefaultParams.ebis_cathode_current_limit_maximum] + [DefaultParams.ebis_current_limit_maximum] * (len(self.limit_rows) - 1)
+            maxima = nominalMaxima(currents[:-1], len(self.limit_rows), maxima, 1000)
+            for row, maximum in zip(self.limit_rows, maxima):
+                row.setLimitMaximum(maximum)
+            heating_maximum = nominalMaxima(currents[-1:], 1, [DefaultParams.ebis_heating_current_maximum])[0]
+            self.spinbox_current_6.setMaximum(heating_maximum)
+            self.spinbox_current_6.setToolTip(
+                f'Set current of the cathode heating in A (press enter to apply, maximum {heating_maximum:g} A). '
+                'Limited while the pressure interlock is tripped.'
+            )
+
+        self.threaded_connection.callback(nominalCurrents, self.threaded_connection.readCurrentNominal(self.all_channels_selector))
 
         def readVoltage(voltages: list[float]):
             if len(voltages) != len(self.spinbox_voltages) != len(self.status_voltages):

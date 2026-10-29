@@ -18,6 +18,7 @@ from Utility.Functions import getPrefix, isSaneNumber
 from Utility.AutoReconnect import AutoReconnect
 from Utility.Dialogs import showMessageBox
 from Utility.Icons import getIcon
+from Utility.Background import BackgroundRunner
 
 from Connection.TLPMx import TLPMxConnection, TLPMxValues, getResources
 from Connection.Threaded import ThreadedTLPMxConnection, ThreadedDummyConnection
@@ -42,6 +43,12 @@ class PowerMeterVBoxLayout(QVBoxLayout):
         self.device_wrapper = DeviceTLPMxWrapper()
         self.connection: None | TLPMxConnection = None
         self.device_wrapper.threaded_connection = ThreadedDummyConnection()
+
+        # searching the power meters (~6 s) and opening the connection (~1.3 s) block, so they run in the background
+        # (one after another, both use the DLL of Thorlabs)
+        self.background = BackgroundRunner(self)
+        self.connecting = False
+        self.closing = False
 
         # Connection Group Box
         self.connection_group_box = QGroupBox('Connection and Status')
@@ -105,9 +112,13 @@ class PowerMeterVBoxLayout(QVBoxLayout):
         self.combobox_display_parameter = ComboBox(entries=[cdp[0] for cdp in self.combobox_display_parameter_table])
         self.combobox_display_parameter.setToolTip('Value that is shown in the large display')
         self.combobox_display_parameter.currentIndexChanged.connect(lambda: self.updateDisplayParameter())
+        self.label_presets = QLabel('Preset')
+        self.label_presets.setToolTip('Wavelengths of the laser (fundamental, second and fourth harmonic, see the preferences)')
         self.settings_grid.addWidgets(
             self.label_display_parameter,
-            self.combobox_display_parameter
+            self.combobox_display_parameter,
+            None,
+            self.label_presets
         )
 
         # device wavelength
@@ -117,18 +128,21 @@ class PowerMeterVBoxLayout(QVBoxLayout):
         self.spinbox_wavelength.editingFinished.connect(lambda: self.setWavelength(self.spinbox_wavelength.value()))
         self.status_wavelength = DisplayLabel(value=0, unit='nm', target_value=0, deviation=0.1, decimals=0)
         self.status_wavelength.setToolTip('Wavelength set in the power meter')
-        self.button_wavelength_ir = QPushButton('IR preset')
-        self.button_wavelength_ir.setToolTip('Set the wavelength to the IR wavelength of the laser')
+        # presets below each other in the column "Preset"
+        self.button_wavelength_ir = QPushButton('IR')
+        self.button_wavelength_ir.setToolTip(f'Set the wavelength to the IR wavelength of the laser ({DefaultParams.laser_ir_wavelength} nm)')
         self.button_wavelength_ir.pressed.connect(lambda: self.setWavelength(DefaultParams.laser_ir_wavelength, update_spinbox=True))
-        self.button_wavelength_uv = QPushButton('UV preset')
-        self.button_wavelength_uv.setToolTip('Set the wavelength to the UV wavelength of the laser')
+        self.button_wavelength_green = QPushButton('Green')
+        self.button_wavelength_green.setToolTip(f'Set the wavelength to the green wavelength of the laser ({DefaultParams.laser_green_wavelength} nm)')
+        self.button_wavelength_green.pressed.connect(lambda: self.setWavelength(DefaultParams.laser_green_wavelength, update_spinbox=True))
+        self.button_wavelength_uv = QPushButton('UV')
+        self.button_wavelength_uv.setToolTip(f'Set the wavelength to the UV wavelength of the laser ({DefaultParams.laser_uv_wavelength} nm)')
         self.button_wavelength_uv.pressed.connect(lambda: self.setWavelength(DefaultParams.laser_uv_wavelength, update_spinbox=True))
         self.settings_grid.addWidgets(
             self.label_wavelength,
             self.spinbox_wavelength,
             self.status_wavelength,
-            self.button_wavelength_ir,
-            self.button_wavelength_uv
+            self.button_wavelength_ir
         )
 
         # device attenuation
@@ -141,7 +155,8 @@ class PowerMeterVBoxLayout(QVBoxLayout):
         self.settings_grid.addWidgets(
             self.label_attenuation,
             self.spinbox_attenuation,
-            self.status_attenuation
+            self.status_attenuation,
+            self.button_wavelength_green
         )
 
         # device averaging
@@ -154,7 +169,8 @@ class PowerMeterVBoxLayout(QVBoxLayout):
         self.settings_grid.addWidgets(
             self.label_averaging,
             self.spinbox_averaging,
-            self.status_averaging
+            self.status_averaging,
+            self.button_wavelength_uv
         )
 
         # beam diameter
@@ -235,8 +251,12 @@ class PowerMeterVBoxLayout(QVBoxLayout):
         self.reset()
         self.combobox_display_parameter.setCurrentIndex(GlobalConf.getPowerMeterDisplayParameter())
 
+        # search first, then connect (both in the background, one after another): while the power meter is open, the
+        # search returns it without serial number ("USB0::0x1313::0x8072::::INSTR")
+        self.setPortsComboBox()
         last_connection = GlobalConf.getConnection('power_meter')
         if last_connection:
+            self.last_port = last_connection
             self.connect(last_connection, False)
             
     def getDisplayParameter(self, values: tuple[float, float]) -> float:
@@ -495,6 +515,9 @@ class PowerMeterVBoxLayout(QVBoxLayout):
         :param messagebox: show messagebox if failed
         """
 
+        if self.connecting:
+            return
+
         if not port:
             port = self.combobox_connection.getValue(save=True)
         self.setPort(port)
@@ -503,52 +526,94 @@ class PowerMeterVBoxLayout(QVBoxLayout):
 
         self.unconnect()
 
-        if connect:
-            try:
-                self.connection = TLPMxConnection(
-                    port,
-                    id_query=True,
-                    reset_device=False
-                )
-
-                self.connection.open()
-                self.device_wrapper.threaded_connection = ThreadedTLPMxConnection(
-                    self.connection,
-                    self.connectionLost
-                )
-                self.indicator_connection.setValue(True)
-                self.status_connection.setText('Connected')
-                self.last_port = port
-                self.combobox_connection.setEnabled(False)
-                self.button_connection_refresh.setEnabled(False)
-                self.button_connection.setText('Disconnect')
-
-                self.device_wrapper.threaded_connection.setAutoRange((1, 1))
-
-            except (ConnectionError, AttributeError, FileNotFoundError) as error:
-                try:
-                    self.connection.close()
-                except (ConnectionError, AttributeError):
-                    pass
-                self.connection = None
-                self.reset()
-
-                GlobalConf.logger.info(f'{type(error).__name__}! Could not connect to ThorLabs Power Meter on port "{port}", because of: {error}')
-
-                if messagebox:
-                    showMessageBox(
-                        None,
-                        QMessageBox.Icon.Critical,
-                        f'{type(error).__name__}!',
-                        f'Could not connect to ThorLabs Power Meter on port "{port}"!',
-                        f'<strong>Encountered Error:</strong><br>{error}',
-                        expand_details=False
-                    )
-        else:
+        if not connect:
             self.combobox_connection.setEnabled(True)
-            self.button_connection_refresh.setEnabled(True)
+            self.button_connection_refresh.setEnabled(not self.background.isBusy())
             self.button_connection.setText('Connect')
+            self.updateAllValues()
+            return
 
+        # the resource name is needed as bytes (the settings store it as text, an empty list gives "-1")
+        if isinstance(port, str):
+            port = port.encode(DefaultParams.TLPMx_encoding)
+        port = bytes(port)
+        if port in (b'', b'-1'):
+            if messagebox:
+                showMessageBox(None, QMessageBox.Icon.Warning, 'No power meter!', 'No ThorLabs Power Meter was found, please refresh the list first!')
+            return
+
+        # opening takes ~1.3 s (identification query), the GUI must not hang
+        self.connecting = True
+        self.status_connection.setText('Connecting...')
+        self.button_connection.setEnabled(False)
+        self.combobox_connection.setEnabled(False)
+        self.button_connection_refresh.setEnabled(False)
+        self.background.run(
+            lambda: TLPMxConnection(port, id_query=True, reset_device=False).open(),
+            lambda connection: self.connectFinished(connection, port),
+            lambda error: self.connectFailed(error, port, messagebox)
+        )
+
+    def connectFinished(self, connection: TLPMxConnection, port: str):
+        """
+        Called in the GUI thread when the connection was opened in the background
+
+        :param connection: opened connection
+        :param port: port of the connection
+        """
+
+        self.connecting = False
+        self.button_connection.setEnabled(True)
+        if self.closing:
+            connection.close()
+            return
+
+        self.connection = connection
+        self.device_wrapper.threaded_connection = ThreadedTLPMxConnection(
+            self.connection,
+            self.connectionLost
+        )
+        self.indicator_connection.setValue(True)
+        self.status_connection.setText('Connected')
+        self.last_port = port
+        self.combobox_connection.setEnabled(False)
+        self.button_connection_refresh.setEnabled(False)
+        self.button_connection.setText('Disconnect')
+
+        self.device_wrapper.threaded_connection.setAutoRange((1, 1))
+        self.auto_reconnect.reconnected()
+        self.updateAllValues()
+
+    def connectFailed(self, error: Exception, port: str, messagebox: bool):
+        """
+        Called in the GUI thread when the connection could not be opened in the background
+
+        :param error: exception of the connection
+        :param port: port of the connection
+        :param messagebox: show a message box
+        """
+
+        self.connecting = False
+        self.button_connection.setEnabled(True)
+        if self.closing:
+            return
+
+        self.connection = None
+        self.reset()
+        self.combobox_connection.setEnabled(True)
+        self.button_connection_refresh.setEnabled(not self.background.isBusy())
+
+        GlobalConf.logger.info(f'{type(error).__name__}! Could not connect to ThorLabs Power Meter on port "{port}", because of: {error}')
+
+        if messagebox:
+            showMessageBox(
+                None,
+                QMessageBox.Icon.Critical,
+                f'{type(error).__name__}!',
+                f'Could not connect to ThorLabs Power Meter on port "{port}"!',
+                f'<strong>Encountered Error:</strong><br>{error}',
+                expand_details=False
+            )
         self.updateAllValues()
 
     def manualConnect(self):
@@ -570,34 +635,51 @@ class PowerMeterVBoxLayout(QVBoxLayout):
 
         if not self.device_wrapper.threaded_connection.isDummy():
             return True
-        self.connect(self.last_port, False)
-        return self.indicator_connection.value()
+        # the connection is opened in the background, a successful attempt calls auto_reconnect.reconnected()
+        if not self.connecting:
+            self.connect(self.last_port, False)
+        return False
 
     def unconnect(self):
-        """Disconnect from any port"""
+        """Disconnect from any port (closing the DLL session takes ~2 s, so it is done in the background)"""
 
-        self.device_wrapper.threaded_connection.close()
+        threaded_connection = self.device_wrapper.threaded_connection
+        connection = self.connection
         self.device_wrapper.threaded_connection = ThreadedDummyConnection()
-        if self.connection is not None:
-            self.connection.close()
-            self.connection = None
+        self.connection = None
+
+        def close():
+            # the worker closes the connection itself if it is running
+            threaded_connection.close()
+            if connection is not None and not threaded_connection.worker.close_called:
+                connection.close()
+
+        if connection is not None or not threaded_connection.isDummy():
+            self.background.run(close, on_failed=lambda error: GlobalConf.logger.error(f'Power Meter: error while closing the connection: {error}'))
 
         comport = self.combobox_connection.getValue(text=True)
         self.reset()
         self.setPort(comport)
 
-    def setPort(self, port: str):
+    def setPort(self, port: str | bytes):
         """
-        Selects the port in the list of ports
+        Selects the power meter in the list
 
-        :param port: port to be selected
+        :param port: resource name (bytes or text) or name of the power meter
         """
 
-        port = port.lower()
+        def text(value) -> str:
+            if isinstance(value, (bytes, bytearray)):
+                return bytes(value).decode(DefaultParams.TLPMx_encoding, errors='replace').lower()
+            return str(value).lower()
 
-        entries = {p.lower(): i for i, p in enumerate(self.combobox_connection.entries)}
-        if port in entries.keys():
-            self.combobox_connection.setCurrentIndex(entries[port])
+        port = text(port)
+        names = [self.combobox_connection.entries or [], self.combobox_connection.entries_save or []]
+        for entries in names:
+            for index, entry in enumerate(entries):
+                if text(entry) == port:
+                    self.combobox_connection.setCurrentIndex(index)
+                    return
 
     def reset(self):
         """Resets everything to default"""
@@ -631,14 +713,28 @@ class PowerMeterVBoxLayout(QVBoxLayout):
         
         self.resetMinMax()
 
-        self.setPortsComboBox()
-
     def setPortsComboBox(self):
-        """Sets available ports in the comports combobox"""
+        """Searches the power meters in the background (~6 s) and shows them in the combobox"""
 
-        QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
+        self.button_connection_refresh.setEnabled(False)
+        self.background.run(getResources, self.setPortsComboBoxFinished, self.setPortsComboBoxFailed)
 
-        resources = getResources()
+    def setPortsComboBoxFailed(self, error: Exception):
+        """Called in the GUI thread if the power meters could not be searched"""
+
+        GlobalConf.logger.error(f'Power Meter: could not search the power meters: {error}')
+        if not self.closing:
+            self.button_connection_refresh.setEnabled(self.device_wrapper.threaded_connection.isDummy() and not self.connecting)
+
+    def setPortsComboBoxFinished(self, resources: dict[bytearray, tuple[bytearray, bytearray, bytearray, int]]):
+        """
+        Called in the GUI thread with the found power meters
+
+        :param resources: result of <getResources>
+        """
+
+        if self.closing:
+            return
 
         names = []
         resource_names = []
@@ -654,11 +750,19 @@ class PowerMeterVBoxLayout(QVBoxLayout):
             entries_save=resource_names,
             tooltips=descriptions
         )
+        if self.last_port:
+            self.setPort(self.last_port)
 
-        QApplication.restoreOverrideCursor()
+        connected = not self.device_wrapper.threaded_connection.isDummy()
+        self.combobox_connection.setEnabled(not connected and not self.connecting)
+        self.button_connection_refresh.setEnabled(not connected and not self.connecting)
 
     def closeEvent(self):
         """Must be called when application is closed"""
+
+        # a connection that is opened in the background is closed again when it is finished
+        self.closing = True
+        self.background.waitForDone()
 
         self.device_wrapper.threaded_connection.close()
 
@@ -666,6 +770,8 @@ class PowerMeterVBoxLayout(QVBoxLayout):
         last_connection = ''
         if self.connection is not None or self.auto_reconnect.active:
             last_connection = self.last_port
+            if isinstance(last_connection, (bytes, bytearray)):
+                last_connection = bytes(last_connection).decode(DefaultParams.TLPMx_encoding)
         self.auto_reconnect.stop()
 
         if self.connection is not None:

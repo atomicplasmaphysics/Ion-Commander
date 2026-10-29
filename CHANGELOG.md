@@ -2,9 +2,52 @@
 
 *Automatically created from the commit messages with `python -m Utility.Changelog` - do not edit by hand.*
 
+## v0.1.82 (2026-10-29)
+
+**Monaco tested with the real laser, Power Meter in the background with IR/Green/UV presets, ISEG nominal limits**
+
+Monaco (Connection/Monaco.py), read-only test with the real laser (only "?" queries, laser/shutter/pulsing unchanged):
+- ?FH and ?WH return lines like "2026-06-25 19:01.56  16 - FAULT: Baseplate temperature": fhGet/whGet read them as
+  plain numbers and were always empty; now parseHistory() -> list of MonacoHistoryEntry(time, code, type, description).
+- ?FAULTS returns the table of ALL fault/warning codes (code, type, description), not the active faults:
+  faultsGet() -> {code: (type, description)} (parseFaultTable, 156 codes).
+- ?SESSIONS is a table (SOURCE, CONTROLLING, ACCESS, ACTIVE, HB, "*" = own connection): sessionsGet() -> list of
+  MonacoSession.
+- ?TIMEZONES: one zone per line, names contain "&" ("Pacific Time (US & Canada)" was split before).
+- ?LOCKOUT answers a text ("A connection from USB has exclusive control of the laser"), lockoutGet returns it (was -1).
+- Checked with the real answers: ?NEW (KEY=VALUE per line, second call empty), ?DAF ("SYSTEM OK-"), ?DATA (also
+  several codes "16&17&51" and "No data was found..."), ?FNAME/?WNAME.
+- No command line arguments anymore: python -m Connection.Monaco runs main(), which only reads the status (state,
+  key switch, shutter, sessions, chiller, faults, warnings, histories, datalogger). The old main() started the laser
+  (sSet, pcSet, fackSet, lSet(1)) - removed; readErrorStatus is part of main(); captureRawOutputs/testParsers removed.
+
+Power Meter (Windows/PowerMeter.py, Utility/Background.py, Utility/AutoReconnect.py):
+- The GUI hung: reset() searched the power meters (getResources, ~6 s) and was called by every connect/disconnect,
+  opening (~1.3 s) and closing (TLPMX_close ~2 s) ran in the GUI thread.
+- New BackgroundRunner: runs blocking functions one after another in a thread pool and calls the callbacks in the GUI
+  thread. Search, connect and disconnect run there (status "Connecting...", buttons disabled meanwhile); the search
+  only runs at startup and with the refresh button. At startup the search runs before the automatic connect (while
+  the power meter is open, the search returns it without serial number).
+- AutoReconnect.reconnected(): background connections stop the reconnecting after a successful attempt.
+- The saved port is text, TLPMxConnection needs bytes (the automatic connect at startup could not work); an empty
+  list gave the port "-1". Both handled, setPort also compares the resource names.
+- Measured with the real PM100USB: longest GUI freeze 0.24 s (search), 0.04 s (connect, disconnect).
+- Presets: column "Preset" (label in the row of the display parameter) with the buttons IR, Green and UV below each
+  other; new DefaultParams.laser_green_wavelength = 518 nm (editable in the preferences).
+
+PSU/EBIS (Windows/PSU.py, Windows/EBIS.py, Utility/ChannelRows.py):
+- After connecting, the voltage and current limit fields are limited to the nominal values of the channels
+  (:READ:VOLT:NOM?, :READ:CURR:NOM?, absolute value): smaller one of nominal value and preference
+  (nominalMaxima(), VoltageChannelRow.setVoltageMaximum(), CurrentLimitRow.setLimitMaximum(), heating current, PSU
+  ramp voltage). Tested with the real crates (only queries): EBIS cathode 5000 V (nominal -5000 V) instead of
+  10000 V; all other limits of the preferences are below the nominal values (PSU 6000 V/4 mA, EBIS 10000 V/1 mA,
+  cathode 12 mA, heating 12.5 V/8 A).
+
+README: TODOs updated and extended.
+
 ## v0.1.81 (2026-10-29)
 
-**Icons for the dark theme, icons relative to the project folder, Scripts toolbar label fixed**
+**Icons for the dark theme, icons relative to the project folder, Scripts toolbar label fixed** (5fbafc1)
 
 Icons (Utility/Icons.py, new):
 - getIcon('<file>') loads icons from the icons folder of the project (before: QIcon('icons/...') relative to the

@@ -78,6 +78,18 @@ class AutoReconnect(QObject):
             return
         self.timer.stop()
 
+    def reconnected(self):
+        """
+        Called by devices that connect in the background (their reconnect function only starts the attempt and returns
+        False): stops reconnecting after a successful connection
+        """
+
+        if not self.timer.isActive():
+            return
+        self.timer.stop()
+        GlobalConf.logger.info(f'{self.name}: Reconnected after {self.attempts} attempt{"" if self.attempts == 1 else "s"}')
+        EventLog.log(self.name, 'reconnected', f'Reconnected after {self.attempts} attempts', self.attempts)
+
     def attempt(self):
         """One reconnect attempt"""
 

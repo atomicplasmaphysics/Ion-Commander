@@ -76,6 +76,7 @@ class DefaultParams:
     laser_baseplate_temperature_on = 28
 
     laser_ir_wavelength = 1035
+    laser_green_wavelength = 518
     laser_uv_wavelength = 259
 
     # power meter parameters
@@ -160,6 +161,7 @@ class DefaultParams:
         'laser_baseplate_temperature_off': ('Laser', 'Baseplate temperature limit (off)', '°C', -50, 100),
         'laser_baseplate_temperature_on': ('Laser', 'Baseplate temperature limit (on)', '°C', -50, 100),
         'laser_ir_wavelength': ('Laser', 'IR wavelength', 'nm', 1, 100000),
+        'laser_green_wavelength': ('Laser', 'Green wavelength (second harmonic)', 'nm', 1, 100000),
         'laser_uv_wavelength': ('Laser', 'UV wavelength', 'nm', 1, 100000),
         'cs_host': ('CommandServer', 'Host of the CommandServer', '', None, None),
         'cs_port': ('CommandServer', 'Port of the CommandServer', '', 1, 65535),
@@ -270,7 +272,7 @@ class GlobalConf:
     title = 'Ion Commander'
 
     # version (single source of truth - update only here)
-    version = '0.1.81'
+    version = '0.1.82'
 
     # logger
     logger = logging.getLogger(title)

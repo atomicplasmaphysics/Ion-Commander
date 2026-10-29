@@ -180,13 +180,17 @@ The size of the database is shown in the menu `Database`.
 - [x] Monaco: cleaner return types for faults/IP/help (lists of codes/texts, `parseIP`, `MonacoCommand`, `MonacoSettings`, `MonacoReprate`)
 - [x] Monaco: answers are read until the `Monaco> ` prompt (long answers like `?HELP`, `?TIMEZONES`, `?NEW`, `?DATA` came in several packets and failed)
 - [x] Monaco: parse `?DATA` (datalogger) output (`dataGet('F', days=10)` -> list of `MonacoDatalogEntry(time, text, value)`, format of the manual)
-- [ ] Monaco: verify the parsing of `?NEW`, `?SESSIONS`, `?TIMEZONES` and `?DAF` with real fault output (formats are not in the manual, the parsers accept the likely variants):
-  run `python -m Connection.Monaco --raw` while the GUI is not connected (only queries, writes `monaco_raw_output.txt`), parser tests: `python -m Connection.Monaco --test`
+- [x] Monaco: verify the parsing of `?NEW`, `?SESSIONS`, `?TIMEZONES` and `?DAF` with the real laser (read-only test); fault/warning history (`?FH`, `?WH`) and the fault table (`?FAULTS`) were always empty before, `?LOCKOUT` is a text
+- [x] Monaco: `python -m Connection.Monaco` reads the status of the laser (only queries, no laser/shutter/pulsing changes)
+- [ ] Monaco: show the fault/warning history and the sessions in the Laser panel (stale USB sessions with control are listed by `?SESSIONS`)
 - [ ] Monaco: show the datalogger (e.g. chiller temperature, faults of the last days) in the Laser panel or the History tab
 - [ ] ISEG: implement MICC user calibration commands
 - [x] Include the device name in error messages of `ThreadedConnection.handleError`
 - [x] Get limits, units and decimals of PSU/EBIS spinboxes right, and move the input ranges to `DefaultParams` (editable in the preferences)
-- [ ] PSU/EBIS: limit the voltage/current fields to the nominal values reported by the ISEG (`:READ:VOLT:NOM?`, `:READ:CURR:NOM?`) after connecting
+- [x] PSU/EBIS: limit the voltage/current fields to the nominal values reported by the ISEG (`:READ:VOLT:NOM?`, `:READ:CURR:NOM?`) after connecting (smaller one of nominal value and preference)
+- [x] Power Meter: searching (~6 s), connecting (~1.3 s) and disconnecting (~2 s) in the background (the GUI hung, the search ran on every connect/disconnect)
+- [x] Power Meter: presets IR, Green (518 nm) and UV below each other in the column "Preset"
+- [ ] Connect the other devices in the background as well (PSU/EBIS/Electrometer open serial ports in the GUI thread, ISEG echo detection takes a while)
 - [ ] EBIS heating current: enable button directly at the current row (currently blocked by the warning message box on `editingFinished`)
 - [ ] PSU: decide if all other channels must be switched on again after a polarity switch
 - [ ] Laser: verify units of the chiller pressure and the RF level / output frequency calculation (see TODOs in `Laser.py`)
@@ -274,7 +278,7 @@ The size of the database is shown in the menu `Database`.
 - [x] Replace `print` statements with the logger (remaining `print`s are only in the demo/test functions of the drivers)
 - [ ] Command-line arguments (log level, virtual devices, no CommandServer)
 - [x] Broken package update (matplotlib half-installed because the GUI was running), DuckDB pinned to < 2 (nanobind leak warnings on exit), `DB.close()` closes the connection
-- [ ] DuckDB 2.0: check again if a later release does not print the nanobind leak warnings on exit (the database file stays readable with 1.x, tested)
+- [ ] DuckDB 2.0: check again if a later release does not print the nanobind leak warnings on exit (known issue of DuckDB 2.0, harmless, the database file stays readable with 1.x, tested)
 - [ ] Warn on startup if a package is missing or broken (instead of a traceback), e.g. a check in `main.py`
 - [ ] Write a short manual (sorry big boy 🐶)
 - [x] Automatic changelog from the commit messages (`python -m Utility.Changelog` writes `CHANGELOG.md`)

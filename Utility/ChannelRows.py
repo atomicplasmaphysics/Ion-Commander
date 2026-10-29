@@ -4,6 +4,7 @@ from typing import Callable
 from PyQt6.QtWidgets import QLabel, QPushButton
 
 
+from Config.GlobalConf import GlobalConf
 from Config.StylesConf import Colors
 
 from Utility.Layouts import InsertingGridLayout, IndicatorLed, DoubleSpinBox, DisplayLabel, PolarityButton
@@ -51,6 +52,7 @@ class VoltageChannelRow:
     ):
         self.name = name
         self.channel = channel
+        self.voltage_unit = voltage_unit
 
         self.label = QLabel(name)
 
@@ -84,6 +86,16 @@ class VoltageChannelRow:
             widgets.append(self.button_polarity)
         widgets.extend([self.spinbox_voltage, self.status_voltage, self.status_current, self.indicator, self.button_enable])
         grid.addWidgets(*widgets)
+
+    def setVoltageMaximum(self, maximum: float):
+        """
+        Sets the maximum of the set voltage (e.g. the nominal voltage of the channel reported by the device)
+
+        :param maximum: maximum voltage
+        """
+
+        self.spinbox_voltage.setMaximum(maximum)
+        self.spinbox_voltage.setToolTip(f'Set voltage of {self.name} in {self.voltage_unit} (press enter to apply, maximum {maximum:g} {self.voltage_unit})')
 
     def setOutputState(self, state: bool):
         """
@@ -142,6 +154,16 @@ class CurrentLimitRow:
         self.indicator_limit.setToolTip(f'Red if the measured current of {name} reached the limit')
         grid.addWidgets(self.label, self.spinbox_limit, self.indicator_limit)
 
+    def setLimitMaximum(self, maximum: float):
+        """
+        Sets the maximum of the current limit (e.g. the nominal current of the channel reported by the device)
+
+        :param maximum: maximum in mA
+        """
+
+        self.spinbox_limit.setMaximum(maximum)
+        self.spinbox_limit.setToolTip(f'Current limit of {self.name} in mA (range {self.spinbox_limit.minimum():g} ... {maximum:g} mA)')
+
     def updateCurrent(self, current: float):
         """
         Shows if the measured current reached the limit
@@ -156,3 +178,22 @@ class CurrentLimitRow:
 
         self.spinbox_limit.reset()
         self.indicator_limit.setValue(False)
+
+
+def nominalMaxima(nominals, count: int, maxima: list[float], factor: float = 1) -> list[float] | None:
+    """
+    Maxima of the input fields from the nominal values of the channels (:READ:VOLT:NOM?, :READ:CURR:NOM?): the smaller
+    one of the maximum from the preferences and the absolute nominal value (negative channels report negative values)
+
+    :param nominals: nominal values reported by the device (list, one per channel)
+    :param count: expected number of channels
+    :param maxima: maxima from the preferences, one per channel
+    :param factor: unit conversion of the nominal values (e.g. 1000 for A -> mA)
+    :returns: maxima or None if the answer is not valid
+    """
+
+    if not isinstance(nominals, list) or len(nominals) != count:
+        GlobalConf.logger.error(f'Nominal values cannot be used, expected {count} values, got {nominals!r}')
+        return None
+    # invalid answers (-1) or 0 keep the maximum of the preferences
+    return [min(maximum, abs(nominal) * factor) if abs(nominal) > 0 and nominal != -1 else maximum for nominal, maximum in zip(nominals, maxima)]
