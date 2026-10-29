@@ -37,17 +37,31 @@ class DefaultParams:
     reconnect_interval_time = 5000
     reconnect_interval_time_laser = 15000
 
-    # PSU parameters
+    # PSU parameters (input ranges of the fields: voltages in V, current limits in mA, ramp speed in %/s of the nominal voltage)
     psu_voltage_deviation = 5
     psu_voltage_maximum = 6000
+    psu_voltage_decimals = 1
     psu_current_maximum = 1E-4
+    psu_current_limit_minimum = 0.002
+    psu_current_limit_maximum = 2.
+    psu_ramp_speed_maximum = 20.
     psu_time_ramp_default = 15
+    psu_time_ramp_maximum = 600
 
-    # EBIS parameters
+    # EBIS parameters (input ranges of the fields: voltages in V, current limits in mA, heating in A, ramp speed in %/s)
     ebis_voltage_deviation = 5
     ebis_voltage_maximum = 10000
+    ebis_voltage_decimals = 1
     ebis_current_maximum = 1E-4
     ebis_current_deviation = 0.05
+    ebis_current_limit_minimum = 0.002
+    ebis_current_limit_maximum = 1.
+    ebis_cathode_current_limit_maximum = 10.
+    ebis_heating_voltage_maximum = 5.
+    ebis_heating_current_maximum = 5.
+    ebis_heating_ramp_maximum = 10.
+    ebis_interlock_current_maximum = 3.
+    ebis_ramp_speed_maximum = 20.
 
     # laser parameters
     laser_ip = (169, 254, 21, 151)
@@ -115,12 +129,26 @@ class DefaultParams:
         'reconnect_interval_time_laser': ('General', 'Time between reconnect attempts of the laser', 'ms', 1000, 600000),
         'psu_voltage_deviation': ('PSU', 'Allowed deviation of the measured voltage', 'V', 0, 1000),
         'psu_voltage_maximum': ('PSU', 'Maximum voltage of the input fields', 'V', 0, 100000),
+        'psu_voltage_decimals': ('PSU', 'Decimals of the voltage input fields', '', 0, 3),
         'psu_current_maximum': ('PSU', 'Allowed current (shown in red above)', 'A', 0, 1),
+        'psu_current_limit_minimum': ('PSU', 'Minimum of the current limit fields', 'mA', 0, 1000),
+        'psu_current_limit_maximum': ('PSU', 'Maximum of the current limit fields', 'mA', 0, 1000),
+        'psu_ramp_speed_maximum': ('PSU', 'Maximum ramp speed of the ISEG crate (% of the nominal voltage per second)', '%/s', 0, 100),
         'psu_time_ramp_default': ('PSU', 'Default duration of the voltage ramp', 'min', 0, 600),
+        'psu_time_ramp_maximum': ('PSU', 'Maximum duration of the voltage ramp', 'min', 1, 10000),
         'ebis_voltage_deviation': ('EBIS', 'Allowed deviation of the measured voltage', 'V', 0, 1000),
         'ebis_voltage_maximum': ('EBIS', 'Maximum voltage of the input fields', 'V', 0, 100000),
+        'ebis_voltage_decimals': ('EBIS', 'Decimals of the voltage input fields', '', 0, 3),
         'ebis_current_maximum': ('EBIS', 'Allowed current (shown in red above)', 'A', 0, 1),
         'ebis_current_deviation': ('EBIS', 'Allowed deviation of the heating current', 'A', 0, 10),
+        'ebis_current_limit_minimum': ('EBIS', 'Minimum of the current limit fields', 'mA', 0, 1000),
+        'ebis_current_limit_maximum': ('EBIS', 'Maximum of the current limit fields (drift tubes, repeller)', 'mA', 0, 1000),
+        'ebis_cathode_current_limit_maximum': ('EBIS', 'Maximum of the current limit field of the cathode', 'mA', 0, 1000),
+        'ebis_heating_voltage_maximum': ('EBIS', 'Maximum of the cathode heating voltage field', 'V', 0, 100),
+        'ebis_heating_current_maximum': ('EBIS', 'Maximum of the cathode heating current field', 'A', 0, 100),
+        'ebis_heating_ramp_maximum': ('EBIS', 'Maximum speed of the heating current ramp', 'A/min', 0, 100),
+        'ebis_interlock_current_maximum': ('EBIS', 'Maximum of the heating current fields of the pressure interlock', 'A', 0, 100),
+        'ebis_ramp_speed_maximum': ('EBIS', 'Maximum ramp speed of the MICC (% of the nominal voltage per second)', '%/s', 0, 100),
         'laser_ip': ('Laser', 'Default IP address of the laser', '', None, None),
         'laser_port': ('Laser', 'Default port of the laser', '', 1, 65535),
         'laser_chiller_temperature_low': ('Laser', 'Lower limit of the chiller temperature', '°C', -50, 100),
@@ -242,7 +270,7 @@ class GlobalConf:
     title = 'Ion Commander'
 
     # version (single source of truth - update only here)
-    version = '0.1.78'
+    version = '0.1.79'
 
     # logger
     logger = logging.getLogger(title)

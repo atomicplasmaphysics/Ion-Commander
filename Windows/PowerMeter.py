@@ -13,7 +13,7 @@ from DB.db import DB
 
 from Socket.CommandServer import DeviceTLPMxWrapper
 
-from Utility.Layouts import InsertingGridLayout, IndicatorLed, DoubleSpinBox, DisplayLabel, SpinBox, ComboBox, LatexLabel
+from Utility.Layouts import InsertingGridLayout, IndicatorLed, DoubleSpinBox, DisplayLabel, SpinBox, ComboBox, LatexLabel, ReadingAgeLabel
 from Utility.Functions import getPrefix, isSaneNumber
 from Utility.AutoReconnect import AutoReconnect
 from Utility.Dialogs import showMessageBox
@@ -60,6 +60,8 @@ class PowerMeterVBoxLayout(QVBoxLayout):
         self.connection_hbox.addWidget(self.indicator_connection)
         self.status_connection = QLabel('Not connected')
         self.connection_hbox.addWidget(self.status_connection)
+        self.status_reading_age = ReadingAgeLabel()
+        self.connection_hbox.addWidget(self.status_reading_age)
 
         self.connection_hbox_selection = QHBoxLayout()
         self.connection_hbox_selection.setAlignment(Qt.AlignmentFlag.AlignLeft)
@@ -273,6 +275,8 @@ class PowerMeterVBoxLayout(QVBoxLayout):
 
     def updateLoop(self, set_startup: bool = False):
         """Called by timer; Updates all values"""
+
+        self.status_reading_age.setAge(self.device_wrapper.threaded_connection.secondsSinceLastResult(), self.indicator_connection.value())
 
         if not self.checkConnection(False):
             return

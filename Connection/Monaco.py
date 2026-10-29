@@ -195,6 +195,7 @@ COMMAND        ACCESS    TYPE MIN  MAX     DESCRIPTION
 """
 
 import re
+from time import monotonic
 from typing import NamedTuple
 from datetime import datetime
 
@@ -227,6 +228,13 @@ class MonacoReprate(NamedTuple):
     name: str
 
 
+class MonacoDatalogEntry(NamedTuple):
+    """One row of the datalogger (?DATA), e.g. "2019-11-06 15:53.06 310" """
+    time: datetime
+    text: str  # value as text, e.g. "310", "38&310", "SYSTEM OK", "28.0"
+    value: float | None  # value as number (None if the text is not a number, e.g. "SYSTEM OK" or several fault codes)
+
+
 def parseCodes(response: str) -> list[int]:
     """
     Parses a list of fault/warning codes like "12&34" ("SYSTEM OK" or other text returns an empty list)
@@ -245,21 +253,74 @@ def parseCodes(response: str) -> list[int]:
 
 def parseTexts(response: str, ok_texts: tuple[str, ...] = ('SYSTEM OK', 'NO ACTIVE')) -> list[str]:
     """
-    Parses a list of texts separated by "&" or new lines. Returns an empty list if the response means "no entries".
+    Parses a list of texts separated by "&" or new lines. Entries that mean "no entries" are removed (e.g. "SYSTEM OK-"
+    of ?DAF without faults), so a mixed answer still returns the real entries.
 
     :param response: response of the laser
-    :param ok_texts: if the response contains one of these texts (case-insensitive), there are no entries
+    :param ok_texts: entries that contain one of these texts (case-insensitive) are removed
     """
 
-    upper = response.upper()
-    if any(ok_text in upper for ok_text in ok_texts):
-        return []
     texts = []
     for text in response.replace('\r', '').replace('\n', '&').split('&'):
-        text = text.strip(' -')
-        if text:
+        text = text.strip(' -\t')
+        if text and not any(ok_text in text.upper() for ok_text in ok_texts):
             texts.append(text)
     return texts
+
+
+def parseTimezones(response: str) -> list[str]:
+    """
+    Parses the list of time zones (?TIMEZONES). The separator is not documented: one zone per line, separated by "&",
+    or several zones in one line like "(UTC-12:00) International Date Line West, (UTC-11:00) Coordinated ..." (the
+    names contain commas, so a line is only split in front of "(UTC")
+
+    :param response: response of the laser
+    """
+
+    timezones = []
+    for line in parseTexts(response, ok_texts=()):
+        for timezone in re.split(r'[,;]?\s*(?=\(UTC)', line):
+            timezone = timezone.strip(' ,;')
+            if timezone:
+                timezones.append(timezone)
+    return timezones
+
+
+def parseDatalog(response: str) -> list[MonacoDatalogEntry]:
+    """
+    Parses the output of the datalogger (?DATA PARAM ...), one row per line: date, time and value, e.g.
+    "2019-11-06 15:53.06 310" or "2019-11-06 15:54.12 SYSTEM OK" (example of the manual, time as hh:mm.ss).
+    Times as hh:mm:ss, hh:mm:ss.fff and hh:mm are accepted as well; lines without date (e.g. a help text) are skipped.
+
+    :param response: response of the laser
+    """
+
+    pattern = re.compile(
+        r'^\s*(?P<date>\d{4}-\d{1,2}-\d{1,2})[ T]+(?P<hour>\d{1,2}):(?P<minute>\d{2})'
+        r'(?:[.:](?P<second>\d{2})(?:\.(?P<fraction>\d+))?)?\s*(?P<text>.*)$'
+    )
+
+    entries = []
+    for line in response.replace('\r', '').split('\n'):
+        match = pattern.match(line)
+        if match is None:
+            continue
+        try:
+            time = datetime.strptime(match['date'], '%Y-%m-%d').replace(
+                hour=int(match['hour']),
+                minute=int(match['minute']),
+                second=int(match['second'] or 0),
+                microsecond=int((match['fraction'] or '0')[:6].ljust(6, '0'))
+            )
+        except ValueError:
+            continue
+        text = match['text'].strip()
+        try:
+            value = float(text)
+        except ValueError:
+            value = None
+        entries.append(MonacoDatalogEntry(time, text, value))
+    return entries
 
 
 def parseIP(ip: str) -> tuple[int, int, int, int] | None:
@@ -329,13 +390,15 @@ def parseReprates(response: str) -> list[MonacoReprate]:
 
 def parseKeyValues(response: str) -> dict[str, str]:
     """
-    Parses "KEY=VALUE" pairs separated by "&", "," or new lines (entries without "=" get an empty value)
+    Parses "KEY=VALUE" pairs separated by "&", new lines or "," (entries without "=" get an empty value).
+    A comma only separates entries if a "KEY=" follows, so values with commas are kept, e.g.
+    "TIMEZONE=(UTC+01:00) Amsterdam, Berlin" or "SV=HD:42.4.462, A1:91.0".
 
     :param response: response of the laser
     """
 
     values = {}
-    for entry in re.split(r'[&,\r\n]+', response):
+    for entry in re.split(r'[&\r\n]+|,\s*(?=[?]?[A-Za-z][A-Za-z0-9_]*\s*=)', response):
         entry = entry.strip()
         if not entry:
             continue
@@ -384,17 +447,45 @@ class MonacoConnection(TelnetConnection):
 
         self.terminating_string = '\r\nMonaco> '
 
-    def readInit(self):
-        """Reads initial """
-        self.read(1024 * 16)
-        self.parseRead()
+    def readInit(self, settle_time: float = 0.3):
+        """
+        Reads the welcome message up to the first cursor, then everything that arrives within <settle_time> seconds
+        (the welcome message and the cursor can come in one or in several packets, maybe with a second cursor - a
+        cursor left in the buffer would shift all following answers by one)
 
-    def parseRead(self, count: int = 1024) -> str:
-        """Reads output and strips cursor for next input"""
-        recv = self.read(count)
-        if not recv.endswith(self.terminating_string):
-            raise ConnectionError(f'Expected terminating {self.terminating_string.encode(self.encoding)} cursor, but received {recv.encode(self.encoding)}')
-        return recv[:-len(self.terminating_string)]
+        :param settle_time: time in seconds to wait for more output after the first cursor
+        """
+
+        self.parseRead(1024 * 16)
+        deadline = monotonic() + self.timeout
+        self.socket.settimeout(settle_time)
+        try:
+            while monotonic() < deadline:
+                self.readBytes(1024 * 16)
+        except TimeoutError:
+            pass
+        finally:
+            self.socket.settimeout(self.timeout)
+
+    def parseRead(self, count: int = 1024, max_size: int = 16 * 1024 * 1024) -> str:
+        """
+        Reads the output until the cursor for the next input and strips the cursor. Long answers (?HELP, ?TIMEZONES,
+        ?NEW, ?DATA) come in several packets and can be longer than <count>, so it is read until the cursor arrives
+        (at most <timeout> seconds and <max_size> bytes). The bytes are decoded at the end (a character with several
+        bytes, e.g. "°", can be split into two packets).
+
+        :param count: bytes per read
+        :param max_size: maximum size of the answer in bytes
+        """
+
+        terminating_bytes = self.terminating_string.encode(self.encoding)
+        deadline = monotonic() + self.timeout
+        recv = self.readBytes(count)
+        while not recv.endswith(terminating_bytes):
+            if monotonic() > deadline or len(recv) > max_size:
+                raise ConnectionError(f'Expected terminating {terminating_bytes} cursor, but received {recv[-200:]} (last 200 of {len(recv)} bytes)')
+            recv += self.readBytes(count)
+        return recv[:-len(terminating_bytes)].decode(self.encoding, errors='replace')
 
     def _queryAndReturn(self, cmd: str) -> str:
         """Queries command and returns result"""
@@ -583,12 +674,53 @@ class MonacoConnection(TelnetConnection):
         return mmr / rrd
 
     def dafGet(self) -> list[str]:
-        """Returns descriptions of active faults (empty if "SYSTEM OK")"""
+        """Returns descriptions of active faults (empty if "SYSTEM OK", the laser answers "SYSTEM OK-")"""
         return parseTexts(self._queryAndReturn('?DAF'))
 
-    # TODO: parse data of datalogger (format unknown)
-    def dataGet(self, cmd: str) -> str:
-        """Returns data from the datalogger"""
+    def dataGet(
+        self,
+        param: str,
+        rows: int | None = None,
+        old_rows: int | None = None,
+        days: float | None = None,
+        hours: float | None = None,
+        minutes: float | None = None,
+        seconds: float | None = None,
+        time_from: str | datetime | None = None,
+        time_to: str | datetime | None = None,
+        no_duplicates: bool = False
+    ) -> list[MonacoDatalogEntry]:
+        """
+        Returns data from the datalogger (?DATA PARAM <OPTIONS>), e.g. dataGet('F', days=10) for the faults of the
+        last 10 days (example of the manual) or dataGet('CHT', rows=100) for the last 100 chiller temperatures
+
+        :param param: parameter logged by the datalogger (name of the query without "?", e.g. "F", "CHT", "BT")
+        :param rows: last n entries (ROWS=n)
+        :param old_rows: first n entries (OLDROWS=n)
+        :param days: last n days (DAYS=n)
+        :param hours: last n hours (HOURS=n)
+        :param minutes: last n minutes (MINS=n)
+        :param seconds: last n seconds (SECS=n)
+        :param time_from: log from this time (FROM="timestamp", e.g. "2014-01-23 10:00am" or a datetime)
+        :param time_to: log up to this time (TO="timestamp")
+        :param no_duplicates: skip duplicate values (NODUP=1)
+        """
+
+        options = []
+        for name, value in (('ROWS', rows), ('OLDROWS', old_rows), ('DAYS', days), ('HOURS', hours), ('MINS', minutes), ('SECS', seconds)):
+            if value is not None:
+                options.append(f'{name}={value:g}' if isinstance(value, float) else f'{name}={value}')
+        for name, value in (('FROM', time_from), ('TO', time_to)):
+            if value is not None:
+                if isinstance(value, datetime):
+                    value = f'{value:%Y-%m-%d %H:%M}'
+                options.append(f'{name}="{value}"')
+        if no_duplicates:
+            options.append('NODUP=1')
+        return parseDatalog(self.dataRawGet(' '.join([param.strip().lstrip('?')] + options)))
+
+    def dataRawGet(self, cmd: str) -> str:
+        """Returns data from the datalogger as text (?DATA <cmd>, e.g. "F DAYS=10")"""
         return self._queryAndReturn(f'?DATA {cmd}')
 
     def datasheetGet(self) -> str:
@@ -1406,7 +1538,7 @@ class MonacoConnection(TelnetConnection):
 
     def timezonesGet(self) -> list[str]:
         """Returns available time zones for this laser"""
-        return parseTexts(self._queryAndReturn('?TIMEZONES'), ok_texts=())
+        return parseTimezones(self._queryAndReturn('?TIMEZONES'))
 
     def tstlGet(self) -> int:
         """Checks if all temperature servos are tight locked"""
@@ -1673,5 +1805,74 @@ def readOutValues():
     """
 
 
+RAW_QUERIES = ('?DAF', '?F', '?FH', '?W', '?WH', '?CHFAULT', '?NEW', '?SESSIONS', '?TIMEZONE', '?TIMEZONES', '?DATA F DAYS=10', '?DATA CHT ROWS=5')
+
+
+def captureRawOutputs(host: str = '169.254.21.151', port: int = 23, file: str = 'monaco_raw_output.txt'):
+    """
+    Sends only queries (nothing is changed at the laser) and writes the raw answers (repr, with all separators) into
+    <file>, to check the parsing of the formats that are not documented in the manual (?NEW, ?SESSIONS, ?TIMEZONES,
+    ?DAF with active faults). Run it while the GUI is not connected to the laser: python -m Connection.Monaco --raw
+    """
+
+    with MonacoConnection(host=host, port=port) as monaco, open(file, 'w', encoding='utf-8') as output:
+        for query in RAW_QUERIES:
+            try:
+                answer = repr(monaco._queryAndReturn(query))
+            except (ConnectionError, OSError) as error:
+                answer = f'ERROR {error!r}'
+            line = f'{query}: {answer}'
+            print(line)
+            output.write(line + '\n')
+    print(f'written to {file}')
+
+
+def testParsers():
+    """Tests of the parsers with the examples of the manual and the recorded answers (no laser needed)"""
+
+    # ?DATA F DAYS=10, example of the manual (time as hh:mm.ss)
+    entries = parseDatalog(
+        '2019-11-06 15:53.06 310\r\n2019-11-06 15:54.12 SYSTEM OK\r\n2019-11-06 16:06.36 SYSTEM OK\r\n'
+        '2019-11-06 16:06.56 38\r\n2019-11-06 16:07.07 38\r\n2019-11-06 16:07.11 SYSTEM OK'
+    )
+    assert len(entries) == 6, entries
+    assert entries[0] == MonacoDatalogEntry(datetime(2019, 11, 6, 15, 53, 6), '310', 310.0), entries[0]
+    assert entries[1].text == 'SYSTEM OK' and entries[1].value is None, entries[1]
+    assert entries[3].time == datetime(2019, 11, 6, 16, 6, 56) and entries[3].value == 38, entries[3]
+    # other time formats, echoed command and help text are skipped
+    entries = parseDatalog('?DATA CHT ROWS=2\r\n2023-12-28 13:33:23 28.0\r\n2023-12-28 13:34:23.5 28.1\r\nROWS=n Shows last n entries')
+    assert [(e.time, e.value) for e in entries] == [(datetime(2023, 12, 28, 13, 33, 23), 28.0), (datetime(2023, 12, 28, 13, 34, 23, 500000), 28.1)], entries
+
+    # ?DAF without faults (recorded: "SYSTEM OK-"), with faults (format not documented)
+    assert parseTexts('SYSTEM OK-') == []
+    assert parseTexts('310: Fault: Chiller flow low&38: Fault: Interlock open') == ['310: Fault: Chiller flow low', '38: Fault: Interlock open']
+    assert parseTexts('310: Chiller flow low\r\nSYSTEM OK-') == ['310: Chiller flow low']
+    assert parseTexts('There are no active chiller faults') == []
+
+    # ?TIMEZONES: one per line or several in one line
+    zones = ['(UTC-12:00) International Date Line West', '(UTC+01:00) Amsterdam, Berlin, Bern, Rome, Stockholm, Vienna']
+    assert parseTimezones('\r\n'.join(zones)) == zones
+    assert parseTimezones(', '.join(zones)) == zones
+    assert parseTimezones('&'.join(zones)) == zones
+
+    # ?NEW: key/value pairs, commas inside values are kept
+    assert parseKeyValues('CHT=28.0&BT=27.582') == {'CHT': '28.0', 'BT': '27.582'}
+    assert parseKeyValues('CHT=28.0,BT=27.582') == {'CHT': '28.0', 'BT': '27.582'}
+    assert parseKeyValues('TIMEZONE=(UTC+01:00) Amsterdam, Berlin\r\nS=1') == {'TIMEZONE': '(UTC+01:00) Amsterdam, Berlin', 'S': '1'}
+    assert parseKeyValues('SV=HD:42.4.462, A1:91.0, IM:2.1') == {'SV': 'HD:42.4.462, A1:91.0, IM:2.1'}
+
+    # ?SESSIONS: one connection per entry
+    assert parseTexts('169.254.21.10:52134\r\n169.254.21.11:52200', ok_texts=()) == ['169.254.21.10:52134', '169.254.21.11:52200']
+
+    print('All Monaco parser tests passed')
+
+
 if __name__ == '__main__':
-    readErrorStatus()
+    import sys
+
+    if '--raw' in sys.argv:
+        captureRawOutputs()
+    elif '--test' in sys.argv:
+        testParsers()
+    else:
+        readErrorStatus()

@@ -2,9 +2,51 @@
 
 *Automatically created from the commit messages with `python -m Utility.Changelog` - do not edit by hand.*
 
+## v0.1.79 (2026-10-29)
+
+**Reading age for Laser/Power Meter, Monaco datalogger and long answers, PSU/EBIS input ranges in DefaultParams**
+
+Reading age (Windows/Laser.py, Windows/PowerMeter.py):
+- Laser and Power Meter show the age of the last successful reading (ReadingAgeLabel, orange/red if too old) like
+  PSU, EBIS, Pressure, Electrometer and Camera.
+
+Monaco (Connection/Monaco.py, Connection/Telnet.py):
+- parseRead read only one recv(1024): long answers (?HELP, ?TIMEZONES, ?NEW after startup, ?DATA with many rows)
+  come in several packets or are longer than 1024 bytes and failed with "Expected terminating cursor" (that is why
+  newGet/sessionsGet/timezonesGet/helpGet were excluded in readOutValues). Now it reads until the "Monaco> " prompt
+  (at most <timeout> s and 16 MB) and decodes the bytes at the end (a "°" split into two packets does not fail).
+  TelnetConnection.readBytes() added, read() uses it.
+- readInit: reads the welcome message up to the first prompt and everything that arrives within 0.3 s (before it
+  needed the welcome message and the prompt in two separate packets, a second prompt would shift all answers).
+- ?DATA (datalogger): dataGet(param, rows=, old_rows=, days=, hours=, minutes=, seconds=, time_from=, time_to=,
+  no_duplicates=) builds the options of the manual (ROWS=n, DAYS=n, FROM="...", NODUP=1, ...) and returns a list of
+  MonacoDatalogEntry(time, text, value); parseDatalog() reads the format of the manual ("2019-11-06 15:53.06 310",
+  "... SYSTEM OK"), also hh:mm:ss(.fff), and skips other lines. The raw text: dataRawGet(cmd).
+- The manual (Monaco 1035-40-40.pdf, Table 7-2) only describes ?NEW ("every parameter that has changed"), ?SESSIONS
+  ("lists the active connections"), ?TIMEZONES and ?DAF without format, so the parsers accept the likely variants:
+  parseTexts drops only the "no entries" entries (e.g. "SYSTEM OK-" of ?DAF) and keeps real entries of a mixed answer;
+  parseTimezones splits lines, "&" and several zones in one line (only in front of "(UTC", the names contain commas);
+  parseKeyValues splits at "," only if "KEY=" follows (values like "(UTC+01:00) Amsterdam, Berlin" are kept).
+- python -m Connection.Monaco --test: parser tests (example of the manual, recorded answers);
+  python -m Connection.Monaco --raw: sends only queries and writes the raw answers to monaco_raw_output.txt, to check
+  the undocumented formats with the real laser (not run: the laser is used by the running GUI).
+- Tested with a local fake Monaco server: answers in 7-byte packets, "°" split, 56 kB ?DATA answer (2000 rows),
+  missing prompt (error after the timeout), welcome message with the prompt in one packet, delayed and doubled.
+
+PSU/EBIS input ranges (Config/GlobalConf.py, Windows/PSU.py, Windows/EBIS.py):
+- New DefaultParams (editable in the preferences): psu/ebis_voltage_decimals, psu/ebis_current_limit_minimum/maximum
+  (mA), ebis_cathode_current_limit_maximum, psu_ramp_speed_maximum, psu_time_ramp_maximum,
+  ebis_heating_voltage_maximum, ebis_heating_current_maximum, ebis_heating_ramp_maximum,
+  ebis_interlock_current_maximum, ebis_ramp_speed_maximum (defaults = the old hard-coded values).
+- Ramp speed of the ISEG crate/MICC: unit %/s of the nominal voltage (SCPI guide: :CONF:RAMP:VOLT), 3 decimals
+  instead of 2, tooltip with an example and the range; docstrings of setRampSpeed said %/min.
+- Heating voltage with 2 decimals (0 ... 5 V), voltage step = 10^-decimals.
+
+README: TODOs updated and extended.
+
 ## v0.1.78 (2026-10-28)
 
-**Fix broken package update (matplotlib), DuckDB pinned to < 2, DB.close() closes the connection**
+**Fix broken package update (matplotlib), DuckDB pinned to < 2, DB.close() closes the connection** (b659196)
 
 Startup failed after updating all packages with "No module named 'matplotlib.backends.registry'":
 - Cause: Ion Commander was running during the update. Windows cannot replace files of loaded packages, so pip left

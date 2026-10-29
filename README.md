@@ -137,7 +137,7 @@ The size of the database is shown in the menu `Database`.
 - [x] Show interlock state (armed / tripped soft / tripped hard / tripped no reading) and log every trip to the database (`Events` table)
 - [x] Persist interlock limits in `QSettings` and keep them in one unit (mbar, `ScientificDoubleSpinBox`)
 - [x] Latch trips until "Re-arm" is pressed, refuse higher heating currents while tripped and also catch current changes from scripts (measured current is checked)
-- [ ] Show the age of the last reading for Laser and Power Meter as well (PSU, EBIS and Pressure done)
+- [x] Show the age of the last reading for Laser and Power Meter as well (PSU, EBIS, Pressure, Electrometer and Camera done)
 - [ ] Optionally also check the other gauges (not only the selected one)
 - [ ] Interlock self-test button (simulate a trip without hardware) and a "reset/re-arm" confirmation
 - [x] Ramp the heating current up slowly instead of jumping (cathode lifetime) - "Ramp [A/min]"; lowering/switching off and the interlock are immediate
@@ -160,11 +160,15 @@ The size of the database is shown in the menu `Database`.
 - [x] Automatic reconnect on lost connection and remember/auto-connect last used ports on startup (all devices, also the power meter)
 - [ ] Detect hanging devices (no answer for a long time, but no exception) and reconnect them as well
 - [x] Monaco: cleaner return types for faults/IP/help (lists of codes/texts, `parseIP`, `MonacoCommand`, `MonacoSettings`, `MonacoReprate`)
-- [ ] Monaco: verify the parsing of `?NEW`, `?SESSIONS`, `?TIMEZONES` and `?DAF` with real fault output (formats are not documented)
-- [ ] Monaco: parse `?DATA` (datalogger) output
+- [x] Monaco: answers are read until the `Monaco> ` prompt (long answers like `?HELP`, `?TIMEZONES`, `?NEW`, `?DATA` came in several packets and failed)
+- [x] Monaco: parse `?DATA` (datalogger) output (`dataGet('F', days=10)` -> list of `MonacoDatalogEntry(time, text, value)`, format of the manual)
+- [ ] Monaco: verify the parsing of `?NEW`, `?SESSIONS`, `?TIMEZONES` and `?DAF` with real fault output (formats are not in the manual, the parsers accept the likely variants):
+  run `python -m Connection.Monaco --raw` while the GUI is not connected (only queries, writes `monaco_raw_output.txt`), parser tests: `python -m Connection.Monaco --test`
+- [ ] Monaco: show the datalogger (e.g. chiller temperature, faults of the last days) in the Laser panel or the History tab
 - [ ] ISEG: implement MICC user calibration commands
 - [x] Include the device name in error messages of `ThreadedConnection.handleError`
-- [ ] Get limits, units and decimals of PSU/EBIS spinboxes right, and move the input ranges to `DefaultParams`
+- [x] Get limits, units and decimals of PSU/EBIS spinboxes right, and move the input ranges to `DefaultParams` (editable in the preferences)
+- [ ] PSU/EBIS: limit the voltage/current fields to the nominal values reported by the ISEG (`:READ:VOLT:NOM?`, `:READ:CURR:NOM?`) after connecting
 - [ ] EBIS heating current: enable button directly at the current row (currently blocked by the warning message box on `editingFinished`)
 - [ ] PSU: decide if all other channels must be switched on again after a polarity switch
 - [ ] Laser: verify units of the chiller pressure and the RF level / output frequency calculation (see TODOs in `Laser.py`)

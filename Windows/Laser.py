@@ -10,7 +10,7 @@ from DB.db import DB
 
 from Socket.CommandServer import DeviceMonacoWrapper
 
-from Utility.Layouts import InsertingGridLayout, IndicatorLed, ErrorTable, DoubleSpinBox, SpinBox, ComboBox, DisplayLabel, SpinBoxRange
+from Utility.Layouts import InsertingGridLayout, IndicatorLed, ErrorTable, DoubleSpinBox, SpinBox, ComboBox, DisplayLabel, SpinBoxRange, ReadingAgeLabel
 from Utility.AutoReconnect import AutoReconnect
 from Utility.Dialogs import IPDialog, showMessageBox
 from Utility.Functions import getPrefix, getSignificantDigits, getIntIfInt
@@ -94,12 +94,14 @@ class LaserVBoxLayout(QVBoxLayout):
         self.button_connection_settings.setToolTip('Set IP address and port of the laser')
         self.button_connection_settings.setIcon(QIcon('icons/preferences.svg'))
         self.button_connection_settings.pressed.connect(self.connectionPreferences)
+        self.status_reading_age = ReadingAgeLabel()
         self.connection_grid.addWidgets(
             self.label_connection,
             self.indicator_connection,
             self.status_connection,
             self.button_connection,
-            self.button_connection_settings
+            self.button_connection_settings,
+            self.status_reading_age
         )
 
         # Key-switch
@@ -368,6 +370,8 @@ class LaserVBoxLayout(QVBoxLayout):
 
     def updateLoop(self):
         """Called by timer; Updates actual voltages"""
+
+        self.status_reading_age.setAge(self.device_wrapper.threaded_connection.secondsSinceLastResult(), self.indicator_connection.value())
 
         if not self.checkConnection(False):
             return

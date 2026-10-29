@@ -110,9 +110,9 @@ class TelnetConnection:
                 break
         return line
 
-    def read(self, count: int = 1024) -> str:
+    def readBytes(self, count: int = 1024) -> bytes:
         """
-        Read defined length of output bytes
+        Read up to count bytes (one packet, an answer can be split into several packets)
 
         :param count: bytes to read
         """
@@ -123,7 +123,16 @@ class TelnetConnection:
         data = self.socket.recv(count)
         if not data and count > 0:
             raise ConnectionResetError(f'Connection closed by {self.host}:{self.port}')
-        return data.decode(self.encoding)
+        return data
+
+    def read(self, count: int = 1024) -> str:
+        """
+        Read defined length of output bytes
+
+        :param count: bytes to read
+        """
+
+        return self.readBytes(count).decode(self.encoding)
 
 
 def main():

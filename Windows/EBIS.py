@@ -153,7 +153,9 @@ class EBISVBoxLayout(QVBoxLayout):
                 set_output=self.setOutput,
                 voltage_maximum=self.voltage_maximum,
                 voltage_deviation=self.voltage_deviation,
-                current_maximum=self.current_maximum
+                current_maximum=self.current_maximum,
+                voltage_decimals=DefaultParams.ebis_voltage_decimals,
+                voltage_step=10 ** -DefaultParams.ebis_voltage_decimals
             )
             for channel, name in enumerate(self.channel_names)
         ]
@@ -176,9 +178,18 @@ class EBISVBoxLayout(QVBoxLayout):
             QLabel('Reached')
         )
 
-        # TODO: global values for input ranges
+        # the cathode allows a higher current limit than the drift tubes and the repeller
         self.limit_rows = [
-            CurrentLimitRow(self.limits_grid, name, channel, self.setCurrentLimit, input_range=(0.002, 10 if channel == 0 else 1))
+            CurrentLimitRow(
+                self.limits_grid,
+                name,
+                channel,
+                self.setCurrentLimit,
+                input_range=(
+                    DefaultParams.ebis_current_limit_minimum,
+                    DefaultParams.ebis_cathode_current_limit_maximum if channel == 0 else DefaultParams.ebis_current_limit_maximum
+                )
+            )
             for channel, name in enumerate(self.channel_names)
         ]
 
@@ -209,15 +220,17 @@ class EBISVBoxLayout(QVBoxLayout):
             5,
             set_voltage=self.setVoltage,
             set_output=self.setOutput,
-            voltage_maximum=5,
+            voltage_maximum=DefaultParams.ebis_heating_voltage_maximum,
             voltage_deviation=self.voltage_deviation,
+            voltage_decimals=2,
+            voltage_step=0.01,
             show_current=False
         ))
 
         # Cathode Heating Current
         self.label_current_6 = QLabel('Heating Current')
         # TODO: enable button here, but it will be stuck on the editingFinished if the warning label overtakes!
-        self.spinbox_current_6 = DoubleSpinBox(default=0, step_size=0.01, input_range=(0, 5), decimals=2, buttons=False)
+        self.spinbox_current_6 = DoubleSpinBox(default=0, step_size=0.01, input_range=(0, DefaultParams.ebis_heating_current_maximum), decimals=2, buttons=False)
         self.spinbox_current_6.setToolTip('Set current of the cathode heating in A (press enter to apply). Limited while the pressure interlock is tripped.')
         self.spinbox_current_6.editingFinished.connect(lambda: self.setCurrent(5, self.spinbox_current_6.value()))
         self.status_current_6 = DisplayLabel(value=0, unit='A', target_value=0, deviation=self.current_deviation, decimals=4)
@@ -233,7 +246,7 @@ class EBISVBoxLayout(QVBoxLayout):
         self.spinbox_heating_ramp = DoubleSpinBox(
             default=GlobalConf.settings.value(GlobalConf.ebis_heating_ramp_name, defaultValue=0.1, type=float),
             step_size=0.01,
-            input_range=(0, 10),
+            input_range=(0, DefaultParams.ebis_heating_ramp_maximum),
             decimals=2,
             buttons=False
         )
@@ -273,11 +286,13 @@ class EBISVBoxLayout(QVBoxLayout):
         self.advanced_settings_grid = InsertingGridLayout()
         self.advanced_settings_hbox.addLayout(self.advanced_settings_grid)
 
-        # Speed
-        # TODO: get limits, unit and number of decimals right
+        # Speed (:CONF:RAMP:VOLT of the MICC in % of the nominal voltage per second)
         self.label_advanced_settings_ramp = QLabel('Ramp speed [%/s]')
-        self.spinbox_advanced_settings_ramp = DoubleSpinBox(default=0, step_size=0.01, input_range=(0, 20), decimals=2, buttons=False)
-        self.spinbox_advanced_settings_ramp.setToolTip('Voltage ramp speed of the MICC in % of the nominal voltage per second (applies to all channels)')
+        self.spinbox_advanced_settings_ramp = DoubleSpinBox(default=0, step_size=0.01, input_range=(0, DefaultParams.ebis_ramp_speed_maximum), decimals=3, buttons=False)
+        self.spinbox_advanced_settings_ramp.setToolTip(
+            'Voltage ramp speed of the MICC in % of the nominal voltage per second (applies to all channels, press enter to apply),\n'
+            f'e.g. 1 %/s = 10 V/s for a 1 kV channel (range 0 ... {DefaultParams.ebis_ramp_speed_maximum:g} %/s)'
+        )
         self.spinbox_advanced_settings_ramp.editingFinished.connect(lambda: self.setRampSpeed(self.spinbox_advanced_settings_ramp.value()))
         self.advanced_settings_grid.addWidgets(
             self.label_advanced_settings_ramp,
@@ -348,7 +363,7 @@ class EBISVBoxLayout(QVBoxLayout):
         self.spinbox_hard_pmax.setToolTip('If the pressure is above this value, the heating current is lowered immediately (e.g. 1E-7)')
         self.spinbox_hard_pmax.editingFinished.connect(self.saveInterlockSettings)
         self.label_hard_current = QLabel('Current [A]')
-        self.spinbox_hard_current = DoubleSpinBox(default=limits.hard_current, step_size=0.1, input_range=(0, 3), decimals=2, buttons=False)
+        self.spinbox_hard_current = DoubleSpinBox(default=limits.hard_current, step_size=0.1, input_range=(0, DefaultParams.ebis_interlock_current_maximum), decimals=2, buttons=False)
         self.spinbox_hard_current.setToolTip('Heating current after a hard trip or if there is no valid pressure reading')
         self.spinbox_hard_current.editingFinished.connect(self.saveInterlockSettings)
         self.pressure_grid.addWidgets(
@@ -365,7 +380,7 @@ class EBISVBoxLayout(QVBoxLayout):
         self.spinbox_soft_pmax.setToolTip('If the median pressure over the soft limit duration is above this value, the heating current is lowered')
         self.spinbox_soft_pmax.editingFinished.connect(self.saveInterlockSettings)
         self.label_soft_current = QLabel('Current [A]')
-        self.spinbox_soft_current = DoubleSpinBox(default=limits.soft_current, step_size=0.1, input_range=(0, 3), decimals=2, buttons=False)
+        self.spinbox_soft_current = DoubleSpinBox(default=limits.soft_current, step_size=0.1, input_range=(0, DefaultParams.ebis_interlock_current_maximum), decimals=2, buttons=False)
         self.spinbox_soft_current.setToolTip('Heating current after a soft trip')
         self.spinbox_soft_current.editingFinished.connect(self.saveInterlockSettings)
         self.pressure_grid.addWidgets(
@@ -803,9 +818,9 @@ class EBISVBoxLayout(QVBoxLayout):
 
     def setRampSpeed(self, speed: float):
         """
-        Sets ramp speed
+        Sets the voltage ramp speed of the MICC (all channels)
 
-        :param speed: ramp speed in %/min
+        :param speed: ramp speed in % of the nominal voltage per second
         """
 
         if not self.checkConnection():

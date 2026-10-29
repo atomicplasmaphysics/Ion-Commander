@@ -127,7 +127,9 @@ class PSUVBoxLayout(QVBoxLayout):
                 set_polarity=self.setPolarity,
                 voltage_maximum=self.voltage_maximum,
                 voltage_deviation=self.voltage_deviation,
-                current_maximum=self.current_maximum
+                current_maximum=self.current_maximum,
+                voltage_decimals=DefaultParams.psu_voltage_decimals,
+                voltage_step=10 ** -DefaultParams.psu_voltage_decimals
             )
             for channel, name in enumerate(self.channel_names)
         ]
@@ -151,7 +153,7 @@ class PSUVBoxLayout(QVBoxLayout):
         )
 
         self.limit_rows = [
-            CurrentLimitRow(self.limits_grid, name, channel, self.setCurrentLimit, input_range=(0.002, 2))
+            CurrentLimitRow(self.limits_grid, name, channel, self.setCurrentLimit, input_range=(DefaultParams.psu_current_limit_minimum, DefaultParams.psu_current_limit_maximum))
             for channel, name in enumerate(self.channel_names)
         ]
 
@@ -166,11 +168,13 @@ class PSUVBoxLayout(QVBoxLayout):
         self.advanced_settings_grid = InsertingGridLayout()
         self.advanced_settings_hbox.addLayout(self.advanced_settings_grid)
 
-        # Speed
-        # TODO: get limits, unit and number of decimals right
+        # Speed (:CONF:RAMP:VOLT of the ISEG crate in % of the nominal voltage per second, e.g. 1 %/s = 60 V/s for 6 kV)
         self.label_advanced_settings_ramp = QLabel('Ramp speed [%/s]')
-        self.spinbox_advanced_settings_ramp = DoubleSpinBox(default=0, step_size=0.01, input_range=(0, 20), decimals=2, buttons=False)
-        self.spinbox_advanced_settings_ramp.setToolTip('Voltage ramp speed of the ISEG crate in % of the nominal voltage per second (applies to all channels)')
+        self.spinbox_advanced_settings_ramp = DoubleSpinBox(default=0, step_size=0.01, input_range=(0, DefaultParams.psu_ramp_speed_maximum), decimals=3, buttons=False)
+        self.spinbox_advanced_settings_ramp.setToolTip(
+            'Voltage ramp speed of the ISEG crate in % of the nominal voltage per second (applies to all channels, press enter to apply),\n'
+            f'e.g. 1 %/s = 10 V/s for a 1 kV channel (range 0 ... {DefaultParams.psu_ramp_speed_maximum:g} %/s)'
+        )
         self.spinbox_advanced_settings_ramp.editingFinished.connect(lambda: self.setRampSpeed(self.spinbox_advanced_settings_ramp.value()))
         self.advanced_settings_grid.addWidgets(
             self.label_advanced_settings_ramp,
@@ -190,7 +194,7 @@ class PSUVBoxLayout(QVBoxLayout):
 
         # Time
         self.label_ramp_time = QLabel('Time [min]')
-        self.spinbox_ramp_time = SpinBox(default=self.time_ramp_default, step_size=1, input_range=(0, 600), buttons=False)
+        self.spinbox_ramp_time = SpinBox(default=self.time_ramp_default, step_size=1, input_range=(0, DefaultParams.psu_time_ramp_maximum), buttons=False)
         self.spinbox_ramp_time.setToolTip('Duration of the software voltage ramp in minutes')
         self.ramp_grid.addWidgets(
             self.label_ramp_time,
@@ -199,7 +203,13 @@ class PSUVBoxLayout(QVBoxLayout):
 
         # Final Value
         self.label_ramp_final = QLabel('Target Voltage [V]')
-        self.spinbox_ramp_voltage = DoubleSpinBox(default=0, step_size=0.1, input_range=(0, self.voltage_maximum), decimals=1, buttons=False)
+        self.spinbox_ramp_voltage = DoubleSpinBox(
+            default=0,
+            step_size=10 ** -DefaultParams.psu_voltage_decimals,
+            input_range=(0, self.voltage_maximum),
+            decimals=DefaultParams.psu_voltage_decimals,
+            buttons=False
+        )
         self.spinbox_ramp_voltage.setToolTip('Final voltage of the software voltage ramp')
         self.ramp_grid.addWidgets(
             self.label_ramp_final,
@@ -410,9 +420,9 @@ class PSUVBoxLayout(QVBoxLayout):
 
     def setRampSpeed(self, speed: float):
         """
-        Sets ramp speed
+        Sets the voltage ramp speed of the crate (all channels)
 
-        :param speed: ramp speed in %/min
+        :param speed: ramp speed in % of the nominal voltage per second
         """
 
         if not self.checkConnection():
