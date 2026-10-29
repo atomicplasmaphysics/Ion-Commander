@@ -8,18 +8,19 @@ from os.path import join, exists, abspath
 
 from PyQt6.QtWidgets import (
     QSplitter, QWidget, QBoxLayout, QVBoxLayout, QPushButton, QLabel, QInputDialog, QMessageBox, QToolBar, QProgressBar,
-    QHBoxLayout
+    QHBoxLayout, QSizePolicy
 )
 from PyQt6.QtGui import QIcon
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QTimer
 
 
 from Config.GlobalConf import GlobalConf, DefaultParams
+from Config.StylesConf import Colors
 
 from Utility.Layouts import TabWidget, VBoxTitleLayout, FilesList, FileEditor, FilePath
 from Utility.FileDialogs import selectFolderDialog
 
-from Socket.ScriptServer import ScriptServer
+from Socket.ScriptServer import ScriptServer, CommandQueue, formatDuration
 
 
 class ScriptsWindow(TabWidget):
@@ -28,8 +29,6 @@ class ScriptsWindow(TabWidget):
 
     :param parent: parent widget
     """
-
-    # TODO: also add QProgressBar with timer until next command will be executed
 
     def __init__(self, parent):
         super().__init__(parent)
@@ -109,6 +108,13 @@ class ScriptsWindow(TabWidget):
         self.script_editor.setToolTip('Select script first to edit')
         self.script_editor_top_vbox.addWidget(self.script_editor)
 
+        # syntax check and duration estimate while editing (debounced)
+        self.script_check_timer = QTimer(self)
+        self.script_check_timer.setSingleShot(True)
+        self.script_check_timer.setInterval(300)
+        self.script_check_timer.timeout.connect(self.checkScript)
+        self.script_editor.textChanged.connect(self.script_check_timer.start)
+
         # Bottom part
         self.script_editor_bottom_vbox = QVBoxLayout()
         self.script_editor_bottom_vbox_parent = QWidget(self)
@@ -134,12 +140,27 @@ class ScriptsWindow(TabWidget):
         self.script_action_abort.setEnabled(False)
         self.script_action_abort.triggered.connect(lambda: self.abortScript())
 
-        # Run script toolbar: progress bar
+        # Run script toolbar: progress bar (planned time, with the time until the next step and the remaining time)
         self.script_run_progress = QProgressBar(self)
-        self.script_run_progress.setToolTip('The progress of the script')
+        self.script_run_progress.setToolTip(
+            'Progress of the script (planned time): executed steps, time until the next step and remaining time.\n'
+            'The real duration is longer if commands take longer than the interval.'
+        )
         self.script_run_progress.setMinimumWidth(50)
-        self.script_run_progress.setMaximumWidth(400)
+        self.script_run_progress.setMaximumWidth(600)
+        self.script_run_progress.setTextVisible(True)
         self.toolbar.addWidget(self.script_run_progress)
+        self.progress_timer = QTimer(self)
+        self.progress_timer.setInterval(200)
+        self.progress_timer.timeout.connect(self.updateProgress)
+
+        # Run script toolbar: number of steps and planned duration of the selected script, or the error of the script
+        self.script_info = QLabel()
+        self.script_info.setToolTip('Syntax check of the script: number of steps and planned duration, or the first error')
+        self.script_info.setContentsMargins(10, 0, 0, 0)
+        # a long error must not widen the window (the full text is in the tooltip)
+        self.script_info.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
+        self.toolbar.addWidget(self.script_info)
 
         # Output folder for the results (CSV) and the output (log) of every run
         self.output_hbox = QHBoxLayout()
@@ -273,6 +294,39 @@ class ScriptsWindow(TabWidget):
         self.script_editor.setDisabled(False)
         self.script_editor.setToolTip('')
         self.script_action_run.setDisabled(False)
+        self.checkScript()
+
+    def checkScript(self):
+        """Syntax check of the script in the editor: shows the number of steps and the planned duration, or the error"""
+
+        if not self.script_editor_path:
+            self.script_info.setText('')
+            return
+
+        queue = CommandQueue.parseScript(self.script_editor.toPlainText())
+        if queue.error:
+            self.script_info.setText(queue.error)
+            self.script_info.setToolTip(queue.error)
+            self.script_info.setStyleSheet(f'color: {Colors.color_red}')
+            return
+        self.script_info.setText(f'{len(queue.queue)} steps, about {formatDuration(queue.duration())}')
+        self.script_info.setToolTip(
+            'Number of steps and planned duration of the script\n(longer if commands take longer than the interval)'
+        )
+        self.script_info.setStyleSheet('')
+
+    def updateProgress(self):
+        """Called by timer while a script runs: progress, time until the next step and remaining time"""
+
+        if self.script_server is None:
+            return
+
+        index, steps, until_next, remaining = self.script_server.progressInfo()
+        self.script_run_progress.setValue(self.script_server.progress())
+        if index < steps:
+            self.script_run_progress.setFormat(f'Step {index}/{steps}, next in {formatDuration(until_next)}, {formatDuration(remaining)} left')
+        else:
+            self.script_run_progress.setFormat(f'Step {steps}/{steps}, {formatDuration(remaining)} left')
 
     def disableWidgets(self, state: bool):
         """Disables needed widgets"""
@@ -294,6 +348,7 @@ class ScriptsWindow(TabWidget):
         self.disableWidgets(True)
 
         self.script_run_progress.setValue(0)
+        self.script_run_progress.setFormat('%p%')
 
         self.script_output.clear()
 
@@ -307,9 +362,13 @@ class ScriptsWindow(TabWidget):
                 f'Results (every command and its answer) are written to "{results_file.resolve()}", '
                 f'the output to "{results_file.with_suffix(".log").name}"'
             )
+            self.script_output.appendPlainText(
+                f'{len(self.script_server.command_queue.queue)} steps, planned duration {formatDuration(self.script_server.duration())}'
+            )
             self.script_server.log.connect(self.processLogScript)
             self.script_server.finish.connect(self.processFinishScript)
             self.script_server.start()
+            self.progress_timer.start()
 
         except (ValueError, ConnectionError, ConnectionRefusedError) as error:
             self.script_output.setPlainText(str(error))
@@ -319,6 +378,8 @@ class ScriptsWindow(TabWidget):
     def abortScript(self):
         """Abort the script"""
 
+        self.progress_timer.stop()
+
         # stop script server
         if self.script_server is not None:
             self.script_server.stop()
@@ -327,23 +388,21 @@ class ScriptsWindow(TabWidget):
         self.disableWidgets(False)
 
         self.script_run_progress.setValue(0)
+        self.script_run_progress.setFormat('%p%')
 
     def processFinishScript(self):
         """Processes finished script"""
 
+        self.progress_timer.stop()
         self.disableWidgets(False)
 
         self.script_run_progress.setValue(100)
+        self.script_run_progress.setFormat('Finished')
 
     def processLogScript(self, log: str):
         """Processes the log messages of the script running"""
 
         self.script_output.appendPlainText(log)
-
-        if self.script_server is None:
-            return
-
-        self.script_run_progress.setValue(self.script_server.progress())
 
     def closeEvent(self, event):
         """Save current script editor"""

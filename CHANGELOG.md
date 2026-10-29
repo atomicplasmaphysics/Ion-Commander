@@ -2,9 +2,43 @@
 
 *Automatically created from the commit messages with `python -m Utility.Changelog` - do not edit by hand.*
 
+## v0.1.80 (2026-10-29)
+
+**Scripts: %1/%2 placeholders, VAR variables, WAIT %, syntax check with duration estimate, progress bar with timer**
+
+Script parser (Socket/ScriptServer.py):
+- Placeholders are now replaced when the steps are built (the values of the enclosing loops are known there), the lines
+  are parsed into ScriptLine(number, indent, kind, text, values, source) first.
+- %1, %2, ...: value of the enclosing loop line with 0, 1, ... tabs (2D scans, e.g. "PSU:voltageSet(1,-%1/2+%) -2:2:1"
+  below a loop over channel 0); % stays the value of the line itself.
+- VAR <name> <values> with an indented block: loop over the values without a step of its own ($name in the block);
+  VAR <name> <value> without block: variable for the following lines of the same level and their blocks (a variable
+  set inside a block is only valid there); several values without block are an error.
+- Variables and placeholders with math work in commands, values and ranges ("0:$umax:0.5", "0:%1*2:1", "$u*2").
+- WAIT % <values> (wait times as loop values), WAIT $t, WAIT %1*2; the seconds are checked when the step is built.
+- PRINT texts: placeholders/variables with a value are replaced, everything else is kept (e.g. "50%").
+- Errors carry the line number (ScriptError, CommandQueue.error_line), clear messages for undefined %n/$name, invalid
+  names, VAR without values, values without "%", WAIT % without values; scripts with more than 1,000,000 steps are
+  rejected.
+- CommandQueue.stepDurations()/duration(): planned duration (stepDuration() and stepCommands() are module functions now,
+  also used by the worker); ScriptServer.duration(), progressInfo() (executed steps, steps, seconds until the next step,
+  remaining seconds), progress() is based on the planned time.
+- All 9 scripts in Scripts/ give exactly the same steps as before (compared with the parser of v0.1.79).
+
+Scripts tab (Windows/Scripts.py):
+- Syntax check while editing (debounced 300 ms): "<n> steps, about <duration>" or the first error in red (the label
+  does not widen the window, full text in the tooltip).
+- Progress bar with a timer (200 ms): "Step 3/7, next in 0.8 s, 3.8 s left", "Finished" at the end; the planned
+  duration is written into the output at the start. TODO comment removed.
+
+Tests: parser tests (2D, VAR scopes, WAIT %, durations, 21 error cases), end-to-end run with a fake PSU and
+electrometer via the CommandServer, Scripts tab offscreen (check while editing, progress text during a run).
+
+README: script syntax (VAR, %1/%2, WAIT %), check and progress; TODOs updated and extended.
+
 ## v0.1.79 (2026-10-29)
 
-**Reading age for Laser/Power Meter, Monaco datalogger and long answers, PSU/EBIS input ranges in DefaultParams**
+**Reading age for Laser/Power Meter, Monaco datalogger and long answers, PSU/EBIS input ranges in DefaultParams** (79e3748)
 
 Reading age (Windows/Laser.py, Windows/PowerMeter.py):
 - Laser and Power Meter show the age of the last successful reading (ReadingAgeLabel, orange/red if too old) like

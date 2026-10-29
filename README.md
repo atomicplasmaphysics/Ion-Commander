@@ -59,6 +59,22 @@ No spaces inside the command (the space separates the command from the values). 
 are only replaced. Wien filter scan: `PSU:voltageSet(0,%);PSU:voltageSet(1,-%) 0:50:0.5` plus an electrometer reading per step
 (a negative voltage needs a channel with electronic polarity (EPU), otherwise set the polarity in the PSU panel and use `%`).
 
+Several placeholders, variables and wait times as values:
+```
+TIME 1
+VAR umax 100                                   # VAR without block: variable for the following lines ($umax)
+PSU:voltageSet(0,%) 0:$umax:10                 # variables and math also in the values and ranges
+	PSU:voltageSet(1,-%1/2+%) -2:2:1           # %1, %2, ... = value of the enclosing loop line with 0, 1, ... tabs (2D scan)
+		ELECTROMETER:readAverage(10)
+VAR u 0:50:0.5                                 # VAR with block: loop over the values, no step of its own
+	PSU:voltageSet(0,$u);PSU:voltageSet(1,-$u)
+	WAIT % 1, 5                                # WAIT % <values>: wait times as loop values (also WAIT $t, WAIT %1*2)
+	PRINT u = $u V                             # placeholders/variables are also replaced in PRINT texts
+```
+A variable set inside a block is only valid in that block. The Scripts tab checks the script while editing and shows
+the number of steps and the planned duration (or the first error with its line), the progress bar shows the step,
+the time until the next step and the remaining time (planned: longer if commands take longer than the interval).
+
 Every command and its answer is written to `<output folder>/<script>_<date>_<time>.csv`
 (columns `time_s, step, command, state, answer, value`; `value` is the first number of the answer, e.g. the current;
 `PRINT` texts are rows with the command `PRINT`), the output of the run to `<script>_<date>_<time>.log`.
@@ -180,13 +196,15 @@ The size of the database is shown in the menu `Database`.
 - [ ] Add a timeout for answers in the ScriptServer, so a non-answering device does not block the script forever
 - [x] Ranges for scans in scripts (`start:stop:step`) and results of every command saved as CSV
 - [x] Basic math with the placeholder in scripts (`-%`, `%+5`, `%*10`, `abs(%)`, ...)
-- [ ] Several placeholders per line (e.g. `%1`, `%2` for 2D scans) and named variables
+- [x] Several placeholders per line (`%1`, `%2` = values of the enclosing loops for 2D scans) and named variables (`VAR`, `$name`)
 - [x] `WAIT <seconds>` and `PRINT <text>` in scripts, selectable output folder (results CSV and log)
 - [x] Script loops: an indented block only belongs to the line directly above it (before, all lines of the same level got the block)
-- [ ] `WAIT %` (wait times as loop values) and a total duration estimate before starting a script
-- [ ] Conditions in scripts (wait-until e.g. `WAIT_UNTIL PRESSURE < 1E-8`) and variables
-- [ ] Syntax check / dry-run of scripts before starting, with highlighting of the faulty line
-- [ ] Progress bar with timer until the next command (see TODO in `Scripts.py`)
+- [x] `WAIT %` (wait times as loop values) and a total duration estimate before starting a script
+- [ ] Conditions in scripts (wait-until e.g. `WAIT_UNTIL PRESSURE < 1E-8`), variables from device answers (e.g. `VAR i ELECTROMETER:readAverage(10)`)
+- [x] Syntax check of scripts while editing (steps, planned duration or the first error with its line number)
+- [ ] Highlight the faulty line in the script editor and a dry-run that lists all steps without sending them
+- [x] Progress bar with the time until the next step and the remaining time
+- [ ] Script steps that take longer than the interval: warn and show the real remaining time (the plan assumes commands take no time)
 - [x] Allow multiple commands at each timestep (`A;B`)
 - [x] Write a short documentation of the script language (README section "Scripts")
 - [ ] Documentation of the CommandServer protocol with a small python client example
