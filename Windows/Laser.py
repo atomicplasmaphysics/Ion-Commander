@@ -1,5 +1,4 @@
 from PyQt6.QtCore import Qt, QTimer
-from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QGroupBox, QMessageBox
 
 
@@ -14,6 +13,7 @@ from Utility.Layouts import InsertingGridLayout, IndicatorLed, ErrorTable, Doubl
 from Utility.AutoReconnect import AutoReconnect
 from Utility.Dialogs import IPDialog, showMessageBox
 from Utility.Functions import getPrefix, getSignificantDigits, getIntIfInt
+from Utility.Icons import getIcon
 
 from Connection.Telnet import TELNET_ERRORS
 from Connection.Monaco import MonacoConnection
@@ -92,7 +92,7 @@ class LaserVBoxLayout(QVBoxLayout):
         self.button_connection.pressed.connect(self.manualConnect)
         self.button_connection_settings = QPushButton()
         self.button_connection_settings.setToolTip('Set IP address and port of the laser')
-        self.button_connection_settings.setIcon(QIcon('icons/preferences.svg'))
+        self.button_connection_settings.setIcon(getIcon('preferences.svg'))
         self.button_connection_settings.pressed.connect(self.connectionPreferences)
         self.status_reading_age = ReadingAgeLabel()
         self.connection_grid.addWidgets(

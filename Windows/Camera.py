@@ -9,7 +9,7 @@ import pyqtgraph as pg
 
 
 from PyQt6.QtCore import Qt, QTimer
-from PyQt6.QtGui import QIcon, QImage
+from PyQt6.QtGui import QImage
 from PyQt6.QtWidgets import QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QGroupBox, QMessageBox
 
 
@@ -23,6 +23,7 @@ from Socket.CommandServer import DeviceCameraWrapper
 from Utility.Layouts import InsertingGridLayout, IndicatorLed, DoubleSpinBox, ComboBox, ReadingAgeLabel, IndicatorLedButton
 from Utility.AutoReconnect import AutoReconnect
 from Utility.Dialogs import showMessageBox
+from Utility.Icons import getIcon
 
 from Connection.Camera import CameraConnection, listCameras, backendHelp, availableBackend, beamStatistics, VIRTUAL_CAMERA_ID
 from Connection.Threaded import ThreadedCameraConnection, ThreadedDummyConnection
@@ -75,7 +76,7 @@ class CameraVBoxLayout(QVBoxLayout):
         self.button_connection.pressed.connect(self.manualConnect)
         self.button_connection_refresh = QPushButton()
         self.button_connection_refresh.setToolTip('Refresh camera list')
-        self.button_connection_refresh.setIcon(QIcon('icons/refresh.svg'))
+        self.button_connection_refresh.setIcon(getIcon('refresh.svg'))
         self.button_connection_refresh.pressed.connect(self.setCamerasComboBox)
         self.status_reading_age = ReadingAgeLabel()
         self.connection_grid.addWidgets(

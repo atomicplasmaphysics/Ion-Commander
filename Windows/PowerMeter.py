@@ -2,7 +2,7 @@ from math import log10, sqrt, pi, nan
 
 
 from PyQt6.QtCore import Qt, QTimer
-from PyQt6.QtGui import QIcon, QFont
+from PyQt6.QtGui import QFont
 from PyQt6.QtWidgets import QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QGroupBox, QMessageBox, QApplication
 
 
@@ -17,6 +17,7 @@ from Utility.Layouts import InsertingGridLayout, IndicatorLed, DoubleSpinBox, Di
 from Utility.Functions import getPrefix, isSaneNumber
 from Utility.AutoReconnect import AutoReconnect
 from Utility.Dialogs import showMessageBox
+from Utility.Icons import getIcon
 
 from Connection.TLPMx import TLPMxConnection, TLPMxValues, getResources
 from Connection.Threaded import ThreadedTLPMxConnection, ThreadedDummyConnection
@@ -77,7 +78,7 @@ class PowerMeterVBoxLayout(QVBoxLayout):
 
         self.button_connection_refresh = QPushButton()
         self.button_connection_refresh.setToolTip('Refresh connections list')
-        self.button_connection_refresh.setIcon(QIcon('icons/refresh.svg'))
+        self.button_connection_refresh.setIcon(getIcon('refresh.svg'))
         self.button_connection_refresh.pressed.connect(self.setPortsComboBox)
         self.connection_hbox_selection.addWidget(self.button_connection_refresh)
 

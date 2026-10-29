@@ -42,6 +42,7 @@ from Utility.ModifyWidget import setWidgetBackground
 from Utility.Functions import CyclicList, getPrefix
 from Utility.Color import hexToRgb, linearInterpolateColor, qColorToHex
 from Utility.FileDialogs import selectFileDialog
+from Utility.Icons import getIcon
 
 if TYPE_CHECKING:
     from Windows.Main import MainWindow
@@ -231,7 +232,7 @@ class VBoxTitleLayout(QVBoxLayout):
             VBoxTitleLayout.popout_instances.append(self)
             self.popout_button = QPushButton(self.parent)
             self.popout_button.setToolTip('Pop out the panel into its own window (click again to put it back)')
-            self.popout_button.setIcon(QIcon('icons/open_external.svg'))
+            self.popout_button.setIcon(getIcon('open_external.svg'))
             self.popout_button.setStyleSheet(title_style)
             self.popout_button.clicked.connect(self._popout)
             self.header_layout.addWidget(self.popout_button)
@@ -1048,7 +1049,7 @@ class FilePath(QWidget):
         self.button = QPushButton()
         if self.function is not None:
             if icon is None:
-                icon = QIcon('icons/open.svg')
+                icon = getIcon('open.svg')
             self.button.setIcon(icon)
             self.button.setMinimumSize(40, 10)
             self.button.setMaximumSize(40, 30)
@@ -1508,7 +1509,7 @@ class DateTimeEdit(QWidget):
         self.main_layout.addWidget(self.date_time_edit, stretch=1)
 
         self.calendar_button = QPushButton()
-        self.calendar_button.setIcon(QIcon('icons/calendar.svg'))
+        self.calendar_button.setIcon(getIcon('calendar.svg'))
         self.calendar_button.setToolTip('Select Date and Time')
         self.calendar_button.clicked.connect(self._selectionPopup)
         self.main_layout.addWidget(self.calendar_button, stretch=0)
@@ -2259,11 +2260,11 @@ class PolarityButton(QWidget):
         self.setLayout(self.main_layout)
 
         self.positive_button = QPushButton(self)
-        self.positive_button.setIcon(QIcon('icons/positive.svg'))
+        self.positive_button.setIcon(getIcon('positive.svg'))
         self.main_layout.addWidget(self.positive_button)
 
         self.negative_button = QPushButton(self)
-        self.negative_button.setIcon(QIcon('icons/negative.svg'))
+        self.negative_button.setIcon(getIcon('negative.svg'))
         self.main_layout.addWidget(self.negative_button)
 
         if connected_buttons:
@@ -2549,7 +2550,7 @@ class DeleteWidgetListItem(QWidget):
         self.setLayout(self.main_layout)
 
         self.delete_button = QPushButton(self)
-        self.delete_button.setIcon(QIcon('icons/delete.svg'))
+        self.delete_button.setIcon(getIcon('delete.svg'))
         self.delete_button.setIconSize(QSize(10, 10))
         self.delete_button.setContentsMargins(0, 0, 0, 0)
         self.delete_button.clicked.connect(lambda: self.deleted.emit())
@@ -2791,7 +2792,7 @@ class FilesList(QListWidget):
 
             button_delete = QPushButton()
             button_delete.setToolTip('Delete Script')
-            button_delete.setIcon(QIcon('icons/delete.svg'))
+            button_delete.setIcon(getIcon('delete.svg'))
             button_delete.setIconSize(QSize(10, 10))
             button_delete.setContentsMargins(0, 0, 0, 0)
             layout.addWidget(button_delete, alignment=Qt.AlignmentFlag.AlignLeft)
@@ -2799,7 +2800,7 @@ class FilesList(QListWidget):
 
             button_rename = QPushButton()
             button_rename.setToolTip('Rename Script')
-            button_rename.setIcon(QIcon('icons/rename.svg'))
+            button_rename.setIcon(getIcon('rename.svg'))
             button_rename.setIconSize(QSize(10, 10))
             button_rename.setContentsMargins(0, 0, 0, 0)
             layout.addWidget(button_rename, alignment=Qt.AlignmentFlag.AlignLeft)

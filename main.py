@@ -8,7 +8,6 @@ import duckdb
 
 from PyQt6.QtCore import Qt, QSize, QRect
 from PyQt6.QtWidgets import QApplication, QSplashScreen
-from PyQt6.QtGui import QIcon
 
 from Config.GlobalConf import GlobalConf
 from Config.StylesConf import Styles
@@ -16,6 +15,7 @@ from Config.StylesConf import Styles
 from Windows.Main import MainWindow
 
 from Utility.Layouts import SplashPixmap, NoButtonFocusFilter
+from Utility.Icons import getIcon
 
 from Log.Logger import setupLogging
 
@@ -38,7 +38,7 @@ def main():
 
     # start application
     app = QApplication(argv)
-    app.setWindowIcon(QIcon('icons/logo.png'))
+    app.setWindowIcon(getIcon('logo.png'))
 
     app.setStyleSheet(Styles.global_style_sheet)
 

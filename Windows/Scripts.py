@@ -10,7 +10,6 @@ from PyQt6.QtWidgets import (
     QSplitter, QWidget, QBoxLayout, QVBoxLayout, QPushButton, QLabel, QInputDialog, QMessageBox, QToolBar, QProgressBar,
     QHBoxLayout, QSizePolicy
 )
-from PyQt6.QtGui import QIcon
 from PyQt6.QtCore import Qt, QTimer
 
 
@@ -19,6 +18,7 @@ from Config.StylesConf import Colors
 
 from Utility.Layouts import TabWidget, VBoxTitleLayout, FilesList, FileEditor, FilePath
 from Utility.FileDialogs import selectFolderDialog
+from Utility.Icons import getIcon
 
 from Socket.ScriptServer import ScriptServer, CommandQueue, formatDuration
 
@@ -65,7 +65,7 @@ class ScriptsWindow(TabWidget):
 
         # Update button
         self.script_update_button = QPushButton()
-        self.script_update_button.setIcon(QIcon('icons/refresh.svg'))
+        self.script_update_button.setIcon(getIcon('refresh.svg'))
         self.script_update_button.setToolTip('Update list')
         self.script_add_update_hbox.addWidget(self.script_update_button, alignment=Qt.AlignmentFlag.AlignHCenter)
 
@@ -130,12 +130,12 @@ class ScriptsWindow(TabWidget):
         self.script_editor_bottom_vbox.addWidget(self.toolbar)
 
         # Run script toolbar: start
-        self.script_action_run = self.toolbar.addAction(QIcon('icons/play.svg'), 'Run')
+        self.script_action_run = self.toolbar.addAction(getIcon('play.svg'), 'Run')
         self.script_action_run.setToolTip('<b>Run</b> the current selected script')
         self.script_action_run.triggered.connect(lambda: self.runScript())
 
         # Run script toolbar: abort
-        self.script_action_abort = self.toolbar.addAction(QIcon('icons/abort.svg'), 'Abort')
+        self.script_action_abort = self.toolbar.addAction(getIcon('abort.svg'), 'Abort')
         self.script_action_abort.setToolTip('<b>Abort</b> the currently running script')
         self.script_action_abort.setEnabled(False)
         self.script_action_abort.triggered.connect(lambda: self.abortScript())
@@ -146,7 +146,7 @@ class ScriptsWindow(TabWidget):
             'Progress of the script (planned time): executed steps, time until the next step and remaining time.\n'
             'The real duration is longer if commands take longer than the interval.'
         )
-        self.script_run_progress.setMinimumWidth(50)
+        self.script_run_progress.setMinimumWidth(150)
         self.script_run_progress.setMaximumWidth(600)
         self.script_run_progress.setTextVisible(True)
         self.toolbar.addWidget(self.script_run_progress)
@@ -158,8 +158,9 @@ class ScriptsWindow(TabWidget):
         self.script_info = QLabel()
         self.script_info.setToolTip('Syntax check of the script: number of steps and planned duration, or the first error')
         self.script_info.setContentsMargins(10, 0, 0, 0)
-        # a long error must not widen the window (the full text is in the tooltip)
-        self.script_info.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
+        # a long error must not widen the window (the full text is in the tooltip), but the label takes the free space
+        self.script_info.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
+        self.script_info.setMinimumWidth(80)
         self.toolbar.addWidget(self.script_info)
 
         # Output folder for the results (CSV) and the output (log) of every run

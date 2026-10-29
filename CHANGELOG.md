@@ -2,9 +2,31 @@
 
 *Automatically created from the commit messages with `python -m Utility.Changelog` - do not edit by hand.*
 
+## v0.1.81 (2026-10-29)
+
+**Icons for the dark theme, icons relative to the project folder, Scripts toolbar label fixed**
+
+Icons (Utility/Icons.py, new):
+- getIcon('<file>') loads icons from the icons folder of the project (before: QIcon('icons/...') relative to the
+  working directory). In a dark theme (palette: window darker than the text, e.g. dark mode of Windows with the
+  windows11 style, checked when the icon is created = at startup) the black (#000000) of the monochrome Lucide icons
+  is replaced by the button text color and the SVG is rendered at 16 ... 128 px (cached per icon and color); colored
+  icons (play, abort, delete) and PNGs are unchanged.
+- All 18 QIcon('icons/...') calls replaced (Layouts, Analyse, Camera, EBIS, Electrometer, Laser, PowerMeter, Pressure,
+  PSU, Scripts, main.py); unused QIcon imports removed.
+- Tested: offscreen with a light and a dark palette (pixel colors of the rendered icons), from another working
+  directory, and on the real Windows platform (windows11 style reports the dark mode: window #1e1e1e, text #ffffff,
+  screenshot of the buttons and the Scripts tab).
+
+Scripts tab (Windows/Scripts.py): the info label of v0.1.80 ("7 steps, about 4.5 s" / error) had width 0 in the
+toolbar (size policy Ignored), now Expanding with a minimum width (a long error still does not widen the window);
+progress bar at least 150 px (the windows11 style draws the text next to a thin bar).
+
+README: icons, TODOs updated and extended.
+
 ## v0.1.80 (2026-10-29)
 
-**Scripts: %1/%2 placeholders, VAR variables, WAIT %, syntax check with duration estimate, progress bar with timer**
+**Scripts: %1/%2 placeholders, VAR variables, WAIT %, syntax check with duration estimate, progress bar with timer** (7830de9)
 
 Script parser (Socket/ScriptServer.py):
 - Placeholders are now replaced when the steps are built (the values of the enclosing loops are known there), the lines

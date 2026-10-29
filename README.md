@@ -106,6 +106,8 @@ The version itself is set in `GlobalConf.version`.
 ## Icons
 Icons: [Lucide](https://lucide.dev) (ISC License, Copyright (c) Lucide Contributors 2022, portions Copyright (c) Cole Bemis 2013-2022
 as part of Feather (MIT)), see `icons/LICENSE-Lucide.txt`. Logo and splash screens are our own.
+Icons are loaded with `Utility.Icons.getIcon('<file>')` (relative to the project folder): in a dark theme (e.g. dark mode of
+Windows, checked at startup) the black of the monochrome icons is replaced by the text color, colored icons stay as they are.
 
 ## Manual
 You are a big boy 🐶, there is no manual needed, you can figure it out yourself.
@@ -257,7 +259,9 @@ The size of the database is shown in the menu `Database`.
 - [x] Electrometer: fixed baud rate 9600 (no setting), live plot of the last minute
 - [ ] Theme switch (light/dark) in the preferences, colors of the plots and icons adapted
 - [x] Icons from Lucide (SVG, sharp at every size)
-- [ ] Icons for a dark theme (the icons are black/colored, `currentColor` of the SVGs is replaced when creating them)
+- [x] Icons for a dark theme (detected at startup from the palette, the black icons get the text color, `Utility/Icons.py`)
+- [ ] Update the icons when the system theme changes while the GUI runs (`QEvent.Type.ApplicationPaletteChange`)
+- [ ] Plots (pyqtgraph/matplotlib) in the colors of the dark theme
 - [x] Show CommandServer status (running, connected clients) in the status bar
 - [x] Start CoboldPC from the GUI
 - [x] Remember popped out panels and their positions (move back to default if they would appear outside of the screen)
@@ -279,7 +283,7 @@ The size of the database is shown in the menu `Database`.
 ## BUGs
 - [x] Laser: `TelnetConnection.readline()` looped forever when the laser closed the connection
 - [x] Values `nan`/`inf` broke the SQL insert of the logging (now stored as `NULL`)
-- [ ] Pack images in executable - otherwise not shown (icon paths are relative to the working directory - resolve them relative to the project folder)
+- [ ] Pack images in executable - otherwise not shown (the icons are resolved relative to the project folder now, the splash screens and `Tips` still use paths relative to the working directory)
 - [x] EBIS interlock: `hard_pmax_val`/`soft_pmax_val` start at `10` (= 10 mbar) and are only converted to `10 * 10^-8 mbar` after the spinbox was edited - the interlock is effectively off until then
 - [x] `ConnectionWorker.execute` (`Threaded.py`): `work.append(work)` in the queue overflow branch should be `self.work.append(work)`
 - [x] `ThreadedConnection.callback` (`Threaded.py`): after deleting a list of callback ids it raises `ValueError`, because the list is not an `int`

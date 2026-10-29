@@ -8,7 +8,7 @@ import pyqtgraph as pg
 
 
 from PyQt6.QtCore import Qt, QTimer
-from PyQt6.QtGui import QIcon, QFont
+from PyQt6.QtGui import QFont
 from PyQt6.QtWidgets import QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QGroupBox, QMessageBox
 
 
@@ -23,6 +23,7 @@ from Utility.Layouts import InsertingGridLayout, IndicatorLed, DoubleSpinBox, Co
 from Utility.Functions import getPrefix, isSaneNumber
 from Utility.AutoReconnect import AutoReconnect
 from Utility.Dialogs import showMessageBox
+from Utility.Icons import getIcon
 
 from Connection.USBPorts import getComports
 from Connection.KeithleyPAmeter import KeithleyPAmeterConnection, KeithleyReading
@@ -79,7 +80,7 @@ class ElectrometerVBoxLayout(QVBoxLayout):
         self.button_connection.pressed.connect(self.manualConnect)
         self.button_connection_refresh = QPushButton()
         self.button_connection_refresh.setToolTip('Refresh connections list')
-        self.button_connection_refresh.setIcon(QIcon('icons/refresh.svg'))
+        self.button_connection_refresh.setIcon(getIcon('refresh.svg'))
         self.button_connection_refresh.pressed.connect(self.setComportsComboBox)
         self.status_reading_age = ReadingAgeLabel()
         self.connection_grid.addWidgets(

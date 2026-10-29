@@ -5,7 +5,6 @@ from serial import SerialException
 
 
 from PyQt6.QtWidgets import QVBoxLayout, QGroupBox, QLabel, QPushButton, QHBoxLayout, QMessageBox
-from PyQt6.QtGui import QIcon
 from PyQt6.QtCore import Qt, QTimer
 
 
@@ -19,6 +18,7 @@ from Socket.CommandServer import DeviceMixedPressureWrapper
 from Utility.Layouts import PressureWidget, IndicatorLed, ComboBox, ReadingAgeLabel
 from Utility.AutoReconnect import AutoReconnect
 from Utility.Dialogs import showMessageBox
+from Utility.Icons import getIcon
 
 from Connection.USBPorts import getComports
 from Connection.Thyracont import thyracontVoltageToPressure
@@ -94,7 +94,7 @@ class PressureVBoxLayout(QVBoxLayout):
 
         self.button_connection_refresh = QPushButton()
         self.button_connection_refresh.setToolTip('Refresh connections list')
-        self.button_connection_refresh.setIcon(QIcon('icons/refresh.svg'))
+        self.button_connection_refresh.setIcon(getIcon('refresh.svg'))
         self.button_connection_refresh.pressed.connect(self.setComportsComboBox)
         self.connection_hbox_selection.addWidget(self.button_connection_refresh)
 

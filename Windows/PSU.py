@@ -5,7 +5,6 @@ from serial import SerialException
 
 
 from PyQt6.QtCore import Qt, QTimer
-from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QGroupBox, QMessageBox
 
 
@@ -20,6 +19,7 @@ from Utility.Layouts import InsertingGridLayout, IndicatorLed, DoubleSpinBox, Di
 from Utility.AutoReconnect import AutoReconnect
 from Utility.Dialogs import showMessageBox
 from Utility.ChannelRows import VoltageChannelRow, CurrentLimitRow
+from Utility.Icons import getIcon
 
 from Connection.USBPorts import getComports
 from Connection.ISEG import ISEGConnection
@@ -81,7 +81,7 @@ class PSUVBoxLayout(QVBoxLayout):
         self.button_connection.pressed.connect(self.manualConnect)
         self.button_connection_refresh = QPushButton()
         self.button_connection_refresh.setToolTip('Refresh connections list')
-        self.button_connection_refresh.setIcon(QIcon('icons/refresh.svg'))
+        self.button_connection_refresh.setIcon(getIcon('refresh.svg'))
         self.button_connection_refresh.pressed.connect(self.setComportsComboBox)
         self.status_reading_age = ReadingAgeLabel()
         self.connection_grid.addWidgets(
