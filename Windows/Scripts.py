@@ -19,6 +19,7 @@ from Config.StylesConf import Colors
 from Utility.Layouts import TabWidget, VBoxTitleLayout, FilesList, FileEditor, FilePath
 from Utility.FileDialogs import selectFolderDialog
 from Utility.Icons import getIcon
+from Utility.ScriptEditor import ScriptEditor, ScriptCatalog
 
 from Socket.ScriptServer import ScriptServer, CommandQueue, formatDuration
 
@@ -101,8 +102,8 @@ class ScriptsWindow(TabWidget):
         self.script_selected_headline = QLabel('Selected script: None')
         self.script_editor_top_vbox.addWidget(self.script_selected_headline, alignment=Qt.AlignmentFlag.AlignHCenter)
 
-        # Text editor
-        self.script_editor = FileEditor(readonly=False)
+        # Text editor (syntax highlighting, autocomplete of the devices and their functions, see <setDevices>)
+        self.script_editor = ScriptEditor(readonly=False)
         self.script_editor_path = ''
         self.script_editor.setDisabled(True)
         self.script_editor.setToolTip('Select script first to edit')
@@ -199,6 +200,16 @@ class ScriptsWindow(TabWidget):
         self.editScript(self.script_selection_list.currentRow())
 
     output_folder_name = 'script_output_folder'
+
+    def setDevices(self, devices: dict[str, type]):
+        """
+        Devices of the CommandServer for the script editor (autocomplete, highlighting, check of the function names)
+
+        :param devices: {device name: connection class}, e.g. {'PSU': ISEGConnection}
+        """
+
+        self.script_editor.setCatalog(ScriptCatalog(devices))
+        self.checkScript()
 
     def selectOutputFolder(self) -> str | None:
         """Folder dialog for the output folder (None if cancelled), the folder is remembered"""
@@ -302,19 +313,29 @@ class ScriptsWindow(TabWidget):
 
         if not self.script_editor_path:
             self.script_info.setText('')
+            self.script_editor.setError(0)
             return
 
-        queue = CommandQueue.parseScript(self.script_editor.toPlainText())
+        script = self.script_editor.toPlainText()
+        queue = CommandQueue.parseScript(script)
         if queue.error:
             self.script_info.setText(queue.error)
             self.script_info.setToolTip(queue.error)
             self.script_info.setStyleSheet(f'color: {Colors.color_red}')
+            self.script_editor.setError(queue.error_line, queue.error)
             return
-        self.script_info.setText(f'{len(queue.queue)} steps, about {formatDuration(queue.duration())}')
-        self.script_info.setToolTip(
-            'Number of steps and planned duration of the script\n(longer if commands take longer than the interval)'
-        )
-        self.script_info.setStyleSheet('')
+        self.script_editor.setError(0)
+
+        info = f'{len(queue.queue)} steps, about {formatDuration(queue.duration())}'
+        tooltip = 'Number of steps and planned duration of the script\n(longer if commands take longer than the interval)'
+        # the parser does not know the devices: unknown devices/functions are only found here (the commands would fail)
+        unknown = self.script_editor.catalog.checkScript(script)
+        if unknown:
+            info += f' - line {unknown[0][0]}: {unknown[0][1]}' + (f' (+{len(unknown) - 1} more)' if len(unknown) > 1 else '')
+            tooltip += '\n\nUnknown devices/functions (the commands would fail):\n' + '\n'.join(f'Line {line}: {message}' for line, message in unknown)
+        self.script_info.setText(info)
+        self.script_info.setToolTip(tooltip)
+        self.script_info.setStyleSheet(f'color: {Colors.color_orange}' if unknown else '')
 
     def updateProgress(self):
         """Called by timer while a script runs: progress, time until the next step and remaining time"""

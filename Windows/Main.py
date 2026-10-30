@@ -108,6 +108,8 @@ class MainWindow(QMainWindow):
             devices['EBIS'] = self.control_window.ebis_group_vbox.device_wrapper
         self.server = CommandServer(devices)
         self.server.startServer()
+        # autocomplete and check of the device functions in the script editor
+        self.scripts_window.setDevices({name: wrapper.connection_class for name, wrapper in devices.items()})
 
         # store the current labels of the logged columns (rename-proof history)
         self.updateDatabaseLabels()

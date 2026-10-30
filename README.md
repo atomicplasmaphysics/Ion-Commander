@@ -46,7 +46,7 @@ TIME 3                                         # first line: interval between th
 PRINT Wien filter scan                         # writes the text into the output and the results (takes no time)
 WAIT                                           # one step without command (one interval)
 WAIT 10                                        # this step takes 10 s instead of the interval
-LASER:rfSet(%) 23, 24                          # "%" is replaced by every value -> one step per value
+LASER:rlSet(%) 23, 24                          # "%" is replaced by every value -> one step per value
 PSU:voltageSet(0,%);PSU:voltageSet(1,-%) 0:10:0.5  # ";" = several commands in ONE step, "start:stop:step" = range (stop included)
 	WAIT                                       # tab = nested loop: executed for every value of the line directly above
 	ELECTROMETER:readAverage(10)               # next step: mean, std and number of 10 electrometer readings
@@ -74,6 +74,12 @@ VAR u 0:50:0.5                                 # VAR with block: loop over the v
 A variable set inside a block is only valid in that block. The Scripts tab checks the script while editing and shows
 the number of steps and the planned duration (or the first error with its line), the progress bar shows the step,
 the time until the next step and the remaining time (planned: longer if commands take longer than the interval).
+
+The script editor highlights comments (grey), statements, devices, functions, numbers, strings and placeholders.
+While typing, statements and devices are completed at the beginning of a line, and after `DEVICE:` the functions of the device
+(`Ctrl+Space` opens the list, `Enter`/`Tab` inserts, `voltS` also finds `voltageSet`); the documentation of the selected
+function is shown next to the list, its signature while typing the arguments, and when hovering over a function. Unknown devices or
+functions (typos) and the faulty line of the syntax check are underlined in red.
 
 Every command and its answer is written to `<output folder>/<script>_<date>_<time>.csv`
 (columns `time_s, step, command, state, answer, value`; `value` is the first number of the answer, e.g. the current;
@@ -211,7 +217,13 @@ The size of the database is shown in the menu `Database`.
 - [x] `WAIT %` (wait times as loop values) and a total duration estimate before starting a script
 - [ ] Conditions in scripts (wait-until e.g. `WAIT_UNTIL PRESSURE < 1E-8`), variables from device answers (e.g. `VAR i ELECTROMETER:readAverage(10)`)
 - [x] Syntax check of scripts while editing (steps, planned duration or the first error with its line number)
-- [ ] Highlight the faulty line in the script editor and a dry-run that lists all steps without sending them
+- [x] Highlight the faulty line in the script editor (red wavy underline, error as tooltip; line numbers are right also with empty lines at the beginning)
+- [x] Script editor: syntax highlighting (comments grey, statements, devices, functions, numbers, strings, placeholders) for the light and the dark theme
+- [x] Script editor: autocomplete of statements, devices and their functions (from the connection classes), documentation next to the list, signature while typing the arguments, tooltip when hovering
+- [x] Script check: unknown devices/functions are underlined and listed in the info label (found `LASER:rfSet` in `example.lsd`/README, correct is `LASER:rlSet`)
+- [ ] Script check: compare the number of arguments with the signature of the function (e.g. `PSU:voltageSet(5)` misses the voltage)
+- [ ] Script editor: show the channel names of PSU/EBIS while typing the channel argument, search/replace (Ctrl+F) and comment/uncomment lines (Ctrl+/)
+- [ ] Dry-run of a script that lists all steps without sending them
 - [x] Progress bar with the time until the next step and the remaining time
 - [ ] Script steps that take longer than the interval: warn and show the real remaining time (the plan assumes commands take no time)
 - [x] Allow multiple commands at each timestep (`A;B`)

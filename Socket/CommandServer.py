@@ -13,6 +13,15 @@ from Connection.Threaded import (
     ThreadedMonacoConnection, ThreadedTLPMxConnection, ThreadedCameraConnection, ThreadedCoboldConnection, ThreadedKeithleyConnection,
     ThreadedDummyConnection
 )
+from Connection.ISEG import ISEGConnection
+from Connection.Thyracont import ThyracontConnection
+from Connection.TPG300 import TPG300Connection
+from Connection.MixedPressure import MixedPressureConnection
+from Connection.Monaco import MonacoConnection
+from Connection.TLPMx import TLPMxConnection
+from Connection.Camera import CameraConnection
+from Connection.Cobold import CoboldConnection
+from Connection.KeithleyPAmeter import KeithleyPAmeterConnection
 
 
 def parseFunctionCall(func_str: str) -> tuple[str, list, dict]:
@@ -57,6 +66,9 @@ class DeviceWrapper:
     :param threaded_connection: <ThreadedConnection> object
     """
 
+    # class of the device connection: its functions can be called by scripts (autocomplete of the script editor)
+    connection_class: type | None = None
+
     def __init__(self, threaded_connection = None):
         if threaded_connection is None:
             threaded_connection = ThreadedDummyConnection()
@@ -71,6 +83,8 @@ class DeviceISEGWrapper(DeviceWrapper):
     :param threaded_connection: ThreadedISEGConnection
     """
 
+    connection_class = ISEGConnection
+
     def __init__(self, threaded_connection: ThreadedISEGConnection | ThreadedDummyConnection = None):
         super().__init__(threaded_connection)
 
@@ -81,6 +95,8 @@ class DeviceThyracontWrapper(DeviceWrapper):
 
     :param threaded_connection: ThreadedThyracontConnection
     """
+
+    connection_class = ThyracontConnection
 
     def __init__(self, threaded_connection: ThreadedThyracontConnection | ThreadedDummyConnection = None):
         super().__init__(threaded_connection)
@@ -93,6 +109,8 @@ class DeviceTPG300Wrapper(DeviceWrapper):
     :param threaded_connection: ThreadedTPG300Connection
     """
 
+    connection_class = TPG300Connection
+
     def __init__(self, threaded_connection: ThreadedTPG300Connection | ThreadedDummyConnection = None):
         super().__init__(threaded_connection)
 
@@ -103,6 +121,8 @@ class DeviceMixedPressureWrapper(DeviceWrapper):
 
     :param threaded_connection: ThreadedMixedPressureConnection
     """
+
+    connection_class = MixedPressureConnection
 
     def __init__(self, threaded_connection: ThreadedMixedPressureConnection | ThreadedDummyConnection = None):
         super().__init__(threaded_connection)
@@ -115,6 +135,8 @@ class DeviceMonacoWrapper(DeviceWrapper):
     :param threaded_connection: ThreadedMonacoConnection
     """
 
+    connection_class = MonacoConnection
+
     def __init__(self, threaded_connection: ThreadedMonacoConnection | ThreadedDummyConnection = None):
         super().__init__(threaded_connection)
 
@@ -125,6 +147,8 @@ class DeviceTLPMxWrapper(DeviceWrapper):
 
     :param threaded_connection: ThreadedTLPMxConnection
     """
+
+    connection_class = TLPMxConnection
 
     def __init__(self, threaded_connection: ThreadedTLPMxConnection | ThreadedDummyConnection = None):
         super().__init__(threaded_connection)
@@ -137,6 +161,8 @@ class DeviceCameraWrapper(DeviceWrapper):
     :param threaded_connection: ThreadedCameraConnection
     """
 
+    connection_class = CameraConnection
+
     def __init__(self, threaded_connection: ThreadedCameraConnection | ThreadedDummyConnection = None):
         super().__init__(threaded_connection)
 
@@ -148,6 +174,8 @@ class DeviceCoboldWrapper(DeviceWrapper):
     :param threaded_connection: ThreadedCoboldConnection
     """
 
+    connection_class = CoboldConnection
+
     def __init__(self, threaded_connection: ThreadedCoboldConnection | ThreadedDummyConnection = None):
         super().__init__(threaded_connection)
 
@@ -158,6 +186,8 @@ class DeviceKeithleyWrapper(DeviceWrapper):
 
     :param threaded_connection: ThreadedKeithleyConnection
     """
+
+    connection_class = KeithleyPAmeterConnection
 
     def __init__(self, threaded_connection: ThreadedKeithleyConnection | ThreadedDummyConnection = None):
         super().__init__(threaded_connection)

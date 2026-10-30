@@ -558,6 +558,8 @@ class CommandQueue:
 
         cmd_queue = cls([], -1)
 
+        # line number of the first line that is not empty (the line numbers of the errors are the ones of the editor)
+        first_line = script[:len(script) - len(script.lstrip())].count('\n') + 1
         script = script.strip()
         script_split = script.split('\n')
 
@@ -579,14 +581,14 @@ class CommandQueue:
 
         if first_line_error:
             cmd_queue.interval = -1
-            cmd_queue.error = f'Line 1: "{script_split[0].strip()}": "TIME <seconds>" is expected!'
-            cmd_queue.error_line = 1
+            cmd_queue.error = f'Line {first_line}: "{script_split[0].strip()}": "TIME <seconds>" is expected!'
+            cmd_queue.error_line = first_line
             return cmd_queue
 
         # Parse all other lines
         lines = []
         try:
-            for line_nbr, line in enumerate(script_split[1:], 2):
+            for line_nbr, line in enumerate(script_split[1:], first_line + 1):
 
                 # strip right side of line
                 line = line.rstrip()

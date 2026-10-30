@@ -2,9 +2,44 @@
 
 *Automatically created from the commit messages with `python -m Utility.Changelog` - do not edit by hand.*
 
+## v0.1.84 (2026-10-30)
+
+**Script editor: syntax highlighting, autocomplete of devices and functions, faulty line underlined**
+
+Script editor (Utility/ScriptEditor.py, Windows/Scripts.py):
+- ScriptHighlighter: comments (grey, italic; only at the beginning of a line like the parser), statements TIME, WAIT,
+  VAR, PRINT (bold), devices (bold), functions, numbers, strings, placeholders/variables (%, %1, $name), PRINT text.
+  Separate colors for the light and the dark theme (from the palette of the editor).
+- Unknown devices/functions are underlined in red (wavy), the line of the syntax error as well; hovering shows the
+  error message.
+- Autocomplete (ScriptEditor, subclass of FileEditor): at the beginning of a line (or after ";") statements and devices,
+  after "DEVICE:" the functions of the device (also opens directly after typing ":"). Ctrl+Space opens the list,
+  Enter/Tab inserts (Tab without list is still the indent), Escape closes. Matching ignores case: names starting with the
+  text first, then names containing it, then names containing its characters in order ("voltS" -> voltageSet first).
+  A device is inserted as "PSU:" and the function list opens; a function as "name(" (or "name()" without parameters).
+- Documentation of the selected function next to the list, its signature and docstring while typing the arguments
+  (after "(" and ","), and as tooltip when hovering over a device/function/statement.
+- ScriptCatalog: devices and their functions from the connection classes (inspect, public functions, cached).
+  DeviceWrapper.connection_class (Socket/CommandServer.py) for every wrapper; Main passes the devices of the
+  CommandServer to the Scripts tab (ScriptsWindow.setDevices), so the list is the same as the CommandServer's
+  (EBIS only if enabled).
+- The syntax check also lists unknown devices/functions in the info label (orange, all of them in the tooltip).
+
+Fixes:
+- Parser (Socket/ScriptServer.py): the line numbers of errors were too small if the script starts with empty lines
+  (the script is stripped before parsing).
+- Scripts/example.lsd and README used LASER:rfSet, which does not exist; the RF level is LASER:rlSet (found by the
+  new check, all other scripts in Scripts/ have no unknown functions).
+
+Tested with the real Windows style (dark theme): highlighting formats, keyboard completion (PS -> PSU: -> voltS ->
+voltageSet( with call tip), Tab indent without list, Ctrl+Space, Escape, tooltips; parser and Scripts tab tests and
+the startup test pass.
+
+README: script editor documented, TODOs updated and extended.
+
 ## v0.1.83 (2026-10-30)
 
-**EBIS: allowed potential differences between the channels with warning (set anyway, abort, edit limits)**
+**EBIS: allowed potential differences between the channels with warning (set anyway, abort, edit limits)** (dc6fed5)
 
 EBIS potential differences (Utility/PotentialDifferences.py, Windows/EBIS.py, Windows/Settings.py, Config/GlobalConf.py):
 - Preferences: new group "EBIS potential differences" with a table (upper triangle, rows Cathode..Drift Tube 3,
