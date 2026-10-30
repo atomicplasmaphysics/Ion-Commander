@@ -1,4 +1,4 @@
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QGroupBox, QLabel, QLineEdit, QPushButton, QMessageBox, QScrollArea, QWidget
 )
@@ -8,17 +8,22 @@ from Config.GlobalConf import GlobalConf, DefaultParams
 
 from Utility.Layouts import InsertingGridLayout
 from Utility.Dialogs import showMessageBox
+from Utility.PotentialDifferences import PotentialDifferenceTable
 
 
 class SettingsDialog(QDialog):
     """
     Dialog to change the editable <DefaultParams> (update intervals, limits, laser address, CommandServer, ...).
-    The values are stored in the settings and applied after restarting the application.
+    The values are stored in the settings and applied after restarting the application, the allowed potential
+    differences of the EBIS are applied immediately.
 
     :param parent: parent widget
+    :param section: section that is shown when the dialog opens (<section_ebis_differences>), '' for the top
     """
 
-    def __init__(self, parent=None):
+    section_ebis_differences = 'ebis_differences'
+
+    def __init__(self, parent=None, section: str = ''):
         super().__init__(parent)
 
         self.setWindowTitle('Preferences')
@@ -27,7 +32,10 @@ class SettingsDialog(QDialog):
         self.main_layout = QVBoxLayout()
         self.setLayout(self.main_layout)
 
-        info = QLabel('Changes take effect after restarting the application. Hover over a field to see its default value.')
+        info = QLabel(
+            'Changes take effect after restarting the application (the EBIS potential differences immediately). '
+            'Hover over a field to see its default value.'
+        )
         info.setWordWrap(True)
         self.main_layout.addWidget(info)
 
@@ -64,11 +72,26 @@ class SettingsDialog(QDialog):
             self.line_edits[name] = line_edit
             grids[group].addWidgets(label, line_edit, QLabel(unit))
 
+        # allowed potential differences between the EBIS channels (applied immediately)
+        self.group_ebis_differences = QGroupBox('EBIS potential differences')
+        group_ebis_differences_layout = QVBoxLayout()
+        self.group_ebis_differences.setLayout(group_ebis_differences_layout)
+        enabled, limits = GlobalConf.getEBISDifferences()
+        self.table_ebis_differences = PotentialDifferenceTable(DefaultParams.ebis_channel_names, enabled, limits)
+        group_ebis_differences_layout.addWidget(self.table_ebis_differences)
+        scroll_layout.addWidget(self.group_ebis_differences)
+
+        if section == self.section_ebis_differences:
+            self.setWindowTitle('Preferences - EBIS potential differences')
+            # after the layout is done, otherwise the position of the group is not known yet
+            QTimer.singleShot(0, lambda: scroll_area.ensureWidgetVisible(self.group_ebis_differences, 0, 0))
+            QTimer.singleShot(0, self.table_ebis_differences.table.setFocus)
+
         buttons_layout = QHBoxLayout()
         self.main_layout.addLayout(buttons_layout)
 
         self.button_defaults = QPushButton('Restore defaults')
-        self.button_defaults.setToolTip('Fills in all default values (press "Save" to store them)')
+        self.button_defaults.setToolTip('Fills in all default values (press "Save" to store them), the EBIS potential differences are kept')
         self.button_defaults.clicked.connect(self.restoreDefaults)
         buttons_layout.addWidget(self.button_defaults)
 
@@ -105,6 +128,9 @@ class SettingsDialog(QDialog):
             else:
                 self.line_edits[name].setStyleSheet('')
 
+        difference_limits, difference_errors = self.table_ebis_differences.limits()
+        errors.extend(difference_errors)
+
         if errors:
             showMessageBox(
                 self,
@@ -115,12 +141,21 @@ class SettingsDialog(QDialog):
             )
             return
 
-        DefaultParams.saveOverrides(GlobalConf.settings, values, GlobalConf.default_params_group_name)
-        GlobalConf.logger.info('Preferences saved, they are applied after restarting the application')
-        showMessageBox(
-            self,
-            QMessageBox.Icon.Information,
-            'Preferences saved',
-            'The preferences are applied after restarting the application.'
+        changed = any(
+            DefaultParams.convert(name, value) != getattr(DefaultParams, name) for name, value in values.items()
         )
+        DefaultParams.saveOverrides(GlobalConf.settings, values, GlobalConf.default_params_group_name)
+        GlobalConf.updateEBISDifferences(self.table_ebis_differences.enabled(), difference_limits)
+        GlobalConf.logger.info(
+            f'Preferences saved, EBIS potential differences: check {"on" if self.table_ebis_differences.enabled() else "off"}, '
+            f'limits {difference_limits}'
+        )
+        if changed:
+            showMessageBox(
+                self,
+                QMessageBox.Icon.Information,
+                'Preferences saved',
+                'The preferences are applied after restarting the application.',
+                'The EBIS potential differences are used immediately.'
+            )
         self.accept()

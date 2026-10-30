@@ -157,6 +157,9 @@ The size of the database is shown in the menu `Database`.
 - [x] Latch trips until "Re-arm" is pressed, refuse higher heating currents while tripped and also catch current changes from scripts (measured current is checked)
 - [x] Show the age of the last reading for Laser and Power Meter as well (PSU, EBIS, Pressure, Electrometer and Camera done)
 - [ ] Optionally also check the other gauges (not only the selected one)
+- [x] EBIS: allowed potential differences between Cathode, DT1-3 and Repeller (table in the preferences, can be switched off); a voltage that exceeds a difference asks to set anyway, abort or edit the limits
+- [ ] EBIS potential differences: also check voltages set by scripts/CommandServer (currently only the GUI fields are checked; a script cannot answer a dialog, so it should refuse the command and report an error)
+- [ ] EBIS potential differences: optionally compare the measured voltages (ramping channels) and check when an output is switched on
 - [ ] Interlock self-test button (simulate a trip without hardware) and a "reset/re-arm" confirmation
 - [x] Ramp the heating current up slowly instead of jumping (cathode lifetime) - "Ramp [A/min]"; lowering/switching off and the interlock are immediate
 

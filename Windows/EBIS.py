@@ -21,12 +21,14 @@ from Utility.Dialogs import showMessageBox
 from Utility.ChannelRows import nominalMaxima, VoltageChannelRow, CurrentLimitRow
 from Utility.Interlock import PressureInterlock, InterlockLimits, InterlockResult
 from Utility.Icons import getIcon
+from Utility.PotentialDifferences import checkDifferences, askDifferenceViolation, DifferenceAnswer
 
 from Connection.USBPorts import getComports
 from Connection.ISEG import ISEGConnection
 from Connection.Threaded import ThreadedISEGConnection, ThreadedDummyConnection
 
 from Windows.Pressure import PressureVBoxLayout
+from Windows.Settings import SettingsDialog
 
 
 class EBISVBoxLayout(QVBoxLayout):
@@ -40,6 +42,13 @@ class EBISVBoxLayout(QVBoxLayout):
         self.update_timer.start()
 
         self.active_message_box = False
+
+        # applied set voltages (index = logical channel, 5 is the heating) for the check of the potential differences
+        self.set_voltages = [0.] * 6
+        # sign of the potential of the channels (-1: negative module, e.g. the cathode), from the nominal voltages
+        self.channel_polarities = [1] * len(DefaultParams.ebis_channel_names)
+        # the warning of the potential differences is open (the spin box emits editingFinished again when it loses the focus)
+        self.difference_warning_active = False
 
         # automatic reconnect after a lost connection
         self.last_port = ''
@@ -143,7 +152,7 @@ class EBISVBoxLayout(QVBoxLayout):
         )
 
         # one row per channel (index = logical channel, see <channel_dict> for the physical channels)
-        self.channel_names = ['Cathode', 'Drift Tube 1', 'Drift Tube 2', 'Drift Tube 3', 'Repeller']
+        self.channel_names = list(DefaultParams.ebis_channel_names)
         self.channel_rows = [
             VoltageChannelRow(
                 self.potential_grid,
@@ -515,6 +524,9 @@ class EBISVBoxLayout(QVBoxLayout):
         # limit the input fields to the nominal values of the channels (before the set values are read),
         # the last channel is the cathode heating (voltage row and heating current)
         def nominalVoltages(voltages: list[float]):
+            # negative modules (cathode) report a negative nominal voltage: their potential is negative
+            if isinstance(voltages, list) and len(voltages) == len(self.channel_rows):
+                self.channel_polarities = [-1 if voltage < 0 else 1 for voltage in voltages[:len(self.channel_names)]]
             maxima = [self.voltage_maximum] * (len(self.channel_rows) - 1) + [DefaultParams.ebis_heating_voltage_maximum]
             maxima = nominalMaxima(voltages, len(self.channel_rows), maxima)
             if maxima is None:
@@ -549,6 +561,7 @@ class EBISVBoxLayout(QVBoxLayout):
             for spinbox_voltage, status_voltage, voltage in zip(self.spinbox_voltages, self.status_voltages, voltages):
                 spinbox_voltage.setValue(voltage)
                 status_voltage.setTargetValue(voltage)
+            self.set_voltages = [abs(voltage) for voltage in voltages]
 
         self.threaded_connection.callback(readVoltage, self.threaded_connection.readVoltage(self.all_channels_selector))
 
@@ -587,9 +600,62 @@ class EBISVBoxLayout(QVBoxLayout):
         if not self.checkConnection():
             return
 
+        # editingFinished of the spin box while the warning is open (focus lost): the warning decides
+        if self.difference_warning_active:
+            return
+
+        if not self.confirmPotentialDifferences(channel, voltage):
+            # aborted: the field shows the applied value again
+            self.spinbox_voltages[channel].setValue(self.set_voltages[channel])
+            return
+
+        self.set_voltages[channel] = voltage
         self.status_voltages[channel].setTargetValue(voltage)
         phys_channel = self.channel_dict[channel]
         self.threaded_connection.voltageSet(phys_channel, voltage)
+
+    def potentials(self) -> list[float]:
+        """Potentials of the channels (without the heating) from the applied set voltages, negative modules are negative"""
+        return [polarity * abs(voltage) for polarity, voltage in zip(self.channel_polarities, self.set_voltages)]
+
+    def confirmPotentialDifferences(self, channel: int, voltage: float) -> bool:
+        """
+        Checks the allowed potential differences (preferences) before a voltage is set. If a difference is too large,
+        a warning asks to set the voltage anyway, to abort or to edit the limits (checked again afterwards).
+
+        :param channel: logical channel that is set
+        :param voltage: new set voltage
+        :returns: True if the voltage may be set
+        """
+
+        if channel >= len(self.channel_names):
+            return True
+
+        while True:
+            enabled, limits = GlobalConf.getEBISDifferences()
+            if not enabled or not limits:
+                return True
+
+            violations = checkDifferences(channel, self.channel_polarities[channel] * abs(voltage), self.potentials(), limits)
+            if not violations:
+                return True
+
+            self.difference_warning_active = True
+            try:
+                answer = askDifferenceViolation(self.parentWidget(), self.channel_names, violations)
+                if answer == DifferenceAnswer.edit_limits:
+                    SettingsDialog(self.parentWidget(), section=SettingsDialog.section_ebis_differences).exec()
+            finally:
+                self.difference_warning_active = False
+
+            if answer == DifferenceAnswer.set_anyway:
+                GlobalConf.logger.warning(
+                    f'EBIS: {self.channel_names[channel]} set to {voltage} V although the allowed potential difference is exceeded: '
+                    + ', '.join(f'{self.channel_names[violation.other]} {violation.difference:g} V > {violation.limit:g} V' for violation in violations)
+                )
+                return True
+            if answer == DifferenceAnswer.abort:
+                return False
 
     def setCurrent(self, channel: int, current: float):
         """
@@ -1006,6 +1072,7 @@ class EBISVBoxLayout(QVBoxLayout):
 
         for row in self.channel_rows + self.limit_rows:
             row.reset()
+        self.set_voltages = [0.] * len(self.set_voltages)
 
         self.spinbox_current_6.reset()
         if hasattr(self, 'heating_ramp_timer'):

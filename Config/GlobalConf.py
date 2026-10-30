@@ -62,6 +62,8 @@ class DefaultParams:
     ebis_heating_ramp_maximum = 10.
     ebis_interlock_current_maximum = 3.
     ebis_ramp_speed_maximum = 20.
+    # channels of the EBIS panel (the allowed potential differences between them are set in the preferences)
+    ebis_channel_names = ['Cathode', 'Drift Tube 1', 'Drift Tube 2', 'Drift Tube 3', 'Repeller']
 
     # laser parameters
     laser_ip = (169, 254, 21, 151)
@@ -272,7 +274,7 @@ class GlobalConf:
     title = 'Ion Commander'
 
     # version (single source of truth - update only here)
-    version = '0.1.82'
+    version = '0.1.83'
 
     # logger
     logger = logging.getLogger(title)
@@ -308,6 +310,10 @@ class GlobalConf:
     ebis_interlock_group_name = 'ebis_interlock'
     ebis_heating_ramp_name = 'ebis_heating_ramp'
     ebis_interlock_gauge_name = 'ebis_interlock_gauge'
+
+    # EBIS allowed potential differences between the channels
+    ebis_differences_group_name = 'ebis_potential_differences'
+    ebis_differences_enabled_name = 'ebis_potential_differences_enabled'
 
     # power meter parameters
     power_meter_display_parameter_name = 'power_meter_display_parameter'
@@ -485,6 +491,46 @@ class GlobalConf:
 
         gauge = GlobalConf.settings.value(GlobalConf.ebis_interlock_gauge_name, defaultValue='', type=str)
         return limits, gauge
+
+    @staticmethod
+    def updateEBISDifferences(enabled: bool = None, limits: dict[tuple[int, int], float] = None):
+        """
+        Updates and saves the allowed potential differences between the EBIS channels
+
+        :param enabled: check the differences when a voltage is set
+        :param limits: {(channel a, channel b): maximum absolute difference in V} with a < b, missing pairs are not checked
+        """
+
+        if enabled is not None:
+            GlobalConf.settings.setValue(GlobalConf.ebis_differences_enabled_name, bool(enabled))
+        if limits is not None:
+            GlobalConf.settings.remove(GlobalConf.ebis_differences_group_name)
+            for (channel_a, channel_b), limit in limits.items():
+                GlobalConf.settings.setValue(f'{GlobalConf.ebis_differences_group_name}/{min(channel_a, channel_b)}_{max(channel_a, channel_b)}', float(limit))
+
+        GlobalConf.settings.sync()
+
+    @staticmethod
+    def getEBISDifferences() -> tuple[bool, dict[tuple[int, int], float]]:
+        """Returns (check enabled, {(channel a, channel b): maximum absolute difference in V} with a < b), invalid entries are ignored"""
+
+        enabled = True
+        if GlobalConf.settings.contains(GlobalConf.ebis_differences_enabled_name):
+            enabled = GlobalConf.settings.value(GlobalConf.ebis_differences_enabled_name, defaultValue=True, type=bool)
+
+        limits = {}
+        GlobalConf.settings.beginGroup(GlobalConf.ebis_differences_group_name)
+        keys = GlobalConf.settings.childKeys()
+        GlobalConf.settings.endGroup()
+        for key in keys:
+            try:
+                channel_a, channel_b = (int(part) for part in key.split('_'))
+                limit = GlobalConf.settings.value(f'{GlobalConf.ebis_differences_group_name}/{key}', defaultValue=-1, type=float)
+            except (TypeError, ValueError):
+                continue
+            if limit >= 0 and channel_a != channel_b:
+                limits[(min(channel_a, channel_b), max(channel_a, channel_b))] = limit
+        return enabled, limits
 
     @staticmethod
     def updatePowerMeterDisplayParameter(display_parameter: int):

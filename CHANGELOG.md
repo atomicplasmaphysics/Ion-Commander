@@ -2,9 +2,39 @@
 
 *Automatically created from the commit messages with `python -m Utility.Changelog` - do not edit by hand.*
 
+## v0.1.83 (2026-10-30)
+
+**EBIS: allowed potential differences between the channels with warning (set anyway, abort, edit limits)**
+
+EBIS potential differences (Utility/PotentialDifferences.py, Windows/EBIS.py, Windows/Settings.py, Config/GlobalConf.py):
+- Preferences: new group "EBIS potential differences" with a table (upper triangle, rows Cathode..Drift Tube 3,
+  columns Drift Tube 1..Repeller) of the maximum absolute voltage difference between two channels in V. Empty cell =
+  no limit, the lower triangle is greyed out. Checkbox "Check the potential differences when a voltage is set" switches
+  the check off (the table is ignored, like before). Invalid cells are marked red and nothing is saved.
+- Stored in the settings (group "ebis_potential_differences", key "<a>_<b>", and "ebis_potential_differences_enabled"),
+  GlobalConf.getEBISDifferences()/updateEBISDifferences(); applied immediately (no restart needed). The "restart"
+  message is only shown if a normal preference changed.
+- EBIS panel: before a voltage is sent, the new set value is compared with the applied set values of the other
+  channels (checkDifferences). A channel of a negative module (nominal voltage < 0, the cathode) counts as negative
+  potential. If a limit is exceeded, a warning lists every violated pair (other channel, its voltage, difference,
+  allowed) with the buttons:
+  - "Set anyway": the voltage is sent (logged as warning),
+  - "Abort" (default, Escape): nothing is sent, the field shows the applied value again,
+  - "Edit limits...": opens the preferences scrolled to the table, afterwards the voltage is checked again.
+  Example: DT1<->DT2 500 V, both at 0 V, DT1 set to 600 V -> warning "difference 600 V, allowed 500 V".
+- The spin box emits editingFinished again when the warning takes the focus; this second call is ignored while the
+  warning is open. The heating channel is not checked. Scripts/CommandServer are not checked yet (README TODO).
+- DefaultParams.ebis_channel_names (used by the EBIS panel and the preferences table).
+
+Tested offscreen with a fake connection: abort (nothing sent, field restored), set anyway, allowed value, edit limits
+(new limit -> sent), check off, negative cathode; preferences table (storage, invalid input) and the warning dialog
+with the real Windows style (dark theme).
+
+README: TODOs updated and extended.
+
 ## v0.1.82 (2026-10-29)
 
-**Monaco tested with the real laser, Power Meter in the background with IR/Green/UV presets, ISEG nominal limits**
+**Monaco tested with the real laser, Power Meter in the background with IR/Green/UV presets, ISEG nominal limits** (ef3c942)
 
 Monaco (Connection/Monaco.py), read-only test with the real laser (only "?" queries, laser/shutter/pulsing unchanged):
 - ?FH and ?WH return lines like "2026-06-25 19:01.56  16 - FAULT: Baseplate temperature": fhGet/whGet read them as
