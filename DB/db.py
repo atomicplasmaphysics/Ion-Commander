@@ -24,6 +24,8 @@ class Tables:
         'Time': '''BIGINT DEFAULT CAST(EXTRACT(EPOCH FROM now()) AS BIGINT)''',
     }
     index = ''
+    # columns without a label are not shown in the History tab (e.g. if only some of the columns are in use)
+    hide_unlabeled = False
 
     def __init__(self):
         self.variables = []
@@ -188,6 +190,30 @@ class PressureTable(Tables):
 
     def __init__(self):
         super().__init__()
+
+
+class PressureRS485Table(Tables):
+    """
+    Pressures of the gauges on the RS485 bus. There is one fixed column for every address of the bus, so adding gauges does
+    not change the structure of the table. The names of the gauges are only labels (see <LabelsTable>), so renaming
+    a gauge does not touch the data. A gauge without a reading is stored as NULL.
+    """
+
+    name = 'PressureRS485'
+    addresses = range(1, 17)
+    structure = {
+        'Time': '''BIGINT DEFAULT CAST(EXTRACT(EPOCH FROM now()) AS BIGINT)''',
+        **{f'Gauge{address:02d}': 'FLOAT' for address in addresses},
+    }
+    hide_unlabeled = True
+
+    def __init__(self):
+        super().__init__()
+
+    @staticmethod
+    def column(address: int) -> str:
+        """Returns name of the column of an address"""
+        return f'Gauge{address:02d}'
 
 
 class PSUTable(Tables):
@@ -382,6 +408,7 @@ class DB:
         self.new_commit_time = datetime.now()
 
         self.pressure_table = PressureTable()
+        self.pressure_rs485_table = PressureRS485Table()
         self.psu_table = PSUTable()
         self.laser_table = LaserTable()
         self.power_meter_table = PowerMeterTable()
@@ -389,6 +416,7 @@ class DB:
         self.electrometer_table = ElectrometerTable()
         self.tables = [
             self.pressure_table,
+            self.pressure_rs485_table,
             self.psu_table,
             self.laser_table,
             self.power_meter_table,
@@ -644,6 +672,33 @@ class DB:
         """
 
         return self.getData(self.tables.index(self.pressure_table), columns, start_time, end_time)
+
+    def insertPressureRS485(self, pressures: dict[int, float | None]):
+        """
+        Inserts pressure values of the gauges on the RS485 bus
+
+        :param pressures: dictionary of {address: pressure in [mbar]}, missing gauges and None are stored as NULL
+        """
+
+        self._execute(self.pressure_rs485_table.insert(*[pressures.get(address) for address in self.pressure_rs485_table.addresses]))
+
+    def getPressureRS485(
+        self,
+        columns: int | tuple[int] | list[str] | None = None,
+        start_time: int | None = None,
+        end_time: int | None = None
+    ) -> bool | tuple[list, np.ndarray]:
+        """
+        Get pressure values of the gauges on the RS485 bus
+
+        :param columns: list of name of columns, tuple of ids of columns or None(=all columns)
+        :param start_time: start time as timestamp
+        :param end_time: end time as timestamp
+
+        :returns: tuple of column names and column values
+        """
+
+        return self.getData(self.tables.index(self.pressure_rs485_table), columns, start_time, end_time)
 
     def insertPSU(
         self,

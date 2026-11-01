@@ -94,12 +94,13 @@ class HistoryWindow(TabWidget):
             self.selection_listwidgets.append(selection_listwidget)
             selection_groupbox_vbox.addWidget(selection_listwidget)
 
-            for attribute in list(table.structure.keys())[1:]:
-                list_item = QListWidgetItem(self.columnLabel(table.name, attribute))
-                list_item.setToolTip(self.columnToolTip(table.name, attribute))
+            for _ in list(table.structure.keys())[1:]:
+                list_item = QListWidgetItem()
                 list_item.setFlags(list_item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
                 list_item.setCheckState(Qt.CheckState.Unchecked)
                 selection_listwidget.addItem(list_item)
+
+        self.updateLabels()
 
         self.splitter.addWidget(self.selection_widget)
 
@@ -258,6 +259,17 @@ class HistoryWindow(TabWidget):
         GlobalConf.settings.sync()
         super().closeEvent(event)
 
+    def updateLabels(self):
+        """Shows the current labels of the database columns in the selection (e.g. after a pressure gauge was renamed), the selection stays"""
+
+        for table, selection_listwidget in zip(self.database.tables, self.selection_listwidgets):
+            labels = self.database.getLabels(table.name)
+            for row, attribute in enumerate(list(table.structure.keys())[1:]):
+                list_item = selection_listwidget.item(row)
+                list_item.setText(self.columnLabel(table.name, attribute))
+                list_item.setToolTip(self.columnToolTip(table.name, attribute))
+                list_item.setHidden(table.hide_unlabeled and attribute not in labels)
+
     def columnLabel(self, table_name: str, column_name: str, with_unit: bool = True) -> str:
         """
         Returns the current label of a database column (falls back to the column name)
@@ -298,7 +310,9 @@ class HistoryWindow(TabWidget):
         """
 
         for row in range(self.selection_listwidgets[listwidget_index].count()):
-            self.selection_listwidgets[listwidget_index].item(row).setCheckState(state)
+            item = self.selection_listwidgets[listwidget_index].item(row)
+            if not item.isHidden():
+                item.setCheckState(state)
 
     def getTimeRange(self) -> tuple[int, int] | None:
         """Returns the selected (start, end) timestamps or None (with a message box) if they are invalid"""
@@ -380,7 +394,8 @@ class HistoryWindow(TabWidget):
             column_names, column_values = data
 
             labels.extend([f'{table.name}: {self.columnLabel(table.name, column_name)}' for column_name in column_names[1:]])
-            datas.append(column_values)
+            # NULL values are exported as nan
+            datas.append(column_values.astype(float))
 
         if not labels:
             return np.array([]), []

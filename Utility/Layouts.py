@@ -269,6 +269,10 @@ class VBoxTitleLayout(QVBoxLayout):
     def setBodyLayout(self, layout):
         """Sets the layout of the body"""
         self.body_widget.setLayout(layout)
+        self.updateBodyMinimumWidth()
+
+    def updateBodyMinimumWidth(self):
+        """Updates the minimum width of the panel, needed if the content of the body changes its width"""
         if not self.scroll_horizontal:
             # the panel cannot get narrower than the body (plus a possible vertical scrollbar), nothing is cut off at the side
             scrollbar_width = self.body_scroll.verticalScrollBar().sizeHint().width()
@@ -1694,11 +1698,13 @@ class PressureWidget(QWidget):
     Widget that extends the QWidget to display the pressure
 
     :param input_range: input range as tuple of (maximum, minimum)
+    :param stack_size: size of the stack with the digit
     """
 
     def __init__(
         self,
         input_range: tuple[float, float] = (1E3, 5E-10),
+        stack_size: QSize = QSize(100, 100),
         **kwargs
     ):
         super().__init__(**kwargs)
@@ -1711,6 +1717,7 @@ class PressureWidget(QWidget):
         self.setLayout(self.main_layout)
 
         self.stack_widget = StackWidget(
+            size=stack_size,
             color_top=Colors.color_green,
             color_bottom=Colors.color_red,
             color_grayed=Colors.app_background_event
@@ -1721,6 +1728,17 @@ class PressureWidget(QWidget):
         self.pressure_label = QLabel('', self)
         self.main_layout.addWidget(self.pressure_label, alignment=Qt.AlignmentFlag.AlignHCenter)
 
+        self.setPressure(self.pressure)
+
+    def setInputRange(self, input_range: tuple[float, float]):
+        """
+        Sets the input range
+
+        :param input_range: input range as tuple of (maximum, minimum)
+        """
+
+        self.input_range = input_range
+        self.input_range_exponents = [int(log10(ir)) for ir in input_range]
         self.setPressure(self.pressure)
 
     def setPressure(self, pressure: float):

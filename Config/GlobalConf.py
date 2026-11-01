@@ -1,4 +1,5 @@
 import logging
+from json import dumps, loads
 
 from PyQt6.QtCore import QSettings, QRect
 from PyQt6.QtWidgets import QApplication
@@ -274,7 +275,7 @@ class GlobalConf:
     title = 'Ion Commander'
 
     # version (single source of truth - update only here)
-    version = '0.1.84'
+    version = '0.1.85'
 
     # logger
     logger = logging.getLogger(title)
@@ -293,6 +294,7 @@ class GlobalConf:
     connection_psu_port_name = 'connection_psu_port'
     connection_ebis_port_name = 'connection_ebis_port'
     connection_pressure_port_name = 'connection_pressure_port'
+    connection_pressure_rs485_port_name = 'connection_pressure_rs485_port'
     connection_laser_ip1_name = 'connection_laser_ip1'
     connection_laser_ip2_name = 'connection_laser_ip2'
     connection_laser_ip3_name = 'connection_laser_ip3'
@@ -302,6 +304,10 @@ class GlobalConf:
     connection_camera_name = 'connection_camera'
     connection_electrometer_name = 'connection_electrometer'
     cobold_measurement_folder_name = 'cobold_measurement_folder'
+
+    # pressure gauges on the ADC and on the RS485 bus
+    pressure_gauges_name = 'pressure_gauges'
+    pressure_rs485_gauges_group_name = 'pressure_rs485_gauges'
 
     # popped out panels
     popout_group_name = 'popouts'
@@ -372,7 +378,8 @@ class GlobalConf:
         laser: tuple[int, int, int, int, int] | list[int] = None,
         power_meter: str = None,
         camera: str = None,
-        electrometer: str = None
+        electrometer: str = None,
+        pressure_rs485: str = None
     ):
         """
         Updates and saves settings object with connection parameters
@@ -380,6 +387,7 @@ class GlobalConf:
         :param psu: port of PSU
         :param ebis: port of EBIS
         :param pressure: port of pressure ADC
+        :param pressure_rs485: port of the RS485 adapter of the pressure gauges
         :param laser: tuple of (laser_ip1, laser_ip2, laser_ip3, laser_ip4, laser_port)
         :param power_meter: resource name of power meter
         """
@@ -390,6 +398,8 @@ class GlobalConf:
             GlobalConf.settings.setValue(GlobalConf.connection_ebis_port_name, ebis)
         if pressure is not None:
             GlobalConf.settings.setValue(GlobalConf.connection_pressure_port_name, pressure)
+        if pressure_rs485 is not None:
+            GlobalConf.settings.setValue(GlobalConf.connection_pressure_rs485_port_name, pressure_rs485)
         if laser is not None:
             GlobalConf.settings.setValue(GlobalConf.connection_laser_ip1_name, laser[0])
             GlobalConf.settings.setValue(GlobalConf.connection_laser_ip2_name, laser[1])
@@ -415,6 +425,8 @@ class GlobalConf:
             return GlobalConf.settings.value(GlobalConf.connection_ebis_port_name, defaultValue='', type=str)
         if connection_type == 'pressure':
             return GlobalConf.settings.value(GlobalConf.connection_pressure_port_name, defaultValue='', type=str)
+        if connection_type == 'pressure_rs485':
+            return GlobalConf.settings.value(GlobalConf.connection_pressure_rs485_port_name, defaultValue='', type=str)
         if connection_type == 'power_meter':
             return GlobalConf.settings.value(GlobalConf.connection_power_meter_port_name, defaultValue='', type=str)
         if connection_type == 'camera':
@@ -428,6 +440,57 @@ class GlobalConf:
                     GlobalConf.settings.value(GlobalConf.connection_laser_ip4_name, defaultValue=-1, type=int),
                     GlobalConf.settings.value(GlobalConf.connection_laser_port_name, defaultValue=-1, type=int))
         raise NotImplementedError(f'Connection type {connection_type} not implemented')
+
+    @staticmethod
+    def updatePressureGauges(gauges: dict[int, tuple[str, str]]):
+        """
+        Updates and saves settings object with the pressure gauges on the ADC
+
+        :param gauges: dictionary of {channel: (name, type of gauge)}
+        """
+
+        GlobalConf.settings.setValue(GlobalConf.pressure_gauges_name, dumps(gauges))
+        GlobalConf.settings.sync()
+
+    @staticmethod
+    def getPressureGauges() -> dict[int, tuple[str, str]] | None:
+        """Returns the pressure gauges on the ADC as {channel: (name, type of gauge)} sorted by channel, None if they were never changed or are invalid"""
+
+        stored = GlobalConf.settings.value(GlobalConf.pressure_gauges_name, defaultValue='', type=str)
+        if not stored:
+            return None
+        try:
+            return dict(sorted((int(channel), (str(name), str(gauge_type))) for channel, (name, gauge_type) in loads(stored).items()))
+        except (ValueError, TypeError, AttributeError) as error:
+            GlobalConf.logger.error(f'Stored pressure gauges are invalid and ignored: {error}')
+            return None
+
+    @staticmethod
+    def updatePressureRS485Gauges(gauges: dict[int, str]):
+        """
+        Updates and saves settings object with the pressure gauges on the RS485 bus
+
+        :param gauges: dictionary of {address: name}
+        """
+
+        GlobalConf.settings.remove(GlobalConf.pressure_rs485_gauges_group_name)
+        for address, name in gauges.items():
+            GlobalConf.settings.setValue(f'{GlobalConf.pressure_rs485_gauges_group_name}/{address}', name)
+        GlobalConf.settings.sync()
+
+    @staticmethod
+    def getPressureRS485Gauges() -> dict[int, str]:
+        """Returns the pressure gauges on the RS485 bus as {address: name} sorted by address, invalid entries are ignored"""
+
+        GlobalConf.settings.beginGroup(GlobalConf.pressure_rs485_gauges_group_name)
+        keys = GlobalConf.settings.childKeys()
+        GlobalConf.settings.endGroup()
+
+        gauges = {}
+        for key in keys:
+            if key.isdigit() and 1 <= int(key) <= 16:
+                gauges[int(key)] = GlobalConf.settings.value(f'{GlobalConf.pressure_rs485_gauges_group_name}/{key}', defaultValue=f'Gauge {key}', type=str)
+        return dict(sorted(gauges.items()))
 
     @staticmethod
     def updatePopouts(popouts: dict[str, tuple[int, int, int, int] | None]):

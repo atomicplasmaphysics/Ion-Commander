@@ -121,11 +121,12 @@ Maybe get some popcorn while figuring it out 🍿
 
 ## Database
 All values are logged once per second into a [DuckDB](https://duckdb.org/) file (`DB/Laserlab.duckdb`).
-- **Data tables** (`Pressure`, `PSU`, `Laser`, `PowerMeter`, `EBIS`): one row per second, one column per value. The column names are
-  *stable ids* - never rename them, otherwise the old data does not match anymore.
+- **Data tables** (`Pressure`, `PressureRS485`, `PSU`, `Laser`, `PowerMeter`, `EBIS`): one row per second, one column per value. The column names are
+  *stable ids* - never rename them, otherwise the old data does not match anymore. `PressureRS485` has one column per bus address
+  (`Gauge01` ... `Gauge16`, empty if there was no reading); columns without a name are hidden in the History tab.
 - **`Labels`**: the human readable name (and unit) of every column, with the time from which it is valid. If something is renamed in the
-  GUI (e.g. a pressure gauge in `PressureVBoxLayout.pressure_gauges` - only the name, not the database column), a new label row is
-  written at the next start. The History tab always shows the current name and lists the previous names in the tooltip.
+  GUI (e.g. a pressure gauge with its Rename button - only the name, not the database column), a new label row is
+  written. The History tab always shows the current name and lists the previous names in the tooltip.
 - **`Events`**: things that happen once (interlock trips, lost connections, ...) with source, type, message and a value.
 
 Old data needs no migration: the data tables and their columns stay exactly the same, only the `Labels` and `Events` tables are
@@ -272,6 +273,8 @@ The size of the database is shown in the menu `Database`.
 - [x] Scrollbars for panels that are larger than the screen (only shown if needed, also in popped out windows)
 - [x] Pressure panel never scrolls horizontally (always full width, vertical scrolling if needed), short reading age ("1.2 s")
 - [x] Pressure digit: only the magnitude of the exponent, positive exponents (>= 10 mbar) in red
+- [x] Thyracont VSH89DL gauges on RS-485 (`Connection/ThyracontRS485.py`), one pressure panel for the ADC and the RS-485 gauges (add, rename, remove, type, degas)
+- [ ] Test the pressure panel with the real LucidControl ADC, the real degas and all gauges on the bus
 - [x] Colored value fields (`DisplayLabel`): margins kept the old color (only the text area was repainted)
 - [x] Script editor: line highlight is a light tint of the background (readable in dark mode)
 - [x] History: auto update button after the end time ("Now")

@@ -15,6 +15,7 @@ from Connection.ISEG import ISEGConnection
 from Connection.TPG300 import TPG300Connection
 from Connection.Thyracont import ThyracontConnection
 from Connection.MixedPressure import MixedPressureConnection
+from Connection.ThyracontRS485 import ThyracontRS485Connection
 from Connection.Monaco import MonacoConnection
 from Connection.TLPMx import TLPMxConnection
 from Connection.Camera import CameraConnection
@@ -27,6 +28,7 @@ if TYPE_CHECKING:
     base_thyracont = ThyracontConnection
     base_tpg300 = TPG300Connection
     base_mixedpressure = MixedPressureConnection
+    base_thyracont_rs485 = ThyracontRS485Connection
     base_monaco = MonacoConnection
     base_tlpmx = TLPMxConnection
     base_camera = CameraConnection
@@ -37,6 +39,7 @@ else:
     base_thyracont = object
     base_tpg300 = object
     base_mixedpressure = object
+    base_thyracont_rs485 = object
     base_monaco = object
     base_tlpmx = object
     base_camera = object
@@ -367,6 +370,17 @@ class ThreadedMixedPressureConnection(ThreadedConnection, base_mixedpressure):
     """
 
     def __init__(self, connection: MixedPressureConnection, *args, **kwargs):
+        super().__init__(connection, *args, **kwargs)
+
+
+class ThreadedThyracontRS485Connection(ThreadedConnection, base_thyracont_rs485):
+    """
+    Threaded connection for <ThyracontRS485Connection>
+
+    :param connection: ThyracontRS485Connection
+    """
+
+    def __init__(self, connection: ThyracontRS485Connection, *args, **kwargs):
         super().__init__(connection, *args, **kwargs)
 
 

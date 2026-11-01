@@ -96,6 +96,12 @@ class ControlWindow(TabWidget):
         self.pressure_vbox.setBodyLayout(self.pressure_group_vbox)
         self.pressure_parent.setLayout(self.pressure_vbox)
         self.splitter.addWidget(self.pressure_parent)
+        self.pressure_group_vbox.setTitleLayout(self.pressure_vbox)
+
+        # the interlock follows renamed gauges and its gauge can not be removed
+        if self.ebis_enabled:
+            self.pressure_group_vbox.interlock_gauge_function = lambda: self.ebis_group_vbox.combobox_pressure_gauge.getValue(text=True)
+            self.pressure_group_vbox.gauges_changed.connect(self.pressureGaugesChanged)
 
         # Division between columns
         splitter_count = self.splitter.count() - 1
@@ -104,6 +110,17 @@ class ControlWindow(TabWidget):
         for c in range(splitter_count):
             self.splitter.setStretchFactor(c, splitter_width)
         self.splitter.setStretchFactor(splitter_count, int(100 - splitter_width * splitter_count))
+
+    def pressureGaugesChanged(self, old_name: str, new_name: str):
+        """
+        The pressure gauges changed: updates the selection of the EBIS pressure interlock
+
+        :param old_name: old name of a renamed gauge
+        :param new_name: new name of a renamed gauge
+        """
+
+        selected = self.ebis_group_vbox.combobox_pressure_gauge.getValue(text=True)
+        self.ebis_group_vbox.setPressureGauges(self.pressure_group_vbox.gaugeNames(), new_name if selected == old_name else selected)
 
     def pressureCheck(self):
         """Feeds the EBIS pressure interlock periodically and logs every trip to the database"""

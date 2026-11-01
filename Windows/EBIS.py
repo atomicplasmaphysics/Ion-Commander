@@ -350,7 +350,7 @@ class EBISVBoxLayout(QVBoxLayout):
 
         # Pressure gauge selection
         self.label_pressure_gauge = QLabel('Pressure Gauge')
-        pressure_gauge_names = list(PressureVBoxLayout.pressure_gauges.keys())
+        pressure_gauge_names = PressureVBoxLayout.gaugeNames()
         self.combobox_pressure_gauge = ComboBox(
             entries=pressure_gauge_names,
             default=pressure_gauge_names.index(stored_gauge) if stored_gauge in pressure_gauge_names else 0
@@ -773,6 +773,19 @@ class EBISVBoxLayout(QVBoxLayout):
             self.status_heating_ramp.setText(f'Ramping: {self.heating_setpoint:.3f} A \u2192 {self.heating_target:.2f} A')
         else:
             self.status_heating_ramp.setText('')
+
+    def setPressureGauges(self, names: list[str], selected: str):
+        """
+        Sets the pressure gauges that can be used by the interlock
+
+        :param names: names of the pressure gauges
+        :param selected: name of the gauge used by the interlock
+        """
+
+        self.combobox_pressure_gauge.blockSignals(True)
+        self.combobox_pressure_gauge.reinitialize(entries=names, default=names.index(selected) if selected in names else 0)
+        self.combobox_pressure_gauge.blockSignals(False)
+        self.saveInterlockSettings()
 
     def saveInterlockSettings(self):
         """Takes the interlock limits from the input fields and stores them persistently"""

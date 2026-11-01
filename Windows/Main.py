@@ -113,6 +113,7 @@ class MainWindow(QMainWindow):
 
         # store the current labels of the logged columns (rename-proof history)
         self.updateDatabaseLabels()
+        self.control_window.pressure_group_vbox.gauges_changed.connect(self.updateDatabaseLabels)
 
         #
         # MENU BAR
@@ -216,7 +217,8 @@ class MainWindow(QMainWindow):
             }
 
         pressure = control.pressure_group_vbox
-        settings['Pressure_mbar'] = {name: pressure.getPressure(name) for name in pressure.pressure_gauges}
+        settings['Pressure_mbar'] = pressure.getPressures()
+        settings['Pressure_RS485_mbar'] = pressure.rs485.getPressures()
 
         laser = control.laser_group_vbox
         settings['Laser'] = {
@@ -248,11 +250,12 @@ class MainWindow(QMainWindow):
     def updateDatabaseLabels(self):
         """Stores the current labels of the logged columns in the database (only changed labels are written)"""
 
-        from Windows.Pressure import PressureVBoxLayout
-
-        self.database.updateLabels(self.database.pressure_table.name, PressureVBoxLayout.databaseLabels())
+        pressure = self.control_window.pressure_group_vbox
+        self.database.updateLabels(self.database.pressure_table.name, pressure.databaseLabels())
+        self.database.updateLabels(self.database.pressure_rs485_table.name, pressure.rs485.databaseLabels())
         self.database.updateLabels(self.database.psu_table.name, self.control_window.psu_group_vbox.databaseLabels())
         self.database.updateLabels(self.database.electrometer_table.name, {'Current': ('Electrometer Current', 'A')})
+        self.history_window.updateLabels()
 
     def updateServerStatus(self):
         """Updates the CommandServer status in the status bar"""
