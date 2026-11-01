@@ -3,7 +3,7 @@ from datetime import datetime
 
 from PyQt6.QtCore import QCoreApplication, QPoint, QTimer, QSize, Qt, QUrl
 from PyQt6.QtGui import QCloseEvent, QPixmap, QDesktopServices
-from PyQt6.QtWidgets import QMainWindow, QTabWidget, QApplication, QSplashScreen, QLabel
+from PyQt6.QtWidgets import QMainWindow, QTabWidget, QApplication, QSplashScreen, QLabel, QDialog
 
 
 from Config.GlobalConf import GlobalConf, DefaultParams
@@ -25,6 +25,7 @@ from Windows.Tips import TipsWindow
 from Windows.Analyse import AnalyseWindow
 from Windows.Simulation import SimulationWindow
 from Windows.Settings import SettingsDialog
+from Windows.GaugeNames import GaugeNamesDialog
 
 
 class MainWindow(QMainWindow):
@@ -129,6 +130,9 @@ class MainWindow(QMainWindow):
         self.action_database_folder.triggered.connect(
             lambda: QDesktopServices.openUrl(QUrl.fromLocalFile(str(self.database.database_path.parent)))
         )
+        self.action_gauge_names = self.menu_database.addAction('Pressure gauge names...')
+        self.action_gauge_names.setToolTip('Assign the readings of the pressure gauges to names (e.g. chambers) and delete names of tests')
+        self.action_gauge_names.triggered.connect(self.editGaugeNames)
         self.menu_database.aboutToShow.connect(self.updateDatabaseSize)
         self.updateDatabaseSize()
 
@@ -256,6 +260,15 @@ class MainWindow(QMainWindow):
         self.database.updateLabels(self.database.psu_table.name, self.control_window.psu_group_vbox.databaseLabels())
         self.database.updateLabels(self.database.electrometer_table.name, {'Current': ('Electrometer Current', 'A')})
         self.history_window.updateLabels()
+
+    def editGaugeNames(self):
+        """Opens the dialog to assign the readings of the pressure gauges to names"""
+
+        pressure = self.control_window.pressure_group_vbox
+        dialog = GaugeNamesDialog(self.database, pressure.databaseGauges())
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            pressure.setGaugeNames(dialog.currentNames())
+            self.updateDatabaseLabels()
 
     def updateServerStatus(self):
         """Updates the CommandServer status in the status bar"""

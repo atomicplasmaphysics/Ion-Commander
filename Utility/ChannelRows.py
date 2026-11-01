@@ -1,26 +1,27 @@
 from typing import Callable
 
 
-from PyQt6.QtWidgets import QLabel, QPushButton
+from PyQt6.QtWidgets import QLabel
 
 
 from Config.GlobalConf import GlobalConf
 from Config.StylesConf import Colors
 
-from Utility.Layouts import InsertingGridLayout, IndicatorLed, DoubleSpinBox, DisplayLabel, PolarityButton
+from Utility.Layouts import InsertingGridLayout, IndicatorLed, LedButton, DoubleSpinBox, DisplayLabel, PolarityButton
 
 
 class VoltageChannelRow:
     """
     One row of a high voltage channel (used by PSU and EBIS):
-    name | (polarity) | set voltage | measured voltage | measured current | output indicator | enable button
+    name | (polarity) | set voltage | measured voltage | measured current | output led (button) | (current limit | limit reached)
 
     :param grid: grid layout where the row is inserted
     :param name: name of the channel
     :param channel: index of the channel (passed to the functions)
     :param set_voltage: function(channel, voltage) called when the set voltage was edited
-    :param set_output: function(channel, state) called when the enable button is pressed
+    :param set_output: function(channel, state) called when the output led is clicked
     :param set_polarity: function(channel, polarity) called when the polarity is changed (None: no polarity button)
+    :param limit_row: current limit of the channel, shown at the end of the row (None: no current limit)
     :param voltage_maximum: maximum of the set voltage
     :param voltage_deviation: allowed deviation of the measured voltage
     :param current_maximum: allowed current (shown in red above)
@@ -40,6 +41,7 @@ class VoltageChannelRow:
         set_voltage: Callable[[int, float], None],
         set_output: Callable[[int, bool], None],
         set_polarity: Callable[[int, bool], None] | None = None,
+        limit_row: 'CurrentLimitRow | None' = None,
         voltage_maximum: float = 1000,
         voltage_deviation: float = 1,
         current_maximum: float = 1E-4,
@@ -75,16 +77,16 @@ class VoltageChannelRow:
             self.status_current = DisplayLabel(value=0, unit='A', target_value=0, deviation=current_maximum, enable_prefix=current_prefix, **current_kwargs)
             self.status_current.setToolTip(f'Measured current of {name}')
 
-        self.indicator = IndicatorLed()
-        self.indicator.setToolTip(f'Output of {name} is on (green) or off')
-        self.button_enable = QPushButton('Enable')
-        self.button_enable.setToolTip(f'Switch the output of {name} on/off')
-        self.button_enable.pressed.connect(lambda: set_output(self.channel, not self.indicator.value()))
+        self.indicator = LedButton()
+        self.indicator.setToolTip(f'Output of {name} is on (green) or off. Click to switch it on/off')
+        self.indicator.clicked.connect(lambda: set_output(self.channel, not self.indicator.value()))
 
         widgets = [self.label]
         if self.button_polarity is not None:
             widgets.append(self.button_polarity)
-        widgets.extend([self.spinbox_voltage, self.status_voltage, self.status_current, self.indicator, self.button_enable])
+        widgets.extend([self.spinbox_voltage, self.status_voltage, self.status_current, self.indicator])
+        if limit_row is not None:
+            widgets.extend([limit_row.spinbox_limit, limit_row.indicator_limit])
         grid.addWidgets(*widgets)
 
     def setVoltageMaximum(self, maximum: float):
@@ -105,7 +107,6 @@ class VoltageChannelRow:
         """
 
         self.indicator.setValue(state)
-        self.button_enable.setText('Disable' if state else 'Enable')
         if not state:
             self.status_voltage.setTargetValue(0)
 
@@ -113,7 +114,6 @@ class VoltageChannelRow:
         """Resets the row to its default values"""
 
         self.indicator.setValue(False)
-        self.button_enable.setText('Enable')
         if self.button_polarity is not None:
             self.button_polarity.reset()
         self.spinbox_voltage.reset()
@@ -126,9 +126,9 @@ class VoltageChannelRow:
 
 class CurrentLimitRow:
     """
-    One row of a current limit (used by PSU and EBIS): name | current limit [mA] | limit reached indicator
+    Current limit of a channel (used by PSU and EBIS): current limit [mA] | limit reached indicator.
+    The widgets are shown in the <VoltageChannelRow> of the channel.
 
-    :param grid: grid layout where the row is inserted
     :param name: name of the channel
     :param channel: index of the channel (passed to the function)
     :param set_current_limit: function(channel, current in mA) called when the limit was edited
@@ -137,7 +137,6 @@ class CurrentLimitRow:
 
     def __init__(
         self,
-        grid: InsertingGridLayout,
         name: str,
         channel: int,
         set_current_limit: Callable[[int, float], None],
@@ -146,13 +145,11 @@ class CurrentLimitRow:
         self.name = name
         self.channel = channel
 
-        self.label = QLabel(name)
-        self.spinbox_limit = DoubleSpinBox(default=input_range[0], step_size=0.001, input_range=input_range, decimals=3, buttons=False)
+        self.spinbox_limit =DoubleSpinBox(default=input_range[0], step_size=0.001, input_range=input_range, decimals=3, buttons=False)
         self.spinbox_limit.setToolTip(f'Current limit of {name} in mA (range {input_range[0]} ... {input_range[1]} mA)')
         self.spinbox_limit.editingFinished.connect(lambda: set_current_limit(self.channel, self.spinbox_limit.value()))
         self.indicator_limit = IndicatorLed(on_color=Colors.color_red)
         self.indicator_limit.setToolTip(f'Red if the measured current of {name} reached the limit')
-        grid.addWidgets(self.label, self.spinbox_limit, self.indicator_limit)
 
     def setLimitMaximum(self, maximum: float):
         """

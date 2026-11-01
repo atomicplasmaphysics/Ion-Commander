@@ -24,8 +24,9 @@ class Tables:
         'Time': '''BIGINT DEFAULT CAST(EXTRACT(EPOCH FROM now()) AS BIGINT)''',
     }
     index = ''
-    # columns without a label are not shown in the History tab (e.g. if only some of the columns are in use)
-    hide_unlabeled = False
+    # the History tab shows one entry per name (label) of the columns instead of one entry per column, it only shows the
+    # readings of the time when a column had this name (e.g. a pressure gauge that moved to a different chamber)
+    track_names = False
 
     def __init__(self):
         self.variables = []
@@ -187,6 +188,7 @@ class PressureTable(Tables):
         'ESD': 'FLOAT default 0',
         'Prevac': 'FLOAT default 0',
     }
+    track_names = True
 
     def __init__(self):
         super().__init__()
@@ -205,7 +207,7 @@ class PressureRS485Table(Tables):
         'Time': '''BIGINT DEFAULT CAST(EXTRACT(EPOCH FROM now()) AS BIGINT)''',
         **{f'Gauge{address:02d}': 'FLOAT' for address in addresses},
     }
-    hide_unlabeled = True
+    track_names = True
 
     def __init__(self):
         super().__init__()
@@ -1028,6 +1030,74 @@ class DB:
         except Exception as error:
             GlobalConf.logger.error(f'DB: Could not read label history of "{table_name}.{column_name}": {error}')
             return []
+
+    def getNamePeriods(self, table_name: str) -> dict[str, list[tuple[str, str, int, int | None]]]:
+        """
+        Returns when which name was used: every label of a column is valid from its time until the time of the next label
+        of this column. An empty label means that the readings of this time have no name, these are not returned.
+
+        :param table_name: name of the data table
+        :returns: dictionary of {name: [(column_name, unit, start_time, end_time or None if it is still valid), ...]}, latest name first
+        """
+
+        if self.connection is None or self.cursor is None:
+            return {}
+
+        try:
+            self.cursor.execute(
+                f'''SELECT ColumnName, Time, Label, Unit FROM {self.labels_table.name} WHERE TableName = ? ORDER BY ColumnName, Time, rowid;''',
+                (table_name, )
+            )
+            rows = self.cursor.fetchall()
+        except Exception as error:
+            GlobalConf.logger.error(f'DB: Could not read names of table "{table_name}": {error}')
+            return {}
+
+        periods = []
+        for row, next_row in zip(rows, rows[1:] + [None]):
+            column_name, start_time, label, unit = row
+            end_time = next_row[1] if next_row is not None and next_row[0] == column_name else None
+            if label:
+                periods.append((label, (column_name, unit, start_time, end_time)))
+
+        # names that are still used first, then the most recently used ones
+        periods.sort(key=lambda period: (period[1][3] is None, period[1][3] or 0, period[1][2]), reverse=True)
+        names = {}
+        for label, period in periods:
+            names.setdefault(label, []).append(period)
+        for name_periods in names.values():
+            name_periods.sort(key=lambda period: period[2])
+        return names
+
+    def setLabelHistory(self, table_name: str, column_name: str, history: list[tuple[int, str, str]]) -> bool:
+        """
+        Replaces all labels of a column (e.g. to assign the readings of a time to a different name). The readings are not changed.
+
+        :param table_name: name of the data table
+        :param column_name: name of the column
+        :param history: list of (time, label, unit), an empty label means that the readings of this time have no name
+        :returns: True if the labels were stored
+        """
+
+        old_history = self.getLabelHistory(table_name, column_name)
+        GlobalConf.logger.info(f'DB: Labels of "{table_name}.{column_name}" changed from {old_history} to {history}')
+        insert = f'''INSERT INTO {self.labels_table.name} (Time, TableName, ColumnName, Label, Unit) VALUES (?, ?, ?, ?, ?);'''
+        delete = f'''DELETE FROM {self.labels_table.name} WHERE TableName = ? AND ColumnName = ?;'''
+        stored = True
+        try:
+            self._execute_parameterized(delete, (table_name, column_name))
+            for time, label, unit in history:
+                self._execute_parameterized(insert, (time, table_name, column_name, label, unit))
+        except Exception as error:
+            GlobalConf.logger.error(f'DB: Could not store labels of "{table_name}.{column_name}", restoring the old ones: {error}')
+            stored = False
+            self._execute_parameterized(delete, (table_name, column_name))
+            for time, label, unit in old_history:
+                self._execute_parameterized(insert, (time, table_name, column_name, label, unit))
+
+        self.labels_cache.pop(table_name, None)
+        self._commit()
+        return stored
 
     def updateLabels(self, table_name: str, labels: dict[str, str | tuple[str, str]]):
         """

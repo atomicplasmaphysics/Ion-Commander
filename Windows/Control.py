@@ -49,7 +49,7 @@ class ControlWindow(TabWidget):
         self.ebis_enabled = True
         if self.ebis_enabled:
             # EBIS CONTROL
-            self.ebis_vbox = VBoxTitleLayout('EBIS', parent=self, add_stretch=True, popout_enable=True)
+            self.ebis_vbox = VBoxTitleLayout('EBIS', parent=self, add_stretch=True, popout_enable=True, fit_content=True)
             self.ebis_group_vbox = EBISVBoxLayout()
 
             # Stretch to bottom
@@ -69,7 +69,7 @@ class ControlWindow(TabWidget):
             self.pressure_check_timer.start()
 
         # LASER CONTROL
-        self.laser_vbox = VBoxTitleLayout('LASER', parent=self, add_stretch=True, popout_enable=True)
+        self.laser_vbox = VBoxTitleLayout('LASER', parent=self, add_stretch=True, popout_enable=True, fit_content=True)
         self.laser_group_vbox = LaserVBoxLayout()
 
         # Stretch to bottom
@@ -84,7 +84,7 @@ class ControlWindow(TabWidget):
 
         # PRESSURE CONTROL
         # the pressures are always fully visible in width (no horizontal scrollbar)
-        self.pressure_vbox = VBoxTitleLayout('Pressure', parent=self, add_stretch=True, popout_enable=True, scroll_horizontal=False)
+        self.pressure_vbox = VBoxTitleLayout('Pressure', parent=self, add_stretch=True, popout_enable=True, scroll_horizontal=False, fit_content=True)
         self.pressure_group_vbox = PressureVBoxLayout()
 
         # Stretch to bottom
@@ -103,13 +103,37 @@ class ControlWindow(TabWidget):
             self.pressure_group_vbox.interlock_gauge_function = lambda: self.ebis_group_vbox.combobox_pressure_gauge.getValue(text=True)
             self.pressure_group_vbox.gauges_changed.connect(self.pressureGaugesChanged)
 
-        # Division between columns
-        splitter_count = self.splitter.count() - 1
-        splitter_width_last = 10
-        splitter_width = int((100 - splitter_width_last) / splitter_count)
-        for c in range(splitter_count):
-            self.splitter.setStretchFactor(c, splitter_width)
-        self.splitter.setStretchFactor(splitter_count, int(100 - splitter_width * splitter_count))
+        # Division between columns: no panel gets wider than its content, only the leftmost panel takes the remaining width
+        self.title_layouts = [self.psu_vbox, self.ebis_vbox, self.laser_vbox, self.pressure_vbox] if self.ebis_enabled else [self.psu_vbox, self.laser_vbox, self.pressure_vbox]
+        for index, title_layout in enumerate(self.title_layouts):
+            title_layout.updateBodyMinimumWidth()
+            self.splitter.setStretchFactor(index, 1 if index == 0 else 0)
+        self.splitter_moved = False
+        self.splitter.splitterMoved.connect(self.splitterMoved)
+
+    def splitterMoved(self):
+        """The user changed the width of the panels: they are not fitted automatically anymore"""
+        self.splitter_moved = True
+
+    def resizeEvent(self, event):
+        """The panels fit the window until the user changes their widths (the window gets its final size after it is shown)"""
+
+        super().resizeEvent(event)
+        if not self.splitter_moved:
+            QTimer.singleShot(0, self.fitPanels)
+
+    def fitPanels(self):
+        """All panels get the width of their content and the leftmost one the rest. If the window is too narrow, the panels that can scroll get smaller."""
+
+        widths = [title_layout.contentWidth() for title_layout in self.title_layouts]
+        widths[0] += sum(self.splitter.sizes()) - sum(widths)
+        if widths[0] < self.psu_vbox.contentWidth():
+            # the pressure panel (last one) keeps its width
+            missing = self.psu_vbox.contentWidth() - widths[0]
+            widths[0] += missing
+            for index in range(len(widths) - 1):
+                widths[index] -= missing // (len(widths) - 1)
+        self.splitter.setSizes(widths)
 
     def pressureGaugesChanged(self, old_name: str, new_name: str):
         """

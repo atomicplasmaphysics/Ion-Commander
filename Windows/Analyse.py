@@ -8,7 +8,7 @@ from PyQt6.QtGui import QDragEnterEvent, QDropEvent
 from PyQt6.QtWidgets import QGroupBox, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QGridLayout, QApplication
 
 
-from Utility.Layouts import DeleteWidgetList, DeleteWidgetListItem, ComboBox, TOFCanvas, TabWidget, IndicatorLedButton
+from Utility.Layouts import IconButton, DeleteWidgetList, DeleteWidgetListItem, ComboBox, TOFCanvas, TabWidget, IndicatorLedButton
 from Utility.Dialogs import TACDialog, LMFDialog
 from Utility.FileDialogs import selectFileDialog
 from Utility.Fitting import getFileData, FitMethod, fittingFunctionsSingle, fittingFunctionsMultiple, supported_file_types
@@ -119,7 +119,7 @@ class AnalyseWindow(TabWidget):
         self.row_fitting.addLayout(self.row_fitting_parameters)
 
         self.fitting_parameters_box = QGroupBox('Fitting Parameters')
-        self.fitting_parameters_copy_button = QPushButton(self)
+        self.fitting_parameters_copy_button = IconButton(self)
         self.fitting_parameters_copy_button.setIcon(getIcon('copy.svg'))
         self.fitting_parameters_copy_button.setToolTip('Copy fitting parameters (not available)')
         self.fitting_parameters_copy_button.setDisabled(True)

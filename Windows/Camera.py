@@ -20,7 +20,7 @@ from DB.db import DB
 
 from Socket.CommandServer import DeviceCameraWrapper
 
-from Utility.Layouts import InsertingGridLayout, IndicatorLed, DoubleSpinBox, ComboBox, ReadingAgeLabel, IndicatorLedButton
+from Utility.Layouts import ConnectButton, IconButton, InsertingGridLayout, IndicatorLed, DoubleSpinBox, ComboBox, ReadingAgeLabel, IndicatorLedButton
 from Utility.AutoReconnect import AutoReconnect
 from Utility.Dialogs import showMessageBox
 from Utility.Icons import getIcon
@@ -71,10 +71,10 @@ class CameraVBoxLayout(QVBoxLayout):
         self.status_connection = QLabel('Not connected')
         self.combobox_connection = ComboBox()
         self.combobox_connection.setToolTip('Camera (the virtual camera simulates a laser spot for testing)')
-        self.button_connection = QPushButton('Connect')
+        self.button_connection = ConnectButton()
         self.button_connection.setToolTip('Connect to / disconnect from the selected camera')
         self.button_connection.pressed.connect(self.manualConnect)
-        self.button_connection_refresh = QPushButton()
+        self.button_connection_refresh = IconButton()
         self.button_connection_refresh.setToolTip('Refresh camera list')
         self.button_connection_refresh.setIcon(getIcon('refresh.svg'))
         self.button_connection_refresh.pressed.connect(self.setCamerasComboBox)
@@ -226,7 +226,7 @@ class CameraVBoxLayout(QVBoxLayout):
             self.status_connection.setText('Connected')
             self.combobox_connection.setEnabled(False)
             self.button_connection_refresh.setEnabled(False)
-            self.button_connection.setText('Disconnect')
+            self.button_connection.setConnected(True)
             self.maximum_value = self.connection.getMaximumValue()
             self.setExposure()
             self.setGain()
@@ -283,7 +283,7 @@ class CameraVBoxLayout(QVBoxLayout):
         self.frame_times = []
         self.indicator_connection.setValue(False)
         self.status_connection.setText('Not connected')
-        self.button_connection.setText('Connect')
+        self.button_connection.setConnected(False)
         self.button_live.setText('Start live')
         self.combobox_connection.setEnabled(True)
         self.button_connection_refresh.setEnabled(True)

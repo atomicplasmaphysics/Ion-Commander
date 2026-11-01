@@ -13,7 +13,7 @@ from DB.db import DB
 
 from Socket.CommandServer import DeviceTLPMxWrapper
 
-from Utility.Layouts import InsertingGridLayout, IndicatorLed, DoubleSpinBox, DisplayLabel, SpinBox, ComboBox, LatexLabel, ReadingAgeLabel
+from Utility.Layouts import ConnectButton, IconButton, InsertingGridLayout, IndicatorLed, DoubleSpinBox, DisplayLabel, SpinBox, ComboBox, LatexLabel, ReadingAgeLabel
 from Utility.Functions import getPrefix, isSaneNumber
 from Utility.AutoReconnect import AutoReconnect
 from Utility.Dialogs import showMessageBox
@@ -78,12 +78,12 @@ class PowerMeterVBoxLayout(QVBoxLayout):
         self.combobox_connection = ComboBox()
         self.combobox_connection.setToolTip('Port of the device (refresh the list with the button on the right)')
         self.connection_hbox_selection.addWidget(self.combobox_connection)
-        self.button_connection = QPushButton('Connect')
+        self.button_connection = ConnectButton()
         self.button_connection.setToolTip('Connect to / disconnect from the selected port')
         self.button_connection.pressed.connect(self.manualConnect)
         self.connection_hbox_selection.addWidget(self.button_connection)
 
-        self.button_connection_refresh = QPushButton()
+        self.button_connection_refresh = IconButton()
         self.button_connection_refresh.setToolTip('Refresh connections list')
         self.button_connection_refresh.setIcon(getIcon('refresh.svg'))
         self.button_connection_refresh.pressed.connect(self.setPortsComboBox)
@@ -529,7 +529,7 @@ class PowerMeterVBoxLayout(QVBoxLayout):
         if not connect:
             self.combobox_connection.setEnabled(True)
             self.button_connection_refresh.setEnabled(not self.background.isBusy())
-            self.button_connection.setText('Connect')
+            self.button_connection.setConnected(False)
             self.updateAllValues()
             return
 
@@ -578,7 +578,7 @@ class PowerMeterVBoxLayout(QVBoxLayout):
         self.last_port = port
         self.combobox_connection.setEnabled(False)
         self.button_connection_refresh.setEnabled(False)
-        self.button_connection.setText('Disconnect')
+        self.button_connection.setConnected(True)
 
         self.device_wrapper.threaded_connection.setAutoRange((1, 1))
         self.auto_reconnect.reconnected()
@@ -690,7 +690,7 @@ class PowerMeterVBoxLayout(QVBoxLayout):
 
         self.indicator_connection.setValue(False)
         self.status_connection.setText('Not connected')
-        self.button_connection.setText('Connect')
+        self.button_connection.setConnected(False)
 
         self.spinbox_wavelength.reset()
         self.status_wavelength.setValue(0)

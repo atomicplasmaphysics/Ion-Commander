@@ -127,6 +127,9 @@ All values are logged once per second into a [DuckDB](https://duckdb.org/) file 
 - **`Labels`**: the human readable name (and unit) of every column, with the time from which it is valid. If something is renamed in the
   GUI (e.g. a pressure gauge with its Rename button - only the name, not the database column), a new label row is
   written. The History tab always shows the current name and lists the previous names in the tooltip.
+  Pressure gauges (`Pressure`, `PressureRS485`): every name is its own entry in the History tab and only shows the readings of the time
+  when a gauge had this name (e.g. the same gauge first on "PITBUL", later on "ThoriumClock"). With `Database > Pressure gauge names...` the
+  readings can be assigned to other names or get no name (empty label, e.g. tests). This only changes `Labels`, never the readings.
 - **`Events`**: things that happen once (interlock trips, lost connections, ...) with source, type, message and a value.
 
 Old data needs no migration: the data tables and their columns stay exactly the same, only the `Labels` and `Events` tables are
@@ -144,10 +147,10 @@ The size of the database is shown in the menu `Database`.
 - [x] Make the current Data-Analysis application as a subtab
 - [x] Build a control subtab (Pressure, Voltage, Laser)
 - [x] Logg everything in the control-tab
-- [ ] Build a measure subtab (for TAC)
+- [ ] Build a measure subtab (for TAC, `# TODO` in `Windows/Main.py`)
 - [x] Build a measure subtab (for TDC) - tab `Measure` with CoboldPC
 - [ ] Test the CoboldPC interface and make it functional with CCF-files
-- [ ] Build a measure subtab (for NDIGO - if NDIGO is built)
+- [ ] Build a measure subtab (for NDIGO - if NDIGO is built, `# TODO` in `Windows/Main.py`)
 - [x] Build a laser subtab
 - [x] Make better logo and splash screen
 - [x] Start TDC software automatic with a button press and safe it automatically (CoboldPC: start, timed measurement, naming format)
@@ -194,16 +197,18 @@ The size of the database is shown in the menu `Database`.
 - [x] Monaco: `python -m Connection.Monaco` reads the status of the laser (only queries, no laser/shutter/pulsing changes)
 - [ ] Monaco: show the fault/warning history and the sessions in the Laser panel (stale USB sessions with control are listed by `?SESSIONS`)
 - [ ] Monaco: show the datalogger (e.g. chiller temperature, faults of the last days) in the Laser panel or the History tab
-- [ ] ISEG: implement MICC user calibration commands
+- [ ] ISEG: implement MICC user calibration commands (`# TODO` in `Connection/ISEG.py`)
 - [x] Include the device name in error messages of `ThreadedConnection.handleError`
 - [x] Get limits, units and decimals of PSU/EBIS spinboxes right, and move the input ranges to `DefaultParams` (editable in the preferences)
 - [x] PSU/EBIS: limit the voltage/current fields to the nominal values reported by the ISEG (`:READ:VOLT:NOM?`, `:READ:CURR:NOM?`) after connecting (smaller one of nominal value and preference)
 - [x] Power Meter: searching (~6 s), connecting (~1.3 s) and disconnecting (~2 s) in the background (the GUI hung, the search ran on every connect/disconnect)
 - [x] Power Meter: presets IR, Green (518 nm) and UV below each other in the column "Preset"
 - [ ] Connect the other devices in the background as well (PSU/EBIS/Electrometer open serial ports in the GUI thread, ISEG echo detection takes a while)
-- [ ] EBIS heating current: enable button directly at the current row (currently blocked by the warning message box on `editingFinished`)
-- [ ] PSU: decide if all other channels must be switched on again after a polarity switch
-- [ ] Laser: verify units of the chiller pressure and the RF level / output frequency calculation (see TODOs in `Laser.py`)
+- [ ] EBIS heating current: enable button directly at the current row (currently blocked by the warning message box on `editingFinished`, `# TODO` in `Windows/EBIS.py`)
+- [ ] PSU: decide if all other channels must be switched on again after a polarity switch (`# TODO` in `PSU.py`)
+- [ ] Laser: verify the unit of the chiller pressure (shown as bar) and its target value (currently the middle of the lower and upper limit), `# TODO`s in `Laser.py`
+- [ ] Laser: verify the RF level / output frequency calculation
+- [ ] Laser: also log `mrr`, `rrd` and `sb` (commented out in `Laser.log`, bare `# TODO` there; `state_rrd_setting` is never set)
 - [x] Laser: catch more socket errors on connect (`TELNET_ERRORS`)
 - [x] Power meter: handle values outside of the valid range (shown as "Out of range", logged as NULL)
 
@@ -242,7 +247,9 @@ The size of the database is shown in the menu `Database`.
 - [x] Better limiting of fit parameters (`Fitting.py`: `estimateGauss`, `gaussBounds`, adaptive window for Gauss (center))
 - [ ] LogNorm/Gauss fits with constant background (offset) as additional parameter
 - [x] Check for sane numbers (no `inf`/`nan`) in `Functions.py` (`isSaneNumber`, `saneOrDefault`)
-- [ ] LMF reader: read more header parameters and full event data (see TODOs in `LMFConvert.py`)
+- [ ] LMF reader: read more header parameters if needed (`# TODO` in `LMFConvert.py`)
+- [ ] LMF reader: full event data (`# TODO`s in `LMFConvert.py`, probably never needed because python is too slow for it): use the bits of an event, `readEvents` has no loop yet, `readEvent` only knows one format
+- [ ] LMF reader: check the condition in `readEvent`: the "NoGrouping" reader is only used if `GroupingEnable` is true, this looks inverted
 - [ ] Export of fit results (CSV) and plots (PNG/PDF) in the Analyse tab
 - [ ] Mass axis calibration in the Analyse tab using the Simulation calculators
 
@@ -251,7 +258,7 @@ The size of the database is shown in the menu `Database`.
 - [x] History: optionally show min/max envelopes instead of averages for downsampled data (toggle "Min/Max")
 - [x] Show the database size (menu `Database`)
 - [x] Rename-proof logging: stable column ids plus a `Labels` table, so renaming e.g. a pressure gauge does not break the history
-- [ ] Use the label valid at the time of the data for exports (currently the latest label is used)
+- [ ] Use the label valid at the time of the data for exports (pressure gauges do this already, all other columns use the latest label)
 - [x] `Events` table for one-time events (interlock trips, lost connections, ...)
 - [x] Log lost connections and reconnects as events
 - [x] Mark the events in the History plots (toggle "Events")
@@ -275,6 +282,16 @@ The size of the database is shown in the menu `Database`.
 - [x] Pressure digit: only the magnitude of the exponent, positive exponents (>= 10 mbar) in red
 - [x] Thyracont VSH89DL gauges on RS-485 (`Connection/ThyracontRS485.py`), one pressure panel for the ADC and the RS-485 gauges (add, rename, remove, type, degas)
 - [ ] Test the pressure panel with the real LucidControl ADC, the real degas and all gauges on the bus
+- [x] Control tab fits on one screen: current limits in the channel rows, leds as on/off buttons (`LedButton`), icon buttons on the gauges
+- [x] History per gauge name (chamber), menu `Database > Pressure gauge names...` to reassign and delete names
+- [ ] Test on the lab PC with real data and devices: gauge names dialog, connect icons (`ConnectButton`), leds as buttons (laser shutter/pulsing, PSU/EBIS outputs)
+- [x] Connect/Disconnect as icons, icon-only buttons with a centered icon and square (`IconButton`, the Windows 11 style draws the icon at a fixed distance from the left edge)
+- [ ] `IconButton`: check in the dark theme
+- [x] Panel widths of the Control tab: never wider than their content (except PSU, which gets the free space), Pressure has a fixed width, fitted on startup and resize until a divider is dragged
+- [ ] Control tab on a 1707 px wide window (2560 px at 150 %): PSU, EBIS and Laser each still scroll sideways by about 37 px, make the rows narrower
+- [ ] Pressure panel in low windows: it switches to more columns (about 1000 px at 800 px window height) and squeezes the other panels, limit the columns and scroll vertically instead
+- [ ] Port comboboxes of the connection rows cut off the last letter of "None"
+- [ ] Flame and folder icons look 1-2 device pixels too high in their buttons (the drawings are not symmetric)
 - [x] Colored value fields (`DisplayLabel`): margins kept the old color (only the text area was repainted)
 - [x] Script editor: line highlight is a light tint of the background (readable in dark mode)
 - [x] History: auto update button after the end time ("Now")
@@ -294,6 +311,9 @@ The size of the database is shown in the menu `Database`.
 - [x] Threaded workers wake up immediately on new work (no 0.1 s polling, faster camera, scripts and GUI updates)
 - [ ] Unit tests for things without hardware (`parseFunctionCall`, `CommandQueue.parseScript`, `convertInChannelString`, `getPrefix`, LMF reader, pressure conversions) using the virtual devices
 - [x] Replace `print` statements with the logger (remaining `print`s are only in the demo/test functions of the drivers)
+- [ ] `tests/` is in `.gitignore`: decide which tests go into the repository
+- [ ] Shared widget for the connection rows (label, led, port combobox, connect, refresh are built separately in every device panel)
+- [ ] Thorlabs power meter driver missing: startup prints `path to dll "TLPMX_64.dll" could not be found`, say once what it means for the panel
 - [ ] Command-line arguments (log level, virtual devices, no CommandServer)
 - [x] Broken package update (matplotlib half-installed because the GUI was running), DuckDB pinned to < 2 (nanobind leak warnings on exit), `DB.close()` closes the connection
 - [ ] DuckDB 2.0: check again if a later release does not print the nanobind leak warnings on exit (known issue of DuckDB 2.0, harmless, the database file stays readable with 1.x, tested)

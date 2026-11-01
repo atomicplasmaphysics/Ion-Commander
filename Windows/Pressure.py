@@ -20,7 +20,7 @@ from DB.db import DB, PressureTable, PressureRS485Table
 
 from Socket.CommandServer import DeviceMixedPressureWrapper
 
-from Utility.Layouts import PressureWidget, IndicatorLed, ComboBox, ReadingAgeLabel, VBoxTitleLayout
+from Utility.Layouts import ConnectButton, IconButton, PressureWidget, IndicatorLed, ComboBox, ReadingAgeLabel, VBoxTitleLayout
 from Utility.AutoReconnect import AutoReconnect, EventLog
 from Utility.Dialogs import showMessageBox
 from Utility.Icons import getIcon
@@ -43,7 +43,7 @@ pressure_gauge_types = {
 
 class PressureGaugeBox(QGroupBox):
     """
-    Compact group box of one gauge: big pressure on the left, small buttons on the right
+    Compact group box of one gauge: digit on the left, on the right the pressure and below it the controls
 
     :param title: title of group box
     :param tooltip: tooltip of group box
@@ -51,46 +51,47 @@ class PressureGaugeBox(QGroupBox):
     :param remove_function: called when the remove button is pressed
     """
 
-    control_style = 'padding: 1px 3px; font-size: 8pt;'
-
     def __init__(self, title: str, tooltip: str, rename_function: Callable, remove_function: Callable):
         super().__init__(title)
         self.setToolTip(tooltip)
 
         self.main_layout = QHBoxLayout()
-        self.main_layout.setContentsMargins(4, 4, 4, 4)
         self.setLayout(self.main_layout)
 
         self.pressure_widget = PressureWidget(stack_size=QSize(84, 84))
         self.pressure_widget.main_layout.setContentsMargins(0, 0, 0, 0)
-        self.pressure_widget.main_layout.setSpacing(2)
-        self.pressure_widget.pressure_label.setStyleSheet('font-size: 11pt; font-weight: bold;')
-        self.main_layout.addWidget(self.pressure_widget, 1)
+        self.main_layout.addWidget(self.pressure_widget)
 
-        self.buttons_vbox = QVBoxLayout()
-        self.buttons_vbox.setSpacing(2)
-        self.buttons_vbox.setAlignment(Qt.AlignmentFlag.AlignVCenter)
-        self.main_layout.addLayout(self.buttons_vbox)
+        self.info_vbox = QVBoxLayout()
+        self.info_vbox.setSpacing(4)
+        self.info_vbox.setAlignment(Qt.AlignmentFlag.AlignVCenter)
+        self.main_layout.addLayout(self.info_vbox, 1)
 
-        self.button_rename = QPushButton('Rename')
-        self.button_rename.setToolTip('Change the name of the gauge. The history in the database stays intact')
+        # the width of the group box does not change with the pressure
+        self.pressure_label = self.pressure_widget.pressure_label
+        self.pressure_label.setStyleSheet('font-size: 12pt; font-weight: bold;')
+        self.pressure_label.setText('8.88 x 10<sup>-10</sup> mbar')
+        self.pressure_label.ensurePolished()
+        self.pressure_label.setMinimumWidth(self.pressure_label.sizeHint().width())
+        self.pressure_widget.setPressure(0)
+        self.info_vbox.addWidget(self.pressure_label)
+
+        self.buttons_hbox = QHBoxLayout()
+        self.buttons_hbox.setSpacing(4)
+        self.buttons_hbox.setAlignment(Qt.AlignmentFlag.AlignLeft)
+        self.info_vbox.addLayout(self.buttons_hbox)
+
+        self.button_rename = IconButton()
+        self.button_rename.setIcon(getIcon('rename.svg'))
+        self.button_rename.setToolTip('Rename: change the name of the gauge. The history in the database stays intact')
         self.button_rename.clicked.connect(lambda: rename_function())
-        self.addControl(self.button_rename)
+        self.buttons_hbox.addWidget(self.button_rename)
 
-        self.button_remove = QPushButton('Remove')
-        self.button_remove.setToolTip('Stop showing and logging this gauge. The history in the database stays intact')
+        self.button_remove = IconButton()
+        self.button_remove.setIcon(getIcon('delete.svg'))
+        self.button_remove.setToolTip('Remove: stop showing and logging this gauge. The history in the database stays intact')
         self.button_remove.clicked.connect(lambda: remove_function())
-        self.addControl(self.button_remove)
-
-    def addControl(self, widget: QWidget):
-        """
-        Adds a small button or combobox to the right of the pressure
-
-        :param widget: button or combobox
-        """
-
-        widget.setStyleSheet(self.control_style)
-        self.buttons_vbox.addWidget(widget)
+        self.buttons_hbox.addWidget(self.button_remove)
 
 
 class PressureSource(QObject):
@@ -131,10 +132,10 @@ class PressureSource(QObject):
         self.indicator_connection.setToolTip('Green if the device is connected')
         self.combobox_connection = ComboBox()
         self.combobox_connection.setToolTip('Port of the device (refresh the list with the button on the right)')
-        self.button_connection = QPushButton('Connect')
+        self.button_connection = ConnectButton()
         self.button_connection.setToolTip('Connect to / disconnect from the selected port')
         self.button_connection.pressed.connect(self.manualConnect)
-        self.button_connection_refresh = QPushButton()
+        self.button_connection_refresh = IconButton()
         self.button_connection_refresh.setToolTip('Refresh connections list')
         self.button_connection_refresh.setIcon(getIcon('refresh.svg'))
         self.button_connection_refresh.pressed.connect(self.setComportsComboBox)
@@ -210,7 +211,7 @@ class PressureSource(QObject):
                 self.last_port = comport
                 self.combobox_connection.setEnabled(False)
                 self.button_connection_refresh.setEnabled(False)
-                self.button_connection.setText('Disconnect')
+                self.button_connection.setConnected(True)
 
             except (SerialException, ConnectionError) as error:
                 try:
@@ -234,7 +235,7 @@ class PressureSource(QObject):
         else:
             self.combobox_connection.setEnabled(True)
             self.button_connection_refresh.setEnabled(True)
-            self.button_connection.setText('Connect')
+            self.button_connection.setConnected(False)
 
     def manualConnect(self):
         """Connect/disconnect button pressed by the user (stops automatic reconnecting)"""
@@ -292,7 +293,7 @@ class PressureSource(QObject):
             self.connection.close()
 
         self.indicator_connection.setValue(False)
-        self.button_connection.setText('Connect')
+        self.button_connection.setConnected(False)
 
         for gauge in self.gauges.values():
             gauge.pressure_widget.setPressure(0)
@@ -502,15 +503,14 @@ class PressureRS485(PressureSource):
                 tooltip = 'Degas is not available: not connected, no answer of the gauge or not supported by the gauge'
             elif degas:
                 enabled = True
-                tooltip = 'Degas is running, it stops automatically after about 3 minutes. Press to stop it now'
+                tooltip = 'Degas is running (red), it stops automatically after about 3 minutes. Press to stop it now'
             else:
                 enabled = pressure is not None and 0 < pressure < limit
                 tooltip = f'Starts Degas (only possible below {limit:g} mbar): heats the anode to around 800 °C for about 3 minutes'
 
             gauge.button_degas.setEnabled(enabled)
             gauge.button_degas.setToolTip(tooltip)
-            gauge.button_degas.setText('Stop Degas' if degas else 'Degas')
-            gauge.button_degas.setStyleSheet(f'{gauge.control_style} color: {Colors.color_red};' if degas else gauge.control_style)
+            gauge.button_degas.setStyleSheet(f'background-color: {Colors.color_red};' if degas else '')
 
     def degasPressed(self, address: int):
         """
@@ -802,9 +802,9 @@ class PressureVBoxLayout(QVBoxLayout):
         gauge.combobox_type.currentIndexChanged.connect(lambda: self.gaugeTypeChanged(channel))
         # the width does not depend on the longest type, the list still shows the full names
         gauge.combobox_type.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
-        gauge.combobox_type.setMinimumContentsLength(9)
+        gauge.combobox_type.setMinimumContentsLength(7)
         gauge.combobox_type.view().setMinimumWidth(gauge.combobox_type.view().sizeHintForColumn(0) + 20)
-        gauge.addControl(gauge.combobox_type)
+        gauge.info_vbox.insertWidget(1, gauge.combobox_type)
         self._setGaugeName(gauge, name)
 
         self.lucid_control.gauges[channel] = gauge
@@ -827,9 +827,10 @@ class PressureVBoxLayout(QVBoxLayout):
             lambda: self.removeGauge(self.rs485, address)
         )
         gauge.key_text = f'RS485 {address}'
-        gauge.button_degas = QPushButton('Degas')
+        gauge.button_degas = IconButton()
+        gauge.button_degas.setIcon(getIcon('flame.svg'))
         gauge.button_degas.clicked.connect(lambda: self.rs485.degasPressed(address))
-        gauge.addControl(gauge.button_degas)
+        gauge.buttons_hbox.addWidget(gauge.button_degas)
         self._setGaugeName(gauge, name)
 
         self.rs485.gauges[address] = gauge
@@ -1047,6 +1048,34 @@ class PressureVBoxLayout(QVBoxLayout):
     def databaseLabels(self) -> dict[str, tuple[str, str]]:
         """Returns the labels of the gauges on the ADC for the database as {database_column: (name, unit)}"""
         return {PressureLucidControl.database_columns[channel]: (gauge.name, 'mbar') for channel, gauge in self.lucid_control.gauges.items()}
+
+    def databaseGauges(self) -> list[tuple[str, str, str, str | None]]:
+        """Returns all possible gauges as (table name, column name, text of gauge, current name or None if it is not shown)"""
+
+        gauges = []
+        for channel, column in PressureLucidControl.database_columns.items():
+            gauge = self.lucid_control.gauges.get(channel)
+            gauges.append((PressureTable.name, column, f'ADC {channel + 1}', gauge.name if gauge is not None else None))
+        for address in PressureRS485Table.addresses:
+            gauge = self.rs485.gauges.get(address)
+            gauges.append((PressureRS485Table.name, PressureRS485Table.column(address), f'RS485 {address}', gauge.name if gauge is not None else None))
+        return gauges
+
+    def setGaugeNames(self, names: dict[tuple[str, str], str]):
+        """
+        Sets the names of the gauges after they were changed in the database
+
+        :param names: {(table name, column name): name}
+        """
+
+        gauges = [(PressureTable.name, PressureLucidControl.database_columns[channel], gauge) for channel, gauge in self.lucid_control.gauges.items()]
+        gauges += [(PressureRS485Table.name, PressureRS485Table.column(address), gauge) for address, gauge in self.rs485.gauges.items()]
+        for table, column, gauge in gauges:
+            name = names.get((table, column), gauge.name)
+            if name != gauge.name:
+                old_name = gauge.name
+                self._setGaugeName(gauge, name)
+                self._gaugesChanged(old_name, name)
 
     def closeEvent(self):
         """Must be called when application is closed"""

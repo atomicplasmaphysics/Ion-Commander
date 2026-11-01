@@ -15,7 +15,7 @@ from DB.db import DB
 
 from Socket.CommandServer import DeviceISEGWrapper
 
-from Utility.Layouts import InsertingGridLayout, IndicatorLed, DoubleSpinBox, DisplayLabel, SpinBox, ComboBox, ReadingAgeLabel
+from Utility.Layouts import ConnectButton, IconButton, InsertingGridLayout, IndicatorLed, DoubleSpinBox, DisplayLabel, SpinBox, ComboBox, ReadingAgeLabel
 from Utility.AutoReconnect import AutoReconnect
 from Utility.Dialogs import showMessageBox
 from Utility.ChannelRows import nominalMaxima, VoltageChannelRow, CurrentLimitRow
@@ -73,13 +73,12 @@ class PSUVBoxLayout(QVBoxLayout):
         self.label_connection = QLabel('Connection')
         self.indicator_connection = IndicatorLed(off_color=Colors.color_red)
         self.indicator_connection.setToolTip('Green if the device is connected')
-        self.status_connection = QLabel('Not connected')
         self.combobox_connection = ComboBox()
         self.combobox_connection.setToolTip('Port of the device (refresh the list with the button on the right)')
-        self.button_connection = QPushButton('Connect')
+        self.button_connection = ConnectButton()
         self.button_connection.setToolTip('Connect to / disconnect from the selected port')
         self.button_connection.pressed.connect(self.manualConnect)
-        self.button_connection_refresh = QPushButton()
+        self.button_connection_refresh = IconButton()
         self.button_connection_refresh.setToolTip('Refresh connections list')
         self.button_connection_refresh.setIcon(getIcon('refresh.svg'))
         self.button_connection_refresh.pressed.connect(self.setComportsComboBox)
@@ -87,7 +86,6 @@ class PSUVBoxLayout(QVBoxLayout):
         self.connection_grid.addWidgets(
             self.label_connection,
             self.indicator_connection,
-            (self.status_connection, 2),
             self.combobox_connection,
             self.button_connection,
             self.button_connection_refresh,
@@ -95,12 +93,31 @@ class PSUVBoxLayout(QVBoxLayout):
         )
 
         # Control Group Box
-        self.control_group_box = QGroupBox('Voltages')
+        self.control_group_box = QGroupBox('Potentials')
         self.addWidget(self.control_group_box)
+
+        self.control_vbox = QVBoxLayout()
+        self.control_vbox.setAlignment(Qt.AlignmentFlag.AlignTop)
+        self.control_group_box.setLayout(self.control_vbox)
+
+        self.ramp_speed_hbox = QHBoxLayout()
+        self.ramp_speed_hbox.setAlignment(Qt.AlignmentFlag.AlignLeft)
+        self.control_vbox.addLayout(self.ramp_speed_hbox)
+
+        # Speed (:CONF:RAMP:VOLT of the ISEG crate in % of the nominal voltage per second, e.g. 1 %/s = 60 V/s for 6 kV)
+        self.label_ramp_speed = QLabel('Ramp speed [%/s]')
+        self.spinbox_advanced_settings_ramp = DoubleSpinBox(default=0, step_size=0.01, input_range=(0, DefaultParams.psu_ramp_speed_maximum), decimals=3, buttons=False)
+        self.spinbox_advanced_settings_ramp.setToolTip(
+            'Voltage ramp speed of the ISEG crate in % of the nominal voltage per second (applies to all channels, press enter to apply),\n'
+            f'e.g. 1 %/s = 10 V/s for a 1 kV channel (range 0 ... {DefaultParams.psu_ramp_speed_maximum:g} %/s)'
+        )
+        self.spinbox_advanced_settings_ramp.editingFinished.connect(lambda: self.setRampSpeed(self.spinbox_advanced_settings_ramp.value()))
+        self.ramp_speed_hbox.addWidget(self.label_ramp_speed)
+        self.ramp_speed_hbox.addWidget(self.spinbox_advanced_settings_ramp)
 
         self.control_hbox = QHBoxLayout()
         self.control_hbox.setAlignment(Qt.AlignmentFlag.AlignLeft)
-        self.control_group_box.setLayout(self.control_hbox)
+        self.control_vbox.addLayout(self.control_hbox)
 
         self.control_grid = InsertingGridLayout()
         self.control_hbox.addLayout(self.control_grid)
@@ -112,11 +129,16 @@ class PSUVBoxLayout(QVBoxLayout):
             QLabel('Set [V]'),
             QLabel('Voltage'),
             QLabel('Current'),
-            (QLabel('High Voltage'), 2)
+            QLabel('On'),
+            (QLabel('Limit [mA]'), 2)
         )
 
         # one row per channel
         self.channel_names = ['MCP Front/Back', 'Anode', 'Cathode LSD', 'Focus LSD']
+        self.limit_rows = [
+            CurrentLimitRow(name, channel, self.setCurrentLimit, input_range=(DefaultParams.psu_current_limit_minimum, DefaultParams.psu_current_limit_maximum))
+            for channel, name in enumerate(self.channel_names)
+        ]
         self.channel_rows = [
             VoltageChannelRow(
                 self.control_grid,
@@ -125,6 +147,7 @@ class PSUVBoxLayout(QVBoxLayout):
                 set_voltage=self.setVoltage,
                 set_output=self.setOutput,
                 set_polarity=self.setPolarity,
+                limit_row=self.limit_rows[channel],
                 voltage_maximum=self.voltage_maximum,
                 voltage_deviation=self.voltage_deviation,
                 current_maximum=self.current_maximum,
@@ -133,53 +156,6 @@ class PSUVBoxLayout(QVBoxLayout):
             )
             for channel, name in enumerate(self.channel_names)
         ]
-
-        # Limits Group Box
-        self.limits_group_box = QGroupBox('Limits')
-        self.addWidget(self.limits_group_box)
-
-        self.limits_hbox = QHBoxLayout()
-        self.limits_hbox.setAlignment(Qt.AlignmentFlag.AlignLeft)
-        self.limits_group_box.setLayout(self.limits_hbox)
-
-        self.limits_grid = InsertingGridLayout()
-        self.limits_hbox.addLayout(self.limits_grid)
-
-        # Labels
-        self.limits_grid.addWidgets(
-            None,
-            QLabel('Current [mA]'),
-            QLabel('Reached')
-        )
-
-        self.limit_rows = [
-            CurrentLimitRow(self.limits_grid, name, channel, self.setCurrentLimit, input_range=(DefaultParams.psu_current_limit_minimum, DefaultParams.psu_current_limit_maximum))
-            for channel, name in enumerate(self.channel_names)
-        ]
-
-        # Advanced Settings Group Box
-        self.advanced_settings_group_box = QGroupBox('Advanced Settings')
-        self.addWidget(self.advanced_settings_group_box)
-
-        self.advanced_settings_hbox = QHBoxLayout()
-        self.advanced_settings_hbox.setAlignment(Qt.AlignmentFlag.AlignLeft)
-        self.advanced_settings_group_box.setLayout(self.advanced_settings_hbox)
-
-        self.advanced_settings_grid = InsertingGridLayout()
-        self.advanced_settings_hbox.addLayout(self.advanced_settings_grid)
-
-        # Speed (:CONF:RAMP:VOLT of the ISEG crate in % of the nominal voltage per second, e.g. 1 %/s = 60 V/s for 6 kV)
-        self.label_advanced_settings_ramp = QLabel('Ramp speed [%/s]')
-        self.spinbox_advanced_settings_ramp = DoubleSpinBox(default=0, step_size=0.01, input_range=(0, DefaultParams.psu_ramp_speed_maximum), decimals=3, buttons=False)
-        self.spinbox_advanced_settings_ramp.setToolTip(
-            'Voltage ramp speed of the ISEG crate in % of the nominal voltage per second (applies to all channels, press enter to apply),\n'
-            f'e.g. 1 %/s = 10 V/s for a 1 kV channel (range 0 ... {DefaultParams.psu_ramp_speed_maximum:g} %/s)'
-        )
-        self.spinbox_advanced_settings_ramp.editingFinished.connect(lambda: self.setRampSpeed(self.spinbox_advanced_settings_ramp.value()))
-        self.advanced_settings_grid.addWidgets(
-            self.label_advanced_settings_ramp,
-            self.spinbox_advanced_settings_ramp
-        )
 
         # Ramp Group Box
         self.ramp_group_box = QGroupBox('Ramp')
@@ -244,7 +220,6 @@ class PSUVBoxLayout(QVBoxLayout):
         # grouped items (the device callbacks work with these lists)
         self.all_channels_selector = '0-3'
         self.indicators = [row.indicator for row in self.channel_rows]
-        self.buttons = [row.button_enable for row in self.channel_rows]
         self.status_voltages = [row.status_voltage for row in self.channel_rows]
         self.status_currents = [row.status_current for row in self.channel_rows]
         self.button_polarities = [row.button_polarity for row in self.channel_rows]
@@ -267,14 +242,13 @@ class PSUVBoxLayout(QVBoxLayout):
             return
 
         def checkVoltageOn(states: list[float]):
-            if len(states) != len(self.indicators) != len(self.buttons) != len(self.status_voltages):
+            if len(states) != len(self.indicators) != len(self.status_voltages):
                 GlobalConf.logger.error(f'High voltage indicators cannot be set, non matching length: expected len = {len(self.indicators)}, got len = {len(states)}')
                 return
 
-            for indicator, status_voltage, state, button in zip(self.indicators, self.status_voltages, states, self.buttons):
+            for indicator, status_voltage, state in zip(self.indicators, self.status_voltages, states):
                 state = bool(state)
                 indicator.setValue(state)
-                button.setText('Disable' if state else 'Enable')
 
                 if not state:
                     status_voltage.setTargetValue(0)
@@ -537,11 +511,10 @@ class PSUVBoxLayout(QVBoxLayout):
                     self.connectionLost
                 )
                 self.indicator_connection.setValue(True)
-                self.status_connection.setText('Connected')
                 self.last_port = comport
                 self.combobox_connection.setEnabled(False)
                 self.button_connection_refresh.setEnabled(False)
-                self.button_connection.setText('Disconnect')
+                self.button_connection.setConnected(True)
 
             except (SerialException, ConnectionError) as error:
                 try:
@@ -565,7 +538,7 @@ class PSUVBoxLayout(QVBoxLayout):
         else:
             self.combobox_connection.setEnabled(True)
             self.button_connection_refresh.setEnabled(True)
-            self.button_connection.setText('Connect')
+            self.button_connection.setConnected(False)
 
         self.updateAllValues()
 
@@ -684,8 +657,7 @@ class PSUVBoxLayout(QVBoxLayout):
             self.connection.close()
 
         self.indicator_connection.setValue(False)
-        self.status_connection.setText('Not connected')
-        self.button_connection.setText('Connect')
+        self.button_connection.setConnected(False)
 
         for row in self.channel_rows + self.limit_rows:
             row.reset()

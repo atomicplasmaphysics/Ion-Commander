@@ -9,7 +9,7 @@ from DB.db import DB
 
 from Socket.CommandServer import DeviceMonacoWrapper
 
-from Utility.Layouts import InsertingGridLayout, IndicatorLed, ErrorTable, DoubleSpinBox, SpinBox, ComboBox, DisplayLabel, SpinBoxRange, ReadingAgeLabel
+from Utility.Layouts import ConnectButton, IconButton, InsertingGridLayout, IndicatorLed, LedButton, ErrorTable, DoubleSpinBox, SpinBox, ComboBox, DisplayLabel, SpinBoxRange, ReadingAgeLabel
 from Utility.AutoReconnect import AutoReconnect
 from Utility.Dialogs import IPDialog, showMessageBox
 from Utility.Functions import getPrefix, getSignificantDigits, getIntIfInt
@@ -87,10 +87,10 @@ class LaserVBoxLayout(QVBoxLayout):
         self.indicator_connection = IndicatorLed(off_color=Colors.color_red)
         self.indicator_connection.setToolTip('Green if the laser is connected')
         self.status_connection = QLabel('Not connected')
-        self.button_connection = QPushButton('Connect')
+        self.button_connection = ConnectButton()
         self.button_connection.setToolTip('Connect to / disconnect from the laser')
         self.button_connection.pressed.connect(self.manualConnect)
-        self.button_connection_settings = QPushButton()
+        self.button_connection_settings = IconButton()
         self.button_connection_settings.setToolTip('Set IP address and port of the laser')
         self.button_connection_settings.setIcon(getIcon('preferences.svg'))
         self.button_connection_settings.pressed.connect(self.connectionPreferences)
@@ -117,48 +117,39 @@ class LaserVBoxLayout(QVBoxLayout):
 
         # Shutter
         self.label_shutter = QLabel('Shutter')
-        self.indicator_shutter = IndicatorLed()
-        self.indicator_shutter.setToolTip('Green if the shutter is open')
+        self.indicator_shutter = LedButton()
+        self.indicator_shutter.setToolTip('Green if the shutter is open. Click to open/close the shutter')
+        self.indicator_shutter.clicked.connect(lambda: self.setShutter(not self.indicator_shutter.value()))
         self.status_shutter = QLabel('Closed')
-        self.button_shutter = QPushButton('Open')
-        self.button_shutter.setToolTip('Open/close the shutter')
-        self.button_shutter.pressed.connect(lambda: self.setShutter(not self.indicator_shutter.value()))
         self.connection_grid.addWidgets(
             self.label_shutter,
             self.indicator_shutter,
-            self.status_shutter,
-            self.button_shutter
+            self.status_shutter
         )
 
         # Pulsing
         self.label_pulsing = QLabel('Pulsing')
-        self.indicator_pulsing = IndicatorLed()
-        self.indicator_pulsing.setToolTip('Green if pulsing is on')
+        self.indicator_pulsing = LedButton()
+        self.indicator_pulsing.setToolTip('Green if pulsing is on. Click to switch pulsing on/off')
+        self.indicator_pulsing.clicked.connect(lambda: self.setPulsing(not self.indicator_pulsing.value()))
         self.status_pulsing = QLabel('Off')
-        self.button_pulsing = QPushButton('On')
-        self.button_pulsing.setToolTip('Switch pulsing on/off')
-        self.button_pulsing.pressed.connect(lambda: self.setPulsing(not self.indicator_pulsing.value()))
         self.connection_grid.addWidgets(
             self.label_pulsing,
             self.indicator_pulsing,
-            self.status_pulsing,
-            self.button_pulsing
+            self.status_pulsing
         )
 
         # System status
-        self.label_system_status = QLabel('System Status')
+        self.label_system_status = QLabel('System')
         self.state_system_status = 0
-        self.indicator_system_status = IndicatorLed()
-        self.indicator_system_status.setToolTip('Green if the laser is running')
+        self.indicator_system_status = LedButton()
+        self.indicator_system_status.setToolTip('Green if the laser is running. Click to start/stop the laser (takes a while)')
+        self.indicator_system_status.clicked.connect(lambda: self.setSystem(not self.indicator_system_status.value()))
         self.status_system_status = QLabel('Standby')
-        self.button_system_status = QPushButton('Start')
-        self.button_system_status.setToolTip('Start/stop the laser (takes a while)')
-        self.button_system_status.pressed.connect(lambda: self.setSystem(not self.indicator_system_status.value()))
         self.connection_grid.addWidgets(
             self.label_system_status,
             self.indicator_system_status,
-            (self.status_system_status, 2),
-            self.button_system_status
+            (self.status_system_status, 4)
         )
 
         # Chiller Group Box
@@ -173,14 +164,14 @@ class LaserVBoxLayout(QVBoxLayout):
         self.chiller_hbox.addLayout(self.chiller_grid)
 
         # Chiller Temperature
-        self.label_chiller_temperature = QLabel('Chiller Temp.')
+        self.label_chiller_temperature = QLabel('Temp.')
         self.indicator_chiller_temperature = IndicatorLed()
         self.indicator_chiller_temperature.setToolTip('Green if the chiller temperature is within the limits')
         self.status_chiller_temperature = DisplayLabel(value=0, target_value=0, deviation=0.5, unit='°C', alignment_flag=Qt.AlignmentFlag.AlignLeft)
         self.status_chiller_temperature.setToolTip('Chiller temperature')
 
         # Baseplate Temperature
-        self.label_baseplate_temperature = QLabel('Baseplate Temp.')
+        self.label_baseplate_temperature = QLabel('Baseplate')
         self.status_baseplate_temperature = DisplayLabel(value=0, target_value=0, deviation=0.5, unit='°C', alignment_flag=Qt.AlignmentFlag.AlignLeft)
         self.status_baseplate_temperature.setToolTip('Temperature of the laser baseplate')
 
@@ -188,21 +179,20 @@ class LaserVBoxLayout(QVBoxLayout):
             self.label_chiller_temperature,
             self.indicator_chiller_temperature,
             self.status_chiller_temperature,
-            None,
             self.label_baseplate_temperature,
             None,
             self.status_baseplate_temperature
         )
 
         # Chiller Flow
-        self.label_chiller_flow = QLabel('Chiller Flow')
+        self.label_chiller_flow = QLabel('Flow')
         self.indicator_chiller_flow = IndicatorLed()
         self.indicator_chiller_flow.setToolTip('Green if the chiller flow is within the limits')
         self.status_chiller_flow = DisplayLabel(value=0, target_value=0, deviation=0.3, unit='lpm', decimals=1, alignment_flag=Qt.AlignmentFlag.AlignLeft)
         self.status_chiller_flow.setToolTip('Chiller flow in liters per minute')
 
         # Chiller Pressure
-        self.label_chiller_pressure = QLabel('Chiller Pressure')
+        self.label_chiller_pressure = QLabel('Pressure')
         self.indicator_chiller_pressure = IndicatorLed()
         self.indicator_chiller_pressure.setToolTip('Green if the chiller pressure is within the limits')
         # TODO: check if unit is right
@@ -213,7 +203,6 @@ class LaserVBoxLayout(QVBoxLayout):
             self.label_chiller_flow,
             self.indicator_chiller_flow,
             self.status_chiller_flow,
-            None,
             self.label_chiller_pressure,
             self.indicator_chiller_pressure,
             self.status_chiller_pressure,
@@ -232,10 +221,7 @@ class LaserVBoxLayout(QVBoxLayout):
             self.label_chiller_service,
             self.indicator_chiller_service,
             self.status_chiller_service,
-            self.button_clear_chiller_service,
-            None,
-            None,
-            None
+            self.button_clear_chiller_service
         )
 
         # Faults Group Box
@@ -286,7 +272,7 @@ class LaserVBoxLayout(QVBoxLayout):
         self.combobox_settings_amplifier.currentIndexChanged.connect(self.setAmplifier)
         self.settings_grid.addWidgets(
             QLabel('Amplifier'),
-            self.combobox_settings_amplifier
+            (self.combobox_settings_amplifier, 2)
         )
 
         # Repetition Rate Settings
@@ -304,7 +290,7 @@ class LaserVBoxLayout(QVBoxLayout):
         self.button_repetition_rate.setToolTip('Set the output repetition rate')
         self.button_repetition_rate.clicked.connect(self.setOutputFrequency)
         self.settings_grid.addWidgets(
-            QLabel('Repetition Rate'),
+            QLabel('Rep. Rate'),
             self.spinbox_repetition_rate,
             self.combobox_repetition_rate_unit,
             self.button_repetition_rate
@@ -398,7 +384,6 @@ class LaserVBoxLayout(QVBoxLayout):
             state = bool(state)
             self.indicator_shutter.setValue(state)
             self.status_shutter.setText('Open' if state else 'Closed')
-            self.button_shutter.setText('Close' if state else 'Open')
 
         self.device_wrapper.threaded_connection.callback(
             shutterOn,
@@ -413,7 +398,6 @@ class LaserVBoxLayout(QVBoxLayout):
             state = bool(state)
             self.indicator_pulsing.setValue(state)
             self.status_pulsing.setText('On' if state else 'Off')
-            self.button_pulsing.setText('Off' if state else 'On')
 
         self.device_wrapper.threaded_connection.callback(
             pulsingOn,
@@ -427,7 +411,6 @@ class LaserVBoxLayout(QVBoxLayout):
 
             self.indicator_system_status.setValue(l_info[1])
             self.status_system_status.setText(l_info[0])
-            self.button_system_status.setText('Stop' if l_info[1] else 'Start')
             self.status_baseplate_temperature.setTargetValue(self.baseplate_temperature_on if l_info[1] else self.baseplate_temperature_off)
             self.state_system_status = l_info[2]
 
@@ -1032,7 +1015,7 @@ class LaserVBoxLayout(QVBoxLayout):
                 self.status_connection.setText('Connected')
                 self.last_port = (tuple(ip), port)
                 self.button_connection_settings.setEnabled(False)
-                self.button_connection.setText('Disconnect')
+                self.button_connection.setConnected(True)
 
                 # clear faults to initialize fault table
                 if clear_faults:
@@ -1061,7 +1044,7 @@ class LaserVBoxLayout(QVBoxLayout):
                     )
         else:
             self.button_connection_settings.setEnabled(True)
-            self.button_connection.setText('Connect')
+            self.button_connection.setConnected(False)
 
         self.updateAllValues()
 
@@ -1112,7 +1095,7 @@ class LaserVBoxLayout(QVBoxLayout):
 
         self.indicator_connection.setValue(False)
         self.status_connection.setText('Not connected')
-        self.button_connection.setText('Connect')
+        self.button_connection.setConnected(False)
         self.button_connection_settings.setEnabled(True)
 
         self.indicator_key_switch.setValue(False)
@@ -1120,15 +1103,12 @@ class LaserVBoxLayout(QVBoxLayout):
 
         self.indicator_shutter.setValue(False)
         self.status_shutter.setText('Closed')
-        self.button_shutter.setText('Open')
 
         self.indicator_pulsing.setValue(False)
         self.status_pulsing.setText('Off')
-        self.button_pulsing.setText('On')
 
         self.indicator_system_status.setValue(False)
         self.status_system_status.setText('Standby')
-        self.button_system_status.setText('Start')
 
         self.indicator_chiller_temperature.setValue(False)
         self.status_chiller_temperature.setValue(0)

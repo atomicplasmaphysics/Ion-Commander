@@ -2,9 +2,72 @@
 
 *Automatically created from the commit messages with `python -m Utility.Changelog` - do not edit by hand.*
 
+## v0.1.86 (2026-11-01)
+
+**Control tab fits on one screen, icon buttons centered, history per pressure gauge name**
+
+Control tab (Windows/Control.py, Utility/Layouts.py):
+- Panels are never wider than their content (VBoxTitleLayout fit_content), except PSU, which gets the free space.
+  Pressure has a fixed width. Widths are fitted on startup and on every resize until a divider is dragged.
+- Overflow reduces PSU, EBIS and Laser equally, Pressure stays fixed.
+
+PSU, EBIS, Laser (Utility/ChannelRows.py, Windows/PSU.py, EBIS.py, Laser.py):
+- Current limits are part of the channel rows (no Limits groups), Advanced Settings groups removed, ramp speed in Potentials.
+- LedButton: leds are the on/off buttons of channels, heating, shutter and pulsing (the state shown is read back from the device).
+- PSU "Voltages" renamed to "Potentials", "Not connected" text removed in PSU/EBIS, EBIS interlock and Laser labels more compact.
+
+Icon buttons (Utility/Layouts.py):
+- ConnectButton: plug icon to connect, unplug icon to disconnect, in all device panels.
+- IconButton: square button with the icon exactly in the center, for all icon-only buttons. The Windows 11 style draws
+  the icon at a fixed distance from the left edge, so the button paints the icon itself; the size of the icon follows
+  the free space in device pixels (also exact at 150 % display scale).
+
+Pressure panel (Windows/Pressure.py):
+- Gauge cards: digit on the left; pressure, type and icon buttons (rename, remove, degas) on the right. The pressure
+  label reserves its widest text, so the width stays stable. Degas button is red while running.
+
+History per gauge name (DB/db.py, Windows/History.py, Windows/GaugeNames.py, Windows/Main.py):
+- Every name of a pressure gauge is its own entry in the History tab and only shows the readings of the time when the
+  gauge had this name, also in the export.
+- Menu Database > Pressure gauge names... assigns readings to other names or to no name. This only changes Labels, never
+  the readings, no migration needed.
+
+README: TODOs updated and extended: all TODO comments of the code are listed with their file, new TODOs found on the way
+(laser values not logged, condition of the LMF reader, width of the Control tab on small screens).
+CHANGELOG: v0.1.85 was missing, created again.
+
+Tested without devices (temporary settings and database, Degas only on a simulated gauge). Not tested: real devices, the
+gauge names dialog by hand, IconButton in the dark theme.
+
+## v0.1.85 (2026-11-01)
+
+**Thyracont VSH89DL gauges on RS-485, one pressure panel for the ADC and the RS-485 gauges** (2262731)
+
+Driver (Connection/ThyracontRS485.py, new, Connection/Threaded.py):
+- All commands of the VSH protocol; getReadings(addresses) returns {address: (pressure, degas)}. setDegas(True),
+  setCathodeControl(True) and resetCathodeControl refuse to run unless the gauge is in vacuum.
+- Tested with a real gauge on COM4 (reads and restored writes). Never sent to a real gauge: DG/CC/DL/AH/AL/OC writes,
+  PM reset, permanent BR.
+
+Pressure panel (Windows/Pressure.py, Windows/Control.py, Windows/EBIS.py, Windows/Main.py, Utility/Layouts.py):
+- The ADC and the RS-485 gauges are shown together (at most 4 columns, fitted to the height of the window), gauges can
+  be added, renamed and removed, the ADC gauges have a type (Thyracont, TPG300 Pirani, TPG300 Cold Cathode).
+- Degas button for the RS-485 gauges.
+- The EBIS interlock follows a renamed gauge, its gauge cannot be removed, a type change on it asks first. RS-485 gauges
+  cannot be selected for the interlock and are not available in scripts/the CommandServer.
+
+Database (DB/db.py, Windows/History.py, Config/GlobalConf.py):
+- New table PressureRS485 (Gauge01 ... Gauge16, empty if there was no reading), names in the Labels table, columns
+  without a name are hidden in the History tab.
+
+Tested: real gauge reads, simulated ADC (also lost connection and reconnect), simulated gauge for the Degas button. Not
+tested: real LucidControl ADC, real degas, the dialogs by hand, unplugging the RS-485 adapter, several real gauges.
+
+README: database, TODOs updated and extended.
+
 ## v0.1.84 (2026-10-30)
 
-**Script editor: syntax highlighting, autocomplete of devices and functions, faulty line underlined**
+**Script editor: syntax highlighting, autocomplete of devices and functions, faulty line underlined** (fe43e66)
 
 Script editor (Utility/ScriptEditor.py, Windows/Scripts.py):
 - ScriptHighlighter: comments (grey, italic; only at the beginning of a line like the parser), statements TIME, WAIT,

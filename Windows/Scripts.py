@@ -16,7 +16,7 @@ from PyQt6.QtCore import Qt, QTimer
 from Config.GlobalConf import GlobalConf, DefaultParams
 from Config.StylesConf import Colors
 
-from Utility.Layouts import TabWidget, VBoxTitleLayout, FilesList, FileEditor, FilePath
+from Utility.Layouts import IconButton, TabWidget, VBoxTitleLayout, FilesList, FileEditor, FilePath
 from Utility.FileDialogs import selectFolderDialog
 from Utility.Icons import getIcon
 from Utility.ScriptEditor import ScriptEditor, ScriptCatalog
@@ -65,7 +65,7 @@ class ScriptsWindow(TabWidget):
         self.script_add_update_hbox.addWidget(self.script_new_button, alignment=Qt.AlignmentFlag.AlignHCenter)
 
         # Update button
-        self.script_update_button = QPushButton()
+        self.script_update_button = IconButton()
         self.script_update_button.setIcon(getIcon('refresh.svg'))
         self.script_update_button.setToolTip('Update list')
         self.script_add_update_hbox.addWidget(self.script_update_button, alignment=Qt.AlignmentFlag.AlignHCenter)

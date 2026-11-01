@@ -94,7 +94,8 @@ class HistoryWindow(TabWidget):
             self.selection_listwidgets.append(selection_listwidget)
             selection_groupbox_vbox.addWidget(selection_listwidget)
 
-            for _ in list(table.structure.keys())[1:]:
+            # tables with names get one entry per name (<updateNames>)
+            for _ in [] if table.track_names else list(table.structure.keys())[1:]:
                 list_item = QListWidgetItem()
                 list_item.setFlags(list_item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
                 list_item.setCheckState(Qt.CheckState.Unchecked)
@@ -263,12 +264,87 @@ class HistoryWindow(TabWidget):
         """Shows the current labels of the database columns in the selection (e.g. after a pressure gauge was renamed), the selection stays"""
 
         for table, selection_listwidget in zip(self.database.tables, self.selection_listwidgets):
-            labels = self.database.getLabels(table.name)
+            if table.track_names:
+                self.updateNames(table.name, selection_listwidget)
+                continue
             for row, attribute in enumerate(list(table.structure.keys())[1:]):
                 list_item = selection_listwidget.item(row)
                 list_item.setText(self.columnLabel(table.name, attribute))
                 list_item.setToolTip(self.columnToolTip(table.name, attribute))
-                list_item.setHidden(table.hide_unlabeled and attribute not in labels)
+
+    def updateNames(self, table_name: str, selection_listwidget: QListWidget):
+        """
+        Shows one entry per name of a table, names that are not used anymore show when they were last used. The selection stays.
+
+        :param table_name: name of table
+        :param selection_listwidget: selection of the table
+        """
+
+        checked = {item.data(Qt.ItemDataRole.UserRole) for item in self.listItems(selection_listwidget) if item.checkState() == Qt.CheckState.Checked}
+        selection_listwidget.clear()
+        for name, periods in self.database.getNamePeriods(table_name).items():
+            unit = periods[0][1]
+            text = f'{name} [{unit}]' if unit else name
+            tooltip = [f'{name}:']
+            for column_name, _, start_time, end_time in periods:
+                start = f'{datetime.fromtimestamp(start_time):%Y-%m-%d %H:%M}' if start_time else 'beginning'
+                end = f'{datetime.fromtimestamp(end_time):%Y-%m-%d %H:%M}' if end_time is not None else 'now'
+                tooltip.append(f'  {table_name}.{column_name}: {start} to {end}')
+            if periods[-1][3] is not None:
+                text += f' (until {datetime.fromtimestamp(periods[-1][3]):%Y-%m-%d})'
+
+            list_item = QListWidgetItem(text)
+            list_item.setToolTip('\n'.join(tooltip))
+            list_item.setData(Qt.ItemDataRole.UserRole, name)
+            list_item.setFlags(list_item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
+            list_item.setCheckState(Qt.CheckState.Checked if name in checked else Qt.CheckState.Unchecked)
+            selection_listwidget.addItem(list_item)
+
+    @staticmethod
+    def listItems(selection_listwidget: QListWidget) -> list[QListWidgetItem]:
+        """Returns all items of a selection"""
+        return [selection_listwidget.item(row) for row in range(selection_listwidget.count())]
+
+    def nameData(self, table_index: int, name: str, start_time: int, end_time: int, bucket_seconds: int = 1, envelope: bool = False, gaps: bool = True) -> np.ndarray | None:
+        """
+        Returns the readings of a name: only the times when a gauge had this name
+
+        :param table_index: index of table
+        :param name: name
+        :param start_time: start time as timestamp
+        :param end_time: end time as timestamp
+        :param bucket_seconds: average data in time buckets of this size
+        :param envelope: also return minimum and maximum of every bucket
+        :param gaps: nan row between the times, so no line is drawn between them
+        :returns: array with time in the first column or None if there is no data
+        """
+
+        parts = []
+        for column_name, _, period_start, period_end in self.database.getNamePeriods(self.database.tables[table_index].name).get(name, []):
+            # the next name starts at <period_end>
+            first = max(start_time, period_start)
+            last = end_time if period_end is None else min(end_time, period_end - 1)
+            data = self.database.getData(table_index, ['Time', column_name], first, last, bucket_seconds, envelope) if first <= last else False
+            if data is False:
+                continue
+
+            values = data[1].astype(float)
+            values = values[values[:, 0].argsort()]
+            if parts and gaps:
+                parts.append(np.full((1, values.shape[1]), np.nan))
+                parts[-1][0, 0] = values[0, 0]
+            parts.append(values)
+        return np.concatenate(parts) if parts else None
+
+    @staticmethod
+    def nameLabel(item: QListWidgetItem) -> str:
+        """
+        Returns the label of a curve of a name (with the unit, without the date of the entry)
+
+        :param item: entry of the name
+        """
+
+        return re.sub(r' \(until [\d-]+\)$', '', item.text())
 
     def columnLabel(self, table_name: str, column_name: str, with_unit: bool = True) -> str:
         """
@@ -345,6 +421,15 @@ class HistoryWindow(TabWidget):
 
         series = []
         for i, table in enumerate(self.database.tables):
+            if table.track_names:
+                for item in self.listItems(self.selection_listwidgets[i]):
+                    if item.checkState() != Qt.CheckState.Checked:
+                        continue
+                    values = self.nameData(i, item.data(Qt.ItemDataRole.UserRole), start_time, end_time, bucket_seconds, envelope)
+                    if values is not None:
+                        series.append((f'{table.name}: {self.nameLabel(item)}', *values.T))
+                continue
+
             checked = [0]
             for row in range(len(table.structure) - 1):
                 if self.selection_listwidgets[i].item(row).checkState() == Qt.CheckState.Checked:
@@ -379,6 +464,16 @@ class HistoryWindow(TabWidget):
         labels = []
 
         for i, table in enumerate(self.database.tables):
+            if table.track_names:
+                for item in self.listItems(self.selection_listwidgets[i]):
+                    if item.checkState() != Qt.CheckState.Checked:
+                        continue
+                    values = self.nameData(i, item.data(Qt.ItemDataRole.UserRole), start_time, end_time, gaps=False)
+                    if values is not None:
+                        labels.append(f'{table.name}: {self.nameLabel(item)}')
+                        datas.append(values)
+                continue
+
             checked = [0]
             table_labels = []
             for row, attribute in enumerate(list(table.structure.keys())[1:]):

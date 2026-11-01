@@ -1,6 +1,6 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING, Callable
-from math import log10, inf
+from math import log10, inf, ceil
 from time import time
 from datetime import datetime
 from os import path, listdir, rename as os_rename, remove as os_remove
@@ -21,7 +21,8 @@ from PyQt6.QtWidgets import (
     QHBoxLayout, QLabel, QWidget, QVBoxLayout, QSpinBox, QDoubleSpinBox, QCheckBox, QComboBox, QLineEdit, QPushButton,
     QListWidget, QListWidgetItem, QApplication, QStyleOption, QTableWidget, QTableWidgetItem, QAbstractItemView,
     QGridLayout, QLCDNumber, QFrame, QTextEdit, QMenuBar, QMessageBox, QInputDialog, QMenu, QColorDialog, QDialog,
-    QGroupBox, QDateTimeEdit, QCalendarWidget, QDial, QHeaderView, QPlainTextEdit, QScrollArea
+    QGroupBox, QDateTimeEdit, QCalendarWidget, QDial, QHeaderView, QPlainTextEdit, QScrollArea, QSizePolicy, QStyle,
+    QStyleOptionButton, QStylePainter
 )
 from PyQt6.QtSvgWidgets import QSvgWidget
 from PyQt6.QtSvg import QSvgRenderer
@@ -192,6 +193,7 @@ class VBoxTitleLayout(QVBoxLayout):
                         if integer: addSpacing(addStretch) after title
     :param scroll_horizontal: if the body can be scrolled horizontally (False: the panel is never narrower than its content,
                               e.g. the pressures are always fully visible in width)
+    :param fit_content: the panel is never wider than its content
     """
 
     # all layouts that can be popped out (to store/restore popped out panels)
@@ -207,11 +209,13 @@ class VBoxTitleLayout(QVBoxLayout):
         popout_enable: bool = False,
         spacing: int = 0,
         add_stretch: bool | int = 0,
-        scroll_horizontal: bool = True
+        scroll_horizontal: bool = True,
+        fit_content: bool = False
     ):
         super().__init__(parent)
         self.parent = parent
         self.scroll_horizontal = scroll_horizontal
+        self.fit_content = fit_content
         self.title_str = title
         self.title_style = title_style
         self.title_style_busy = title_style_busy
@@ -230,7 +234,7 @@ class VBoxTitleLayout(QVBoxLayout):
 
         if self.popout_enable:
             VBoxTitleLayout.popout_instances.append(self)
-            self.popout_button = QPushButton(self.parent)
+            self.popout_button = IconButton(self.parent)
             self.popout_button.setToolTip('Pop out the panel into its own window (click again to put it back)')
             self.popout_button.setIcon(getIcon('open_external.svg'))
             self.popout_button.setStyleSheet(title_style)
@@ -269,14 +273,37 @@ class VBoxTitleLayout(QVBoxLayout):
     def setBodyLayout(self, layout):
         """Sets the layout of the body"""
         self.body_widget.setLayout(layout)
+        if self.fit_content:
+            self.body_widget.installEventFilter(self)
+        self.body_scroll.verticalScrollBar().rangeChanged.connect(lambda: self.updateBodyMinimumWidth())
         self.updateBodyMinimumWidth()
 
+    def eventFilter(self, watched, event) -> bool:
+        """Keeps the width of the panel up to date if the content of the body changes its width"""
+
+        if watched is self.body_widget and event.type() == QEvent.Type.LayoutRequest:
+            self.updateBodyMinimumWidth()
+        return False
+
+    def scrollbarWidth(self) -> int:
+        """Returns the width of the vertical scrollbar, 0 if it is not needed"""
+
+        scrollbar = self.body_scroll.verticalScrollBar()
+        return scrollbar.sizeHint().width() if scrollbar.maximum() > 0 else 0
+
+    def contentWidth(self) -> int:
+        """Returns the width of the panel that is needed for its content"""
+
+        margins = self.contentsMargins()
+        return self.body_widget.minimumSizeHint().width() + self.scrollbarWidth() + margins.left() + margins.right()
+
     def updateBodyMinimumWidth(self):
-        """Updates the minimum width of the panel, needed if the content of the body changes its width"""
+        """Updates the minimum and maximum width of the panel, needed if the content of the body changes its width"""
         if not self.scroll_horizontal:
-            # the panel cannot get narrower than the body (plus a possible vertical scrollbar), nothing is cut off at the side
-            scrollbar_width = self.body_scroll.verticalScrollBar().sizeHint().width()
-            self.body_scroll.setMinimumWidth(self.body_widget.minimumSizeHint().width() + scrollbar_width)
+            # the panel cannot get narrower than the body (plus a vertical scrollbar if needed), nothing is cut off at the side
+            self.body_scroll.setMinimumWidth(self.body_widget.minimumSizeHint().width() + self.scrollbarWidth())
+        if self.fit_content and self.parentWidget() is not None:
+            self.parentWidget().setMaximumWidth(self.contentWidth())
 
     def busy(self, busy: bool = True, busy_text: str = ''):
         """
@@ -1050,13 +1077,11 @@ class FilePath(QWidget):
         self.layout.addWidget(self.path_display, Qt.AlignmentFlag.AlignLeft)
 
         self.function = function
-        self.button = QPushButton()
+        self.button = IconButton()
         if self.function is not None:
             if icon is None:
                 icon = getIcon('open.svg')
             self.button.setIcon(icon)
-            self.button.setMinimumSize(40, 10)
-            self.button.setMaximumSize(40, 30)
             self.layout.addWidget(self.button, Qt.AlignmentFlag.AlignRight)
 
             self.button.clicked.connect(self.selectPath)
@@ -1512,7 +1537,7 @@ class DateTimeEdit(QWidget):
         self.date_time_edit.setDateTime(timestamp)
         self.main_layout.addWidget(self.date_time_edit, stretch=1)
 
-        self.calendar_button = QPushButton()
+        self.calendar_button = IconButton()
         self.calendar_button.setIcon(getIcon('calendar.svg'))
         self.calendar_button.setToolTip('Select Date and Time')
         self.calendar_button.clicked.connect(self._selectionPopup)
@@ -1664,6 +1689,100 @@ class IndicatorLed(QWidget):
         super().mouseReleaseEvent(event)
 
 
+class IconButton(QPushButton):
+    """
+    Button that only shows an icon: the icon is exactly in the center and the button is as narrow as it is high. The icon
+    is not left to the style, because the Windows 11 style draws it at a fixed distance from the left edge.
+    """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.setSizePolicy(QSizePolicy.Policy.Fixed, self.sizePolicy().verticalPolicy())
+
+    def sizeHint(self) -> QSize:
+        """Square button with the height the style wants"""
+
+        height = super().sizeHint().height()
+        return QSize(height, height)
+
+    def paintEvent(self, event):
+        """Paints the button without its icon and then the icon in the center"""
+
+        option = QStyleOptionButton()
+        self.initStyleOption(option)
+        option.icon = QIcon()
+
+        painter = QStylePainter(self)
+        painter.drawControl(QStyle.ControlElement.CE_PushButton, option)
+
+        # in device pixels: the free space has to be even, otherwise one side is a pixel wider (e.g. with 150 % display scale)
+        ratio = self.devicePixelRatioF()
+        width = ceil(self.width() * ratio)
+        height = ceil(self.height() * ratio)
+        size = round(self.iconSize().height() * ratio)
+        size += (height - size) % 2
+
+        mode = QIcon.Mode.Normal if self.isEnabled() else QIcon.Mode.Disabled
+        state = QIcon.State.On if self.isChecked() else QIcon.State.Off
+        pixmap = self.icon().pixmap(QSize(size, size), 1, mode, state)
+        x = (width - pixmap.width()) // 2
+        y = (height - pixmap.height()) // 2
+        pixmap.setDevicePixelRatio(ratio)
+        painter.drawPixmap(QPointF(x / ratio, y / ratio), pixmap)
+
+
+class ConnectButton(IconButton):
+    """Button to connect to / disconnect from a device, only shows an icon: plug if it would connect, unplug if it would disconnect"""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.setConnected(False)
+
+    def setConnected(self, connected: bool):
+        """
+        Shows what the button does
+
+        :param connected: device is connected
+        """
+
+        self.setIcon(getIcon('unplug.svg' if connected else 'plug.svg'))
+
+
+class LedButton(IndicatorLed):
+    """
+    Indicator led that is also the on/off button of something: <clicked> asks for the change, the state is only shown
+    with <setValue> (normally the state read back from the device). The ring shows that it can be clicked.
+    """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.setFixedSize(22, 22)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.setAttribute(Qt.WidgetAttribute.WA_Hover, True)
+
+    def paintEvent(self, event):
+        """Paints the led and its ring"""
+
+        super().paintEvent(event)
+
+        size = min(self.width(), self.height()) - 2
+        ring = QRectF((self.width() - size) / 2, (self.height() - size) / 2, size, size)
+        color = self.palette().color(self.foregroundRole())
+        color.setAlphaF(1 if self.underMouse() else 0.4)
+
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+        painter.setPen(QPen(color, 1.5))
+        painter.drawEllipse(ring)
+
+    def mouseReleaseEvent(self, event):
+        """When mouse is released: only a click with the left button that ends on the led counts"""
+
+        if event.button() != Qt.MouseButton.LeftButton or not self.rect().contains(event.position().toPoint()):
+            self.pressed = False
+        super().mouseReleaseEvent(event)
+
+
 class IndicatorLedButton(QWidget):
     """
     Extends the IndicatorLed with some Label in the same line to the right
@@ -1750,12 +1869,12 @@ class PressureWidget(QWidget):
 
         self.pressure = pressure
         percentage = 1
-        label_text = 'No pressure available'
+        label_text = 'No pressure'
         stack_widget_value = abs(self.input_range_exponents[0]) + 1
 
         self.stack_widget.enableDigit(bool(pressure))
         if pressure:
-            pressure_string_split = f'{self.pressure:E}'.split('E')
+            pressure_string_split = f'{self.pressure:.2E}'.split('E')
             exponent = int(pressure_string_split[1])
             label_text = f'{pressure_string_split[0]} x 10<sup>{exponent}</sup> mbar'
 
@@ -2275,13 +2394,14 @@ class PolarityButton(QWidget):
         self.main_layout = QHBoxLayout(self)
         self.main_layout.setAlignment(Qt.AlignmentFlag.AlignLeft)
         self.main_layout.setContentsMargins(0, 0, 0, 0)
+        self.main_layout.setSpacing(2)
         self.setLayout(self.main_layout)
 
-        self.positive_button = QPushButton(self)
+        self.positive_button = IconButton(self)
         self.positive_button.setIcon(getIcon('positive.svg'))
         self.main_layout.addWidget(self.positive_button)
 
-        self.negative_button = QPushButton(self)
+        self.negative_button = IconButton(self)
         self.negative_button.setIcon(getIcon('negative.svg'))
         self.main_layout.addWidget(self.negative_button)
 
@@ -2567,7 +2687,7 @@ class DeleteWidgetListItem(QWidget):
         self.main_layout.setContentsMargins(0, 0, 0, 0)
         self.setLayout(self.main_layout)
 
-        self.delete_button = QPushButton(self)
+        self.delete_button = IconButton(self)
         self.delete_button.setIcon(getIcon('delete.svg'))
         self.delete_button.setIconSize(QSize(10, 10))
         self.delete_button.setContentsMargins(0, 0, 0, 0)
@@ -2808,7 +2928,7 @@ class FilesList(QListWidget):
             item.setData(100, file)
             item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
 
-            button_delete = QPushButton()
+            button_delete = IconButton()
             button_delete.setToolTip('Delete Script')
             button_delete.setIcon(getIcon('delete.svg'))
             button_delete.setIconSize(QSize(10, 10))
@@ -2816,7 +2936,7 @@ class FilesList(QListWidget):
             layout.addWidget(button_delete, alignment=Qt.AlignmentFlag.AlignLeft)
             button_delete.clicked.connect(lambda _, i=item: self._deleteFile(i))
 
-            button_rename = QPushButton()
+            button_rename = IconButton()
             button_rename.setToolTip('Rename Script')
             button_rename.setIcon(getIcon('rename.svg'))
             button_rename.setIconSize(QSize(10, 10))
