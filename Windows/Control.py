@@ -12,6 +12,7 @@ from Windows.PSU import PSUVBoxLayout
 from Windows.EBIS import EBISVBoxLayout
 from Windows.Laser import LaserVBoxLayout
 from Windows.Pressure import PressureVBoxLayout
+from Windows.DelayStage import DelayStageVBoxLayout
 
 
 class ControlWindow(TabWidget):
@@ -44,7 +45,27 @@ class ControlWindow(TabWidget):
         self.psu_vbox_parent = QWidget(self)
         self.psu_vbox.setBodyLayout(self.psu_group_vbox)
         self.psu_vbox_parent.setLayout(self.psu_vbox)
-        self.splitter.addWidget(self.psu_vbox_parent)
+
+        # DELAY STAGE CONTROL
+        self.delay_stage_vbox = VBoxTitleLayout('Delay Stage', parent=self, add_stretch=True, popout_enable=True)
+        self.delay_stage_group_vbox = DelayStageVBoxLayout()
+
+        # Stretch to bottom
+        self.delay_stage_group_vbox.addStretch(1)
+        self.delay_stage_group_vbox.setAlignment(Qt.AlignmentFlag.AlignTop)
+
+        self.delay_stage_parent = QWidget(self)
+        self.delay_stage_vbox.setBodyLayout(self.delay_stage_group_vbox)
+        self.delay_stage_parent.setLayout(self.delay_stage_vbox)
+
+        # the delay stage uses the free space below the PSU, another column would not fit on the screen
+        self.left_splitter = QSplitter(Qt.Orientation.Vertical)
+        self.left_splitter.setChildrenCollapsible(False)
+        self.left_splitter.addWidget(self.psu_vbox_parent)
+        self.left_splitter.addWidget(self.delay_stage_parent)
+        self.left_splitter.setStretchFactor(0, 0)
+        self.left_splitter.setStretchFactor(1, 1)
+        self.splitter.addWidget(self.left_splitter)
 
         self.ebis_enabled = True
         if self.ebis_enabled:
@@ -110,6 +131,7 @@ class ControlWindow(TabWidget):
             self.splitter.setStretchFactor(index, 1 if index == 0 else 0)
         self.splitter_moved = False
         self.splitter.splitterMoved.connect(self.splitterMoved)
+        self.left_splitter.splitterMoved.connect(self.splitterMoved)
 
     def splitterMoved(self):
         """The user changed the width of the panels: they are not fitted automatically anymore"""
@@ -134,6 +156,10 @@ class ControlWindow(TabWidget):
             for index in range(len(widths) - 1):
                 widths[index] -= missing // (len(widths) - 1)
         self.splitter.setSizes(widths)
+
+        height = sum(self.left_splitter.sizes())
+        psu_height = min(self.psu_vbox.contentHeight(), height - self.delay_stage_parent.minimumSizeHint().height())
+        self.left_splitter.setSizes([psu_height, height - psu_height])
 
     def pressureGaugesChanged(self, old_name: str, new_name: str):
         """
@@ -169,6 +195,7 @@ class ControlWindow(TabWidget):
     def closeEvent(self, event):
         """Closes all connections"""
         self.psu_group_vbox.closeEvent()
+        self.delay_stage_group_vbox.closeEvent()
         if self.ebis_enabled:
             self.ebis_group_vbox.closeEvent()
         self.laser_group_vbox.closeEvent()
@@ -182,6 +209,7 @@ class ControlWindow(TabWidget):
         """
 
         self.psu_group_vbox.log(db)
+        self.delay_stage_group_vbox.log(db)
         self.laser_group_vbox.log(db)
         self.pressure_group_vbox.log(db)
         if self.ebis_enabled:

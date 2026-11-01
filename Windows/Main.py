@@ -26,6 +26,7 @@ from Windows.Analyse import AnalyseWindow
 from Windows.Simulation import SimulationWindow
 from Windows.Settings import SettingsDialog
 from Windows.GaugeNames import GaugeNamesDialog
+from Windows.DelayStageCalibration import DelayStageCalibrationDialog
 
 
 class MainWindow(QMainWindow):
@@ -99,6 +100,7 @@ class MainWindow(QMainWindow):
         devices = {
             'PSU': self.control_window.psu_group_vbox.device_wrapper,
             'LASER': self.control_window.laser_group_vbox.device_wrapper,
+            'DELAY': self.control_window.delay_stage_group_vbox.device_wrapper,
             'PRESSURE': self.control_window.pressure_group_vbox.device_wrapper,
             'POWER': self.monitor_window.power_meter_group_vbox.device_wrapper,
             'CAMERA': self.monitor_window.camera_group_vbox.device_wrapper,
@@ -141,6 +143,10 @@ class MainWindow(QMainWindow):
         self.action_settings = self.menu_settings.addAction('Preferences...')
         self.action_settings.setToolTip('Change update intervals, limits, laser address, CommandServer port, ...')
         self.action_settings.triggered.connect(lambda: SettingsDialog(self).exec())
+        self.delay_stage_calibration: DelayStageCalibrationDialog | None = None
+        self.action_delay_stage_calibration = self.menu_settings.addAction('Delay stage calibration...')
+        self.action_delay_stage_calibration.setToolTip('Moves the delay stage by a known number of steps, the measured distance gives the lead of the screw')
+        self.action_delay_stage_calibration.triggered.connect(self.calibrateDelayStage)
 
         #
         # STATUS BAR
@@ -235,6 +241,13 @@ class MainWindow(QMainWindow):
             'pulse_width_fs': laser.status_settings_pulsewidth.value,
         }
 
+        delay_stage = control.delay_stage_group_vbox
+        settings['DelayStage'] = {
+            'connected': delay_stage.indicator_connection.value(),
+            'delay_ps': delay_stage.timeForLog(),
+            'zero_time_set': delay_stage.zero_set,
+        }
+
         electrometer = self.monitor_window.electrometer_group_vbox
         settings['Electrometer'] = {
             'connected': electrometer.indicator_connection.value(),
@@ -259,6 +272,7 @@ class MainWindow(QMainWindow):
         self.database.updateLabels(self.database.pressure_rs485_table.name, pressure.rs485.databaseLabels())
         self.database.updateLabels(self.database.psu_table.name, self.control_window.psu_group_vbox.databaseLabels())
         self.database.updateLabels(self.database.electrometer_table.name, {'Current': ('Electrometer Current', 'A')})
+        self.database.updateLabels(self.database.delay_stage_table.name, {'Delay': ('Delay Stage Delay', 'ps')})
         self.history_window.updateLabels()
 
     def editGaugeNames(self):
@@ -269,6 +283,15 @@ class MainWindow(QMainWindow):
         if dialog.exec() == QDialog.DialogCode.Accepted:
             pressure.setGaugeNames(dialog.currentNames())
             self.updateDatabaseLabels()
+
+    def calibrateDelayStage(self):
+        """Opens the dialog to calibrate the delay stage (the panel stays usable, e.g. to switch on the motor)"""
+
+        if self.delay_stage_calibration is None:
+            self.delay_stage_calibration = DelayStageCalibrationDialog(self.control_window.delay_stage_group_vbox, self)
+        self.delay_stage_calibration.updateLabels()
+        self.delay_stage_calibration.show()
+        self.delay_stage_calibration.raise_()
 
     def updateServerStatus(self):
         """Updates the CommandServer status in the status bar"""

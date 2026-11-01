@@ -297,6 +297,12 @@ class VBoxTitleLayout(QVBoxLayout):
         margins = self.contentsMargins()
         return self.body_widget.minimumSizeHint().width() + self.scrollbarWidth() + margins.left() + margins.right()
 
+    def contentHeight(self) -> int:
+        """Returns the height of the panel that is needed for its content"""
+
+        margins = self.contentsMargins()
+        return self.header_layout.sizeHint().height() + self.spacing() + self.body_widget.sizeHint().height() + 2 * self.body_scroll.frameWidth() + margins.top() + margins.bottom()
+
     def updateBodyMinimumWidth(self):
         """Updates the minimum and maximum width of the panel, needed if the content of the body changes its width"""
         if not self.scroll_horizontal:

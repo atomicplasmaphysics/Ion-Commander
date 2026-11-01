@@ -85,6 +85,12 @@ class DefaultParams:
     # power meter parameters
     TLPMx_encoding = 'utf-8'
 
+    # delay stage parameters
+    delay_stage_lead = 1.5
+    delay_stage_path_factor = 2
+    delay_stage_travel = 800.
+    delay_stage_invert = False
+
     # database parameters
     db_folder = 'DB'
     db_file_sqlite3 = 'Laserlab.db'
@@ -166,6 +172,10 @@ class DefaultParams:
         'laser_ir_wavelength': ('Laser', 'IR wavelength', 'nm', 1, 100000),
         'laser_green_wavelength': ('Laser', 'Green wavelength (second harmonic)', 'nm', 1, 100000),
         'laser_uv_wavelength': ('Laser', 'UV wavelength', 'nm', 1, 100000),
+        'delay_stage_lead': ('Delay stage', 'Distance of the slide per motor rotation (lead of the screw)', 'mm', 0.01, 100),
+        'delay_stage_path_factor': ('Delay stage', 'Change of the laser path per distance of the slide', '', 1, 100),
+        'delay_stage_travel': ('Delay stage', 'Length of the stage, limits the input fields of the delay', 'mm', 1, 10000),
+        'delay_stage_invert': ('Delay stage', 'Positive motor steps shorten the delay instead of extending it (true/false)', '', None, None),
         'cs_host': ('CommandServer', 'Host of the CommandServer', '', None, None),
         'cs_port': ('CommandServer', 'Port of the CommandServer', '', 1, 65535),
         'cs_max_connections': ('CommandServer', 'Maximum number of simultaneous clients', '', 1, 1000),
@@ -248,6 +258,25 @@ class DefaultParams:
                 logging.getLogger('Ion Commander').error(f'Stored parameter is invalid and ignored: {error}')
 
     @classmethod
+    def saveOverride(cls, settings: QSettings, name: str, value, group: str = 'default_params'):
+        """
+        Stores one value and uses it immediately (e.g. a calibration), the other stored values stay
+
+        :param settings: settings object
+        :param name: name of parameter
+        :param value: new value, is converted and checked (ValueError if invalid)
+        :param group: group in the settings
+        """
+
+        converted = cls.convert(name, value)
+        if converted != cls.original.get(name, getattr(cls, name)):
+            settings.setValue(f'{group}/{name}', cls.toString(converted))
+        else:
+            settings.remove(f'{group}/{name}')
+        settings.sync()
+        setattr(cls, name, converted)
+
+    @classmethod
     def saveOverrides(cls, settings: QSettings, values: dict[str, str], group: str = 'default_params'):
         """
         Stores the values that differ from the original values (takes effect after restarting the application)
@@ -275,7 +304,7 @@ class GlobalConf:
     title = 'Ion Commander'
 
     # version (single source of truth - update only here)
-    version = '0.1.86'
+    version = '0.1.87'
 
     # logger
     logger = logging.getLogger(title)
@@ -303,6 +332,7 @@ class GlobalConf:
     connection_power_meter_port_name = 'connection_power_meter_port'
     connection_camera_name = 'connection_camera'
     connection_electrometer_name = 'connection_electrometer'
+    connection_delay_stage_name = 'connection_delay_stage'
     cobold_measurement_folder_name = 'cobold_measurement_folder'
 
     # pressure gauges on the ADC and on the RS485 bus
@@ -323,6 +353,11 @@ class GlobalConf:
 
     # power meter parameters
     power_meter_display_parameter_name = 'power_meter_display_parameter'
+
+    # delay stage parameters
+    delay_stage_speed_name = 'delay_stage_speed'
+    delay_stage_acceleration_name = 'delay_stage_acceleration'
+    delay_stage_mode_name = 'delay_stage_mode'
 
     # simulation parameters
     simulation_paths_parameter_name = 'simulation_paths_parameter'
@@ -379,7 +414,8 @@ class GlobalConf:
         power_meter: str = None,
         camera: str = None,
         electrometer: str = None,
-        pressure_rs485: str = None
+        pressure_rs485: str = None,
+        delay_stage: str = None
     ):
         """
         Updates and saves settings object with connection parameters
@@ -390,6 +426,7 @@ class GlobalConf:
         :param pressure_rs485: port of the RS485 adapter of the pressure gauges
         :param laser: tuple of (laser_ip1, laser_ip2, laser_ip3, laser_ip4, laser_port)
         :param power_meter: resource name of power meter
+        :param delay_stage: port of the delay stage
         """
 
         if psu is not None:
@@ -412,6 +449,8 @@ class GlobalConf:
             GlobalConf.settings.setValue(GlobalConf.connection_camera_name, camera)
         if electrometer is not None:
             GlobalConf.settings.setValue(GlobalConf.connection_electrometer_name, electrometer)
+        if delay_stage is not None:
+            GlobalConf.settings.setValue(GlobalConf.connection_delay_stage_name, delay_stage)
 
         GlobalConf.settings.sync()
 
@@ -433,6 +472,8 @@ class GlobalConf:
             return GlobalConf.settings.value(GlobalConf.connection_camera_name, defaultValue='', type=str)
         if connection_type == 'electrometer':
             return GlobalConf.settings.value(GlobalConf.connection_electrometer_name, defaultValue='', type=str)
+        if connection_type == 'delay_stage':
+            return GlobalConf.settings.value(GlobalConf.connection_delay_stage_name, defaultValue='', type=str)
         if connection_type == 'laser':
             return (GlobalConf.settings.value(GlobalConf.connection_laser_ip1_name, defaultValue=-1, type=int),
                     GlobalConf.settings.value(GlobalConf.connection_laser_ip2_name, defaultValue=-1, type=int),

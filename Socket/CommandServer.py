@@ -11,6 +11,7 @@ from Config.GlobalConf import GlobalConf, DefaultParams
 from Connection.Threaded import (
     ThreadedISEGConnection, ThreadedThyracontConnection, ThreadedTPG300Connection, ThreadedMixedPressureConnection,
     ThreadedMonacoConnection, ThreadedTLPMxConnection, ThreadedCameraConnection, ThreadedCoboldConnection, ThreadedKeithleyConnection,
+    ThreadedAdjustableDelayStage,
     ThreadedDummyConnection
 )
 from Connection.ISEG import ISEGConnection
@@ -22,6 +23,7 @@ from Connection.TLPMx import TLPMxConnection
 from Connection.Camera import CameraConnection
 from Connection.Cobold import CoboldConnection
 from Connection.KeithleyPAmeter import KeithleyPAmeterConnection
+from Connection.AdjustableDelayStage import AdjustableDelayStage
 
 
 def parseFunctionCall(func_str: str) -> tuple[str, list, dict]:
@@ -190,6 +192,19 @@ class DeviceKeithleyWrapper(DeviceWrapper):
     connection_class = KeithleyPAmeterConnection
 
     def __init__(self, threaded_connection: ThreadedKeithleyConnection | ThreadedDummyConnection = None):
+        super().__init__(threaded_connection)
+
+
+class DeviceDelayStageWrapper(DeviceWrapper):
+    """
+    Simple wrapper for <ThreadedAdjustableDelayStage>
+
+    :param threaded_connection: ThreadedAdjustableDelayStage
+    """
+
+    connection_class = AdjustableDelayStage
+
+    def __init__(self, threaded_connection: ThreadedAdjustableDelayStage | ThreadedDummyConnection = None):
         super().__init__(threaded_connection)
 
 

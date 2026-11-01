@@ -262,7 +262,7 @@ class ElectrometerVBoxLayout(QVBoxLayout):
     def setComportsComboBox(self):
         """Sets available ports in the comports combobox"""
 
-        comports = getComports()
+        comports = getComports(not_available_entry=True)
         self.combobox_connection.reinitialize(
             entries=[port for port, _, _ in comports],
             tooltips=[f'{port}: {description} [{hardware_id}]' for port, description, hardware_id in comports]

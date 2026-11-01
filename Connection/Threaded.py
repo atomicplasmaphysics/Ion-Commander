@@ -21,6 +21,7 @@ from Connection.TLPMx import TLPMxConnection
 from Connection.Camera import CameraConnection
 from Connection.Cobold import CoboldConnection
 from Connection.KeithleyPAmeter import KeithleyPAmeterConnection
+from Connection.AdjustableDelayStage import AdjustableDelayStage
 
 
 if TYPE_CHECKING:
@@ -34,6 +35,7 @@ if TYPE_CHECKING:
     base_camera = CameraConnection
     base_cobold = CoboldConnection
     base_keithley = KeithleyPAmeterConnection
+    base_delay_stage = AdjustableDelayStage
 else:
     base_iseg = object
     base_thyracont = object
@@ -45,6 +47,7 @@ else:
     base_camera = object
     base_cobold = object
     base_keithley = object
+    base_delay_stage = object
 
 
 class CallbackId:
@@ -303,7 +306,12 @@ class ThreadedConnection(QObject):
 
         self.closed = True
 
-        if not self.worker.started or not self.worker.running:
+        # a worker that did not start yet ends immediately when it starts, otherwise it would run forever
+        if not self.worker.started:
+            self.worker.running = False
+            return
+
+        if not self.worker.running:
             return
 
         self.worker.execute(self.callback_id(), 'close')
@@ -403,6 +411,17 @@ class ThreadedKeithleyConnection(ThreadedConnection, base_keithley):
     """
 
     def __init__(self, connection: KeithleyPAmeterConnection, *args, **kwargs):
+        super().__init__(connection, *args, **kwargs)
+
+
+class ThreadedAdjustableDelayStage(ThreadedConnection, base_delay_stage):
+    """
+    Threaded connection for <AdjustableDelayStage>
+
+    :param connection: AdjustableDelayStage
+    """
+
+    def __init__(self, connection: AdjustableDelayStage, *args, **kwargs):
         super().__init__(connection, *args, **kwargs)
 
 

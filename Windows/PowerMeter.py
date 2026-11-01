@@ -75,7 +75,7 @@ class PowerMeterVBoxLayout(QVBoxLayout):
         self.connection_hbox_selection.setAlignment(Qt.AlignmentFlag.AlignLeft)
         self.connection_vbox.addLayout(self.connection_hbox_selection)
 
-        self.combobox_connection = ComboBox()
+        self.combobox_connection = ComboBox(entries=['None'], entries_save=[b'-1'])
         self.combobox_connection.setToolTip('Port of the device (refresh the list with the button on the right)')
         self.connection_hbox_selection.addWidget(self.combobox_connection)
         self.button_connection = ConnectButton()
@@ -744,6 +744,11 @@ class PowerMeterVBoxLayout(QVBoxLayout):
             names.append(resource_info[0].decode(DefaultParams.TLPMx_encoding))
             resource_names.append(resource)
             descriptions.append(f'{resource_info[0].decode(DefaultParams.TLPMx_encoding)}: {resource_info[2].decode(DefaultParams.TLPMx_encoding)} [SN: {resource_info[1].decode(DefaultParams.TLPMx_encoding)}]')
+
+        if not names:
+            names = ['None']
+            resource_names = [b'-1']
+            descriptions = ['There is no power meter available']
 
         self.combobox_connection.reinitialize(
             entries=names,

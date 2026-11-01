@@ -2,9 +2,52 @@
 
 *Automatically created from the commit messages with `python -m Utility.Changelog` - do not edit by hand.*
 
+## v0.1.87 (2026-11-01)
+
+**Delay stage: panel with delay in ps, calibration, A4988 driver and firmware in the project; virtual camera removed**
+
+Delay stage panel (Windows/DelayStage.py, below the PSU in the Control tab):
+- Delay relative to the zero time in ps and slide position in mm, leds for motor, moving and limit switches, Stop.
+- Set zero (asks before replacing a zero time), go to zero, fixed moves +-0.01/0.1/1/10/100/1000 ps (buttons smaller than a
+  step are off), move by, go to, speed, acceleration, step size. Settings are stored and sent on connecting.
+- Limit switches are only shown while the motor is on. Connecting never switches the motor on, disconnecting and closing the
+  GUI stop it and switch it off.
+- The panel shows if the zero time is missing because the Arduino restarted.
+- CommandServer device DELAY for scripts (moveTime, moveToTime, getTime, ... in ps), table DelayStage in the database with the
+  delay, values in the measurement metadata. Databases with the column Position of the first version are tolerated
+  (Tables.legacy_columns), the column stays untouched.
+
+Driver (Connection/AdjustableDelayStage.py):
+- StepperDriver describes a driver board (name, microstepping modes, position unit of the firmware), A4988 is the default of
+  AdjustableDelayStage without a selection in the GUI. The step size only offers the modes of the board, setMode refuses others.
+- Delay from the lead of the screw and the path factor (preferences): 1.5 mm per rotation, 3 mm laser path = 10.007 ps.
+- Port opened without DTR so the Arduino does not restart, waits for it if it does. Wrong devices get no motor commands.
+- Commands return the answer of the firmware ("OK" or "ERR ..."), help reads all lines, limit switch names LIMIT1/LIMIT2
+  (normally closed switches: a disconnected wire counts as activated).
+
+Calibration (Windows/DelayStageCalibration.py, menu Settings > Delay stage calibration...):
+- Takes out the play of the screw, moves a known number of steps (150 mm = 100 rotations by default), the measured distance
+  gives the lead, which is stored and used immediately. A move stopped early does not count, closing the dialog stops the move.
+- DefaultParams.saveOverride stores one value without changing the others.
+
+Firmware (Firmware/IR_delay_stage_A4988/IR_delay_stage_A4988.ino, moved into the project):
+- Fixed: no acceleration ramp at the start of a move, braking too early in coarse step sizes, endless move around a target between
+  two steps (MOVE ZERO after changing the step size), crash on MOVE without argument, division by zero with SPEED 0.
+- New: STATUS ZEROED. Speed and acceleration are in 1/16 steps in every mode.
+
+Others:
+- Threaded connections: a worker closed before it started ended never (connect and disconnect right away).
+- Camera: virtual camera removed, auto levels off by default, the color scale covers the range of the camera.
+- Port lists of Delay Stage, Power Meter, Electrometer and Camera show "None" if nothing is available, like the other panels.
+
+README: section "Delay stage", TODOs updated and extended.
+
+Tested with a simulated firmware and a simulated camera (temporary settings and database). The firmware compiles for an Uno.
+Not tested: the changed firmware and the panel on the real stage, the calibration with a real measurement, a real camera.
+
 ## v0.1.86 (2026-11-01)
 
-**Control tab fits on one screen, icon buttons centered, history per pressure gauge name**
+**Control tab fits on one screen, icon buttons centered, history per pressure gauge name** (08ef1b6)
 
 Control tab (Windows/Control.py, Utility/Layouts.py):
 - Panels are never wider than their content (VBoxTitleLayout fit_content), except PSU, which gets the free space.

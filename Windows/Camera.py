@@ -25,7 +25,7 @@ from Utility.AutoReconnect import AutoReconnect
 from Utility.Dialogs import showMessageBox
 from Utility.Icons import getIcon
 
-from Connection.Camera import CameraConnection, listCameras, backendHelp, availableBackend, beamStatistics, VIRTUAL_CAMERA_ID
+from Connection.Camera import CameraConnection, listCameras, backendHelp, availableBackend, beamStatistics
 from Connection.Threaded import ThreadedCameraConnection, ThreadedDummyConnection
 
 
@@ -70,7 +70,7 @@ class CameraVBoxLayout(QVBoxLayout):
         self.indicator_connection.setToolTip('Green if the camera is connected')
         self.status_connection = QLabel('Not connected')
         self.combobox_connection = ComboBox()
-        self.combobox_connection.setToolTip('Camera (the virtual camera simulates a laser spot for testing)')
+        self.combobox_connection.setToolTip('Camera')
         self.button_connection = ConnectButton()
         self.button_connection.setToolTip('Connect to / disconnect from the selected camera')
         self.button_connection.pressed.connect(self.manualConnect)
@@ -130,7 +130,7 @@ class CameraVBoxLayout(QVBoxLayout):
         self.button_save.pressed.connect(self.saveImage)
         self.settings_grid.addWidgets(self.button_live, self.button_single, self.button_save)
 
-        self.button_auto_levels = IndicatorLedButton('Auto levels', initial_state=True)
+        self.button_auto_levels = IndicatorLedButton('Auto levels', initial_state=False)
         self.button_auto_levels.setToolTip('Adjust the color scale to every image (otherwise use the histogram on the right)')
         self.button_crosshair = IndicatorLedButton('Crosshair', initial_state=True)
         self.button_crosshair.setToolTip('Show the centroid of the beam')
@@ -172,7 +172,7 @@ class CameraVBoxLayout(QVBoxLayout):
         self.reset()
 
         last_connection = GlobalConf.getConnection('camera')
-        if last_connection and last_connection != VIRTUAL_CAMERA_ID:
+        if last_connection and last_connection in (self.combobox_connection.entries_save or []):
             self.connect(last_connection, False)
 
     # ------------------------------------------------------------------ connection
@@ -202,7 +202,7 @@ class CameraVBoxLayout(QVBoxLayout):
         """
         Connect to given camera. If no camera is given, the selected camera will be connected to
 
-        :param camera_id: id of camera (serial number, index or "virtual")
+        :param camera_id: id of camera (serial number or index)
         :param messagebox: show messagebox if failed
         """
 
@@ -228,6 +228,9 @@ class CameraVBoxLayout(QVBoxLayout):
             self.button_connection_refresh.setEnabled(False)
             self.button_connection.setConnected(True)
             self.maximum_value = self.connection.getMaximumValue()
+            # without auto levels the color scale covers the full range of the camera
+            self.image_view.setLevels(0, self.maximum_value)
+            self.image_view.getHistogramWidget().setHistogramRange(0, self.maximum_value)
             self.setExposure()
             self.setGain()
 
@@ -272,7 +275,7 @@ class CameraVBoxLayout(QVBoxLayout):
         self.combobox_connection.reinitialize(
             entries=[description for _, description in cameras],
             entries_save=[camera_id for camera_id, _ in cameras],
-            tooltips=[f'Camera id: {camera_id}' for camera_id, _ in cameras]
+            tooltips=[f'Camera id: {camera_id}' if camera_id else 'There is no camera available' for camera_id, _ in cameras]
         )
 
     def reset(self):

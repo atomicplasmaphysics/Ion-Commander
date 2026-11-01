@@ -27,6 +27,8 @@ class Tables:
     # the History tab shows one entry per name (label) of the columns instead of one entry per column, it only shows the
     # readings of the time when a column had this name (e.g. a pressure gauge that moved to a different chamber)
     track_names = False
+    # columns that are not used anymore, but can exist in old databases (they are tolerated and stay untouched)
+    legacy_columns = []
 
     def __init__(self):
         self.variables = []
@@ -310,6 +312,18 @@ class ElectrometerTable(Tables):
         super().__init__()
 
 
+class DelayStageTable(Tables):
+    name = 'DelayStage'
+    structure = {
+        'Time': '''BIGINT DEFAULT CAST(EXTRACT(EPOCH FROM now()) AS BIGINT)''',
+        'Delay': 'DOUBLE default 0',
+    }
+    legacy_columns = ['Position']
+
+    def __init__(self):
+        super().__init__()
+
+
 class EventsTable(Tables):
     """
     Events like interlock trips, (lost) connections or script starts.
@@ -416,6 +430,7 @@ class DB:
         self.power_meter_table = PowerMeterTable()
         self.ebis_table = EBISTable()
         self.electrometer_table = ElectrometerTable()
+        self.delay_stage_table = DelayStageTable()
         self.tables = [
             self.pressure_table,
             self.pressure_rs485_table,
@@ -423,7 +438,8 @@ class DB:
             self.laser_table,
             self.power_meter_table,
             self.ebis_table,
-            self.electrometer_table
+            self.electrometer_table,
+            self.delay_stage_table
         ]
 
         # tables with meta information (not plottable in the History tab)
@@ -540,7 +556,7 @@ class DB:
 
             # check if table structure is correct
             result = [res[1] for res in self._execute_return(table.columns())]
-            if set(result) != set(table.column_names()):
+            if set(result) - set(table.legacy_columns) != set(table.column_names()):
                 raise RuntimeError(f'Columns of existing table "{table.name}" of ({result}) do not match required column names ({table.column_names()}).\nTry to call DB.updateColumns() for updating the columns. You should probably safe the DB beforehand.')
 
             # check if index exists and if not create it
@@ -920,6 +936,31 @@ class DB:
         """
 
         return self.getData(self.tables.index(self.electrometer_table), columns, start_time, end_time)
+
+    def insertDelayStage(self, delay: float):
+        """
+        Inserts delay stage values
+
+        :param delay: delay relative to the zero time in [ps]
+        """
+
+        self._execute(self.delay_stage_table.insert(delay))
+
+    def getDelayStage(
+        self,
+        columns: int | tuple[int] | list[str] | None = None,
+        start_time: int | None = None,
+        end_time: int | None = None
+    ) -> bool | tuple[list, np.ndarray]:
+        """
+        Get delay stage values
+
+        :param columns: list of name of columns, tuple of ids of columns or None(=all columns)
+        :param start_time: start time as timestamp
+        :param end_time: end time as timestamp
+        """
+
+        return self.getData(self.tables.index(self.delay_stage_table), columns, start_time, end_time)
 
     def insertEvent(self, source: str, event_type: str, message: str = '', value: float = 0., force_commit: bool = True):
         """

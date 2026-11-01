@@ -6,13 +6,11 @@ Backends (the first available one is used):
                  version and the Python version from the Teledyne website and install the wheel with pip)
 2) harvesters  - generic GenICam library (pip install harvesters) that uses the GenTL producer (.cti) of the installed
                  Spinnaker SDK, e.g. "C:/Program Files/Teledyne/Spinnaker/cti64/vs2015/Spinnaker_GenTL_v140.cti"
-3) virtual     - simulated camera with a laser spot (camera id "virtual"), for testing without hardware
 
 All functions are blocking, use the threaded connection in the GUI.
 """
 
 from glob import glob
-from time import sleep, monotonic
 
 
 import numpy as np
@@ -31,8 +29,6 @@ try:
 except ImportError:
     Harvester = None
 
-
-VIRTUAL_CAMERA_ID = 'virtual'
 
 # possible locations of the Spinnaker GenTL producer (used by harvesters)
 SPINNAKER_CTI_PATTERNS = [
@@ -68,7 +64,7 @@ def backendHelp() -> str:
     if availableBackend():
         return f'Camera backend: {availableBackend()}'
     cti = findSpinnakerCTI()
-    text = 'No camera backend installed (only the virtual camera is available). Install either\n'
+    text = 'No camera backend installed. Install either\n'
     text += '- the Spinnaker Python wrapper "spinnaker_python" (wheel from the Teledyne website, must match the Spinnaker and Python version) or\n'
     text += '- "pip install harvesters"'
     text += f' (uses the installed Spinnaker GenTL producer: {cti})' if cti else ' together with the Spinnaker SDK'
@@ -77,7 +73,7 @@ def backendHelp() -> str:
 
 def listCameras() -> list[tuple[str, str]]:
     """
-    Returns the connected cameras as list of (camera id, description); the virtual camera is always included.
+    Returns the connected cameras as list of (camera id, description), an entry without id if there is none.
     The camera id is the serial number (PySpin) or the index (harvesters).
     """
 
@@ -112,22 +108,21 @@ def listCameras() -> list[tuple[str, str]]:
     except Exception as error:
         GlobalConf.logger.error(f'Camera: listing cameras with backend "{backend}" failed: {error}')
 
-    cameras.append((VIRTUAL_CAMERA_ID, 'Virtual camera (simulated laser spot)'))
-    return cameras
+    return cameras or [('', 'None')]
 
 
 class CameraConnection:
     """
     Connection to one camera
 
-    :param camera_id: serial number (PySpin), index (harvesters) or "virtual"
+    :param camera_id: serial number (PySpin) or index (harvesters)
     :param timeout: timeout for grabbing an image in ms
     """
 
     def __init__(self, camera_id: str, timeout: int = 2000):
         self.camera_id = str(camera_id)
         self.timeout = timeout
-        self.backend = VIRTUAL_CAMERA_ID if self.camera_id == VIRTUAL_CAMERA_ID else availableBackend()
+        self.backend = availableBackend()
 
         self.acquiring = False
 
@@ -140,9 +135,6 @@ class CameraConnection:
         self._harvester = None
         self._acquirer = None
 
-        # virtual camera
-        self._virtual = {'exposure': 10000., 'gain': 0., 'width': 640, 'height': 480, 'start': monotonic()}
-
     def __enter__(self):
         return self.open()
 
@@ -153,11 +145,11 @@ class CameraConnection:
     def open(self):
         """Opens the connection (raises ConnectionError if not possible)"""
 
-        if self.backend == VIRTUAL_CAMERA_ID:
-            return self
-
         if not self.backend:
             raise ConnectionError(backendHelp())
+
+        if not self.camera_id:
+            raise ConnectionError('There is no camera available')
 
         try:
             if self.backend == 'pyspin':
@@ -248,8 +240,6 @@ class CameraConnection:
     def identification(self) -> str:
         """Returns model and serial number"""
 
-        if self.backend == VIRTUAL_CAMERA_ID:
-            return 'Virtual camera'
         if self.backend == 'pyspin' and self._camera is not None:
             return f'{self._camera.TLDevice.DeviceModelName.GetValue()} (S/N {self._camera.TLDevice.DeviceSerialNumber.GetValue()})'
         if self.backend == 'harvesters' and self._acquirer is not None:
@@ -267,9 +257,7 @@ class CameraConnection:
 
         minimum, maximum = self.getExposureRange()
         exposure = float(np.clip(exposure, minimum, maximum))
-        if self.backend == VIRTUAL_CAMERA_ID:
-            self._virtual['exposure'] = exposure
-        elif self.backend == 'pyspin':
+        if self.backend == 'pyspin':
             self._camera.ExposureTime.SetValue(exposure)
         elif self.backend == 'harvesters':
             self._node('ExposureTime').value = exposure
@@ -277,8 +265,6 @@ class CameraConnection:
     def getExposure(self) -> float:
         """Returns the exposure time in µs"""
 
-        if self.backend == VIRTUAL_CAMERA_ID:
-            return self._virtual['exposure']
         if self.backend == 'pyspin':
             return float(self._camera.ExposureTime.GetValue())
         return float(self._node('ExposureTime').value)
@@ -286,8 +272,6 @@ class CameraConnection:
     def getExposureRange(self) -> tuple[float, float]:
         """Returns (minimum, maximum) of the exposure time in µs"""
 
-        if self.backend == VIRTUAL_CAMERA_ID:
-            return 10., 1E6
         if self.backend == 'pyspin':
             return float(self._camera.ExposureTime.GetMin()), float(self._camera.ExposureTime.GetMax())
         node = self._node('ExposureTime')
@@ -298,9 +282,7 @@ class CameraConnection:
 
         minimum, maximum = self.getGainRange()
         gain = float(np.clip(gain, minimum, maximum))
-        if self.backend == VIRTUAL_CAMERA_ID:
-            self._virtual['gain'] = gain
-        elif self.backend == 'pyspin':
+        if self.backend == 'pyspin':
             self._camera.Gain.SetValue(gain)
         elif self.backend == 'harvesters':
             self._node('Gain').value = gain
@@ -308,8 +290,6 @@ class CameraConnection:
     def getGain(self) -> float:
         """Returns the gain in dB"""
 
-        if self.backend == VIRTUAL_CAMERA_ID:
-            return self._virtual['gain']
         if self.backend == 'pyspin':
             return float(self._camera.Gain.GetValue())
         return float(self._node('Gain').value)
@@ -317,8 +297,6 @@ class CameraConnection:
     def getGainRange(self) -> tuple[float, float]:
         """Returns (minimum, maximum) of the gain in dB"""
 
-        if self.backend == VIRTUAL_CAMERA_ID:
-            return 0., 40.
         if self.backend == 'pyspin':
             return float(self._camera.Gain.GetMin()), float(self._camera.Gain.GetMax())
         node = self._node('Gain')
@@ -367,9 +345,6 @@ class CameraConnection:
 
         self.startAcquisition()
 
-        if self.backend == VIRTUAL_CAMERA_ID:
-            return self._virtualImage()
-
         if self.backend == 'pyspin':
             image = self._camera.GetNextImage(self.timeout)
             try:
@@ -382,20 +357,6 @@ class CameraConnection:
         with self._acquirer.fetch(timeout=self.timeout / 1000) as buffer:
             component = buffer.payload.components[0]
             return np.array(component.data, copy=True).reshape(component.height, component.width)
-
-    def _virtualImage(self) -> np.ndarray:
-        """Simulated laser spot that moves slowly, with noise; brightness scales with exposure and gain"""
-
-        sleep(0.03)
-        height, width = self._virtual['height'], self._virtual['width']
-        t = monotonic() - self._virtual['start']
-        x0 = width / 2 + 40 * np.sin(t / 5)
-        y0 = height / 2 + 25 * np.cos(t / 7)
-        y, x = np.mgrid[0:height, 0:width]
-        scale = self._virtual['exposure'] / 10000 * 10 ** (self._virtual['gain'] / 20)
-        spot = 3000 * scale * np.exp(-((x - x0) ** 2 / (2 * 30 ** 2) + (y - y0) ** 2 / (2 * 20 ** 2)))
-        image = spot + np.random.normal(60, 8, (height, width))
-        return np.clip(image, 0, 4095).astype(np.uint16)
 
 
 def beamStatistics(image: np.ndarray, maximum_value: int, background_percentile: float = 10) -> dict[str, float]:
@@ -457,7 +418,7 @@ def beamStatistics(image: np.ndarray, maximum_value: int, background_percentile:
 def main():
     print(backendHelp())
     print('Cameras:', listCameras())
-    with CameraConnection(VIRTUAL_CAMERA_ID) as camera:
+    with CameraConnection(listCameras()[0][0]) as camera:
         camera.setExposure(20000)
         image = camera.grabImage()
         print(camera.identification(), image.shape, image.dtype, beamStatistics(image, camera.getMaximumValue()))

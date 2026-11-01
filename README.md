@@ -24,7 +24,7 @@ Optional (for the camera in the Monitor tab, the Spinnaker SDK/SpinView must be 
 - `spinnaker_python` (PySpin): wheel from the Teledyne website, must match the installed Spinnaker version and the Python version
 - `harvesters` (`pip install harvesters`): uses the GenTL producer of the installed Spinnaker SDK (`Spinnaker_GenTL_*.cti`)
 
-Without them only the virtual camera (simulated laser spot) is available.
+Without them no camera is available.
 With `harvesters` the Blackfly S (BFS-U3-16S2M, 1440x1080) delivers ~200 fps; the live view shows ~30 fps (`DefaultParams.camera_live_interval`).
 
 To execute the GUI, download all files from this repository and execute the `main.py` file from the console.
@@ -101,6 +101,24 @@ Next to every list mode file a `.json` file with name, comment, start/stop time 
 pressures, laser, power meter) at start and stop is written. Start and stop are logged as events.
 Scripts can use the device `COBOLD` of the CommandServer (e.g. `COBOLD:startMeasurement('D:/data/test.lmf')`, `COBOLD:stopMeasurement()`).
 
+## Delay stage
+Laser delay with a stepper motor (Arduino with an A4988 driver board) and a lead screw, panel `Delay Stage` in the Control tab, device `DELAY` in scripts
+(e.g. `DELAY:moveTime(20)`, `DELAY:moveToTime(-5)`, `DELAY:getTime()`, all in ps).
+- **Firmware**: `Firmware/IR_delay_stage_A4988/IR_delay_stage_A4988.ino`. On the PC of the Arduino IDE, `Documents/Arduino/IR_delay_stage_A4988` is a directory
+  junction to this folder (`New-Item -ItemType Junction -Path <sketchbook>\IR_delay_stage_A4988 -Target <project>\Firmware\IR_delay_stage_A4988`).
+- **Driver board**: `StepperDriver` in `Connection/AdjustableDelayStage.py` describes a board (name, microstepping modes, position unit of its firmware). `A4988` is the default of
+  `AdjustableDelayStage`, there is no selection in the GUI (`DelayStageVBoxLayout.driver`). The step size only offers the modes of the board, `setMode` refuses other ones.
+- **Delay**: one rotation is 200 full steps and moves the slide by 1.5 mm (`delay_stage_lead`), the laser path changes by twice that
+  (`delay_stage_path_factor`): 3 mm = 10.007 ps per rotation (speed of light in vacuum), 3.13 fs per 1/16 step, 50 fs per full step.
+  The direction, lead, path factor and length of the stage are in the preferences (`Delay stage`).
+- **Calibration**: `Settings > Delay stage calibration...` moves by a known number of steps (150 mm = 100 rotations by default, measurable with the
+  18 cm calliper). The measured distance gives the lead, which is used immediately. Delays logged before keep the old lead.
+- **Limit switches**: normally closed to GND. A disconnected wire counts as activated, so it cannot be distinguished from an activated switch. The panel shows them while the motor is on.
+- **Database**: table `DelayStage` with the delay in ps. Databases from before can still have an unused column `Position` (`Tables.legacy_columns`).
+- **Zero time**: only the Arduino knows the position. It is lost if the Arduino restarts (power, USB), the panel then shows that the zero time is missing.
+  The port is opened without DTR, so connecting should not restart it.
+- **Disconnecting or closing the GUI** stops the motor and switches it off. Connecting never switches it on.
+
 ## Changelog
 All changes are listed in [CHANGELOG.md](CHANGELOG.md), which is created from the commit messages with
 ```bash
@@ -174,15 +192,24 @@ The size of the database is shown in the menu `Database`.
 - [x] Ramp the heating current up slowly instead of jumping (cathode lifetime) - "Ramp [A/min]"; lowering/switching off and the interlock are immediate
 
 ### Hardware / Devices
-- [ ] Integrate the Adjustable Delay Stage (`Threaded` wrapper, `DeviceWrapper`, GUI panel, CommandServer entry, DB logging, position in mm/ps instead of steps)
+- [x] Integrate the Adjustable Delay Stage (`Threaded` wrapper, `DeviceWrapper`, GUI panel, CommandServer entry, DB logging, position in mm/ps instead of steps)
+- [x] Delay stage: firmware in the project (`Firmware/`), limit switches normally closed, panel with delay in ps, zero time, fixed moves, move by, go to, speed, acceleration, step size
+- [x] Delay stage firmware: no ramp at the start of a move, braking too early in coarse step sizes, endless move around a target between two steps (`MOVE ZERO` after changing the step size), crash on `MOVE` without argument, `SPEED 0`, `STATUS ZEROED`
+- [ ] Delay stage: test with the real stage (only tested with a simulated firmware): limit switches, restart of the Arduino when connecting, direction (`delay_stage_invert`), highest step rate of the Arduino
+- [ ] Delay stage: measure the lead with `Settings > Delay stage calibration...` (1.5 mm per rotation is the nominal value)
+- [x] Delay stage: driver board in the code (`StepperDriver`, `A4988` by default), only its microstepping modes can be selected
+- [ ] Delay stage: second driver board (own firmware in `Firmware/`, `StepperDriver` with its modes, new modes in `MicrostepMode`)
+- [ ] Delay stage: reference run to a limit switch, so the position is not lost if the Arduino restarts (and the usable range is known)
+- [ ] Delay stage: scripts wait until a move is finished (`WAIT` needs the duration of the move), delay scans with the results in the CSV
 - [x] Implement Keithley PicoAmp meter in the Monitor tab (panel "Electrometer", DB table `Electrometer`, CommandServer `ELECTROMETER`)
 - [x] Keithley PicoAmp meter: set instrument back to local mode on close (`KeithleyPAmeter.py`)
 - [x] Keithley PicoAmp meter: check return values of `setCurrentRange`/`getLastData` (`KeithleyPAmeter.py`, rewritten after the manual, test: `python -m Connection.KeithleyPAmeter`, port `TEST_COMPORT` and `BAUDRATE` (9600) in the source code)
 - [x] Keithley 6514: run the device test routine with the real instrument (COM6, 9600 baud; READ? needs arm count 1, ^C recovers a blocked instrument, front panel defaults on close)
 - [ ] Keithley 6514: measure with a real current source (only the open input, ~1E-13 A, was measured) and check the zero correct procedure
 - [ ] Keithley 6514: offer the data elements/units in the CSV of the scripts (mean, std, n as separate columns)
-- [x] Implement camera in the Monitor tab (FLIR/Teledyne via PySpin or harvesters, virtual camera, beam statistics, CommandServer `CAMERA`)
+- [x] Implement camera in the Monitor tab (FLIR/Teledyne via PySpin or harvesters, beam statistics, CommandServer `CAMERA`)
 - [x] Camera: test with the real camera (Blackfly S via harvesters; live view lagged: old buffered images, slow beam statistics, 0.1 s worker polling)
+- [x] Camera: virtual camera removed, auto levels off by default (the color scale covers the range of the camera)
 - [ ] Camera: log beam position/width to the database, ROI selection (smaller images = higher frame rate), exposure/gain limits from the camera
 - [ ] Camera: compute the beam statistics in the worker thread and optionally on a downsampled image
 - [x] EBIS: use a `DeviceWrapper` like the PSU so it can be controlled via CommandServer/Scripts
@@ -286,7 +313,8 @@ The size of the database is shown in the menu `Database`.
 - [x] History per gauge name (chamber), menu `Database > Pressure gauge names...` to reassign and delete names
 - [ ] Test on the lab PC with real data and devices: gauge names dialog, connect icons (`ConnectButton`), leds as buttons (laser shutter/pulsing, PSU/EBIS outputs)
 - [x] Connect/Disconnect as icons, icon-only buttons with a centered icon and square (`IconButton`, the Windows 11 style draws the icon at a fixed distance from the left edge)
-- [ ] `IconButton`: check in the dark theme
+- [x] `IconButton`: checked in the dark theme
+- [x] Port lists of all panels show "None" if nothing is available (also Delay Stage, Power Meter, Electrometer, Camera)
 - [x] Panel widths of the Control tab: never wider than their content (except PSU, which gets the free space), Pressure has a fixed width, fitted on startup and resize until a divider is dragged
 - [ ] Control tab on a 1707 px wide window (2560 px at 150 %): PSU, EBIS and Laser each still scroll sideways by about 37 px, make the rows narrower
 - [ ] Pressure panel in low windows: it switches to more columns (about 1000 px at 800 px window height) and squeezes the other panels, limit the columns and scroll vertically instead
